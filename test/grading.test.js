@@ -189,6 +189,12 @@ test('an observation whose text already ends in #1 does not collide with a suffi
   const keys = G.apply(c).items.map(i => i.key);
   assert.strictEqual(new Set(keys).size, keys.length);
 });
+test('observations that name a generator tool count towards confirming AI involvement', () => {
+  const c = mkCase({ verdict: 'AI-generated content', category: 'Synthetic image', extra: [agentObs('ComfyUI workflow embedded in PNG', 'image file', 'B2'), agentObs('Midjourney job ID in caption', 'post caption', 'A2')] });
+  c.local.ai_involvement = { assessment: 'confirmed', basis: 'workflow' };
+  G.apply(c);
+  assert.strictEqual(c.local.ai_involvement.assessment, 'confirmed');
+});
 test('AI involvement is only confirmed by AI-related items, not by unrelated well-graded evidence', () => {
   const c = mkCase({ verdict: 'Scam', category: 'Phishing', extra: [agentObs('Generator tag in XMP', 'image file', 'B2'), agentObs('Domain registered 2 days ago', 'domain registry', 'A2')] });
   c.local.ai_involvement = { assessment: 'confirmed', basis: 'XMP tag' };
