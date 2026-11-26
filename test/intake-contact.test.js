@@ -43,7 +43,7 @@ test('header sender checks are never graded above moderate and only the top Auth
   const forged = 'Authentication-Results: mx.example.org; spf=fail smtp.mailfrom=shop.example; dkim=none; dmarc=fail header.from=shop.example\nReceived: from a by mx.example.org; Mon, 2 Nov 2026 10:00:00 +0000\nAuthentication-Results: fake.example; spf=pass; dkim=pass header.d=shop.example; dmarc=pass\nReceived-SPF: pass\nFrom: Shop <news@shop.example>\nSubject: x\n';
   const f = C.analyzeHeaders(forged);
   assert.deepStrictEqual(plain([f.auth.spf, f.auth.dmarc, f.auth.server, !!f.passed]), ['fail', 'fail', 'mx.example.org', false]);
-  assert.match(texts(f.signals), /We only read the top one/);
+  assert.strictEqual(f.auth.count, 2);
   const noAr = C.analyzeHeaders('Received-SPF: pass\nReceived: from a by b; Mon, 2 Nov 2026 10:00:00 +0000\nFrom: Shop <news@shop.example>\nSubject: x\n');
   assert.strictEqual(noAr.auth.spf, 'missing', 'Received-SPF alone is not trusted');
 });

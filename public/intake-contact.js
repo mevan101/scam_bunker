@@ -185,7 +185,6 @@
     if (from && sender && regDomain(sender.domain) !== freg) S.push(signal('weak', `A "Sender" line says it was sent on behalf of ${from.address} by ${sender.address}.`));
     // --- Authentication ---
     const a = res.auth;
-    if (a.count > 1) S.push(signal('weak', `There are ${a.count} Authentication-Results lines. We only read the top one, which your own email provider adds; lower ones can be written by the sender.`));
     if (!a.present) S.push(signal('weak', 'The headers have no "Authentication-Results" line, so we cannot see whether your email provider verified the sender.', 'Copy the full original headers from your email app (see "How to get the headers").'));
     else {
       // Header lines can be written by the sender; only the topmost result, added by your own provider, is trustworthy, so these stay at most moderate.
@@ -451,7 +450,7 @@
     </section>
     <section aria-labelledby="ct-h-auth"><h3 id="ct-h-auth">Sender checks (as reported in the headers)</h3>
       ${a.present ? `<div class="kv"><div>Server allowed to send (SPF)</div><div>${authCell(a.spf)}${a.spfDomain ? ` · <code>${esc(a.spfDomain)}</code>` : ''}</div><div>Digital signature (DKIM)</div><div>${authCell(a.dkim)}${a.dkimDomains.length ? ` · <code>${esc(a.dkimDomains.join(', '))}</code>` : ''}</div><div>Anti-spoofing policy (DMARC)</div><div>${authCell(a.dmarc)}</div>${a.server ? `<div>Checked by</div><div><code>${esc(a.server)}</code></div>` : ''}</div>
-      <p class="muted">These results are not proof. Only the topmost results, added by your own email provider, can be trusted, so we read only the first Authentication-Results line; the sender can write fake ones lower down. Even a real pass only means the email came from the domain shown: scammers register lookalike domains that pass every check.</p>` : '<p class="empty">No Authentication-Results line was pasted, so we cannot see the checks.</p>'}
+      <p class="muted">These results are not proof. Only the topmost results, added by your own email provider, can be trusted, so we read only the first Authentication-Results line; the sender can write fake ones lower down. Even a real pass only means the email came from the domain shown: scammers register lookalike domains that pass every check.</p>${h.auth.count > 1 ? `<p class="muted">These headers have ${esc(String(h.auth.count))} Authentication-Results lines; we ignored all but the top one.</p>` : ''}` : '<p class="empty">No Authentication-Results line was pasted, so we cannot see the checks.</p>'}
       ${h.signals.some(s => s.strength === 'weak') ? `<details><summary>Minor notes (${h.signals.filter(s => s.strength === 'weak').length})</summary>${sigList(h.signals.filter(s => s.strength === 'weak'))}</details>` : ''}
     </section>
     <section aria-labelledby="ct-h-hops"><h3 id="ct-h-hops">Delivery route (${h.hops.length} hop${h.hops.length === 1 ? '' : 's'})</h3>${hops}</section>`;
