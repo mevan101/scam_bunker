@@ -195,6 +195,14 @@ test('observations that name a generator tool count towards confirming AI involv
   G.apply(c);
   assert.strictEqual(c.local.ai_involvement.assessment, 'confirmed');
 });
+test('vendor-qualified generator names (Google Imagen, OpenAI Sora, FLUX 1.1 Pro) count as AI evidence', () => {
+  for (const name of ['Google Imagen', 'OpenAI Sora', 'FLUX 1.1 Pro']) {
+    const c = mkCase({ verdict: 'AI-generated content', category: 'Synthetic image', extra: [agentObs('ComfyUI workflow embedded in PNG', 'image file', 'B2'), agentObs(`Caption credits ${name}`, 'post caption', 'A2')] });
+    c.local.ai_involvement = { assessment: 'confirmed', basis: 'workflow' };
+    G.apply(c);
+    assert.strictEqual(c.local.ai_involvement.assessment, 'confirmed', name);
+  }
+});
 test('ordinary words that double as tool names (runway, flux, gemini) do not count as AI evidence', () => {
   const c = mkCase({ verdict: 'AI-generated content', category: 'Synthetic image', extra: [agentObs('ComfyUI workflow embedded in PNG', 'image file', 'B2'), agentObs('Photo shows an airport runway', 'reverse image search', 'A2')] });
   c.local.ai_involvement = { assessment: 'confirmed', basis: 'workflow' };
