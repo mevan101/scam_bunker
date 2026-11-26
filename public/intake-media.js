@@ -574,6 +574,8 @@
       if (ocr && c.local && ocr.h.score > (+c.local.risk || 0)) {
         const v = c.local;
         v.risk = ocr.h.score;
+        // Same verdict, stronger evidence: the screenshot's scheme decides the advice.
+        if (v.verdict === ocr.h.verdict && ocr.h.category) v.category = ocr.h.category;
         if (v.verdict !== ocr.h.verdict && (['No strong red flags', 'Insufficient evidence', 'Edited image'].includes(v.verdict) || ['Scam', 'Likely scam'].includes(ocr.h.verdict))) {
           v.verdict = ocr.h.verdict; v.category = ocr.h.category;
           const scam = ['Scam', 'Likely scam', 'Suspicious'].includes(v.verdict);
