@@ -32,7 +32,15 @@ function injectServiceWorker(out) {
   return { version, assets };
 }
 
+// The output dir is wiped first: inside the repo only _site/ is allowed, and never the repo or one of its parents.
+function assertSafeOutDir(out) {
+  const within = (a, b) => a === b || a.startsWith(b + path.sep);
+  if (within(root, out) || (within(out, root) && out !== path.join(root, '_site'))) throw new Error(`build-pages: refusing to wipe ${out}; use _site/ or a directory outside the repo`);
+}
+
 function build(out = path.join(root, '_site')) {
+  out = path.resolve(out);
+  assertSafeOutDir(out);
   fs.rmSync(out, { recursive: true, force: true });
   fs.cpSync(path.join(root, 'public'), out, { recursive: true });
   fs.writeFileSync(path.join(out, '.nojekyll'), '');
