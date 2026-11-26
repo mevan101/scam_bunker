@@ -234,7 +234,8 @@ test('a suspicious image-only case is worded about AI or manipulation, not scams
 test('app.js, index.html and server.js carry the hooks', () => {
   const app = fs.readFileSync(path.join(__dirname, '../public/app.js'), 'utf8');
   const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
-  const srv = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  // The lead brief (with the grading fields) lives in public/shared/prompt.js, loaded by server.js and the browser.
+  const srv = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8') + fs.readFileSync(path.join(__dirname, '../public/shared/prompt.js'), 'utf8');
   assert.ok(/c\.grading\?\.reportLines/.test(app) && /o\.grade/.test(app));
   assert.ok(/id="tab-checklist"[^>]*aria-controls="panel-checklist"/.test(html) && /<script src="grading.js">/.test(html));
   for (const k of ['"likelihood"', '"analytic_confidence"', '"grade"', '"limitations"', '"would_change_if"']) assert.ok(srv.includes(k), k);

@@ -34,6 +34,10 @@ The interface follows a small design system documented in [docs/DESIGN.md](docs/
 
 Every finding is labelled **proof**, **strong** or **weak**. Missing metadata is never treated as proof of AI.
 
+## Use it now
+
+**Hosted version:** https://mevan101.github.io/scam_bunker/. It runs entirely in your browser: image and video forensics, scam detection, the offender index, grading, the custody log and the "Investigate with Claude" agent handoff. Features that need a server (page fetching, username sweeps, domain and wallet lookups, built-in agents) are available in the local app below.
+
 ## Quick start
 
 Requires Node.js 22 or later. There are no dependencies to install.
@@ -44,6 +48,18 @@ cd scam_bunker
 cp .env.example .env    # optional — works with no keys at all
 npm start               # → http://localhost:4400
 ```
+
+### Live development
+
+```bash
+npm run dev
+```
+
+This starts the app with live reload. Edits under `public/` refresh the open page right away. Edits to `server.js` or `server/` restart the server, and the page reloads when it reconnects.
+
+### Deploying to GitHub Pages
+
+Every push to `main` runs the tests, builds the browser app (`npm run build:pages` → `_site/`) and publishes it to the `gh-pages` branch. In the repository settings, Pages should be set to **Deploy from a branch → gh-pages → / (root)**.
 
 ## Running the agent team: no API key required
 

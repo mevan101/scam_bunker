@@ -8,6 +8,8 @@ Several agents (Claude Code, Devin) and humans work on this repo in parallel. Th
 - **Stay in your lane.** New features go in their own files (`public/<feature>.js`, `server/<feature>.js`) and hook in through the module API instead of editing shared code:
   - `window.ScamBunker` exposes `current`, `esc`, `post`, `toast`, `panel`, `showTab`, `store`, `renderAll`, `server`.
   - `document` events: `sb:case` (after local analysis, `detail` = case) and `sb:case-complete`.
+  - **Static mode (GitHub Pages):** there is no `/api` there. `ScamBunker.isStatic()` is true and `sb:ready` fires with `{static:true}`. Every module that calls `/api/*` must check it and either use a browser-direct fallback (only CORS-enabled, no-key public APIs) or show a clear "needs the local app" state. Never throw or leave a spinner running.
+  - Agent briefs and the handoff prompt live in `public/shared/prompt.js`, which both the server and the browser load. Edit them there.
   - Keep edits to `public/app.js`, `public/index.html`, `server.js` minimal (a script tag, a route line, a tab button).
 - **Design system.** Use the existing CSS custom properties and component classes (see `docs/DESIGN.md` once merged). Do not restyle globally.
 - **Security.** Any server-side fetch of a user-supplied URL must go through `assertPublicUrl` (SSRF guard), re-checked on every redirect. Escape all user/remote content with `esc()` before inserting HTML. Only render `http(s)` links.

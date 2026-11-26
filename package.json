@@ -5,6 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --watch-path=server.js --watch-path=server --watch-path=public/shared --env-file-if-exists=.env server.js --dev",
+    "build:pages": "node scripts/build-pages.js",
     "test": "node test/all.js"
   },
   "engines": { "node": ">=22" },

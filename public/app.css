@@ -472,3 +472,11 @@ fieldset > legend { padding: 0 6px; margin-left: -6px; font-size: var(--fs-base)
 }
 .linkcard .top a { display: inline-flex; align-items: center; min-height: 24px; }
 @media (max-width: 640px) { .panel .row { align-items: stretch; } .panel .row > button { align-self: flex-start; } .panel .row > button + button { margin-top: var(--s2); } }
+
+/* Static hosting notice (GitHub Pages): shown only when no local server is detected */
+.static-notice { display: none; border-bottom: 1px solid var(--line); background: var(--subtle); color: var(--ink-2); font-size: var(--fs-xs); }
+.static-notice p { margin: 0 auto; padding: 8px 24px; max-width: 1440px; line-height: 1.5; }
+.static-notice a { color: var(--accent); }
+.static-notice strong { color: var(--ink); }
+:root[data-static] .static-notice { display: block; }
+@media (max-width: 640px) { .static-notice p { padding: 8px 16px; } }

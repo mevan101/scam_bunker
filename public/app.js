@@ -41,13 +41,21 @@ How I want you to work:
     bots: { platform: 'X / Twitter', url: '', text: `I made $27,400 in two weeks thanks to @Mrs_Jessica_Trades, she is the best!! #bitcoin #crypto #forex #trading #investing #money #wealth #btc #passiveincome\nI made $27,400 in two weeks thanks to @Mrs_Jessica_Trades, she is the best!! #bitcoin #crypto #forex\nI made $27,400 in two weeks thanks to @Mrs_Jessica_Trades, she is the best!! #bitcoin #crypto\nWow is she legit? @Mrs_Jessica_Trades\nYes 100% legit, she helped me recover my lost funds too. DM her on Telegram` },
   };
 
-  let server = { ai: false, firecrawl: false, online: false };
+  let server = { ai: false, firecrawl: false, online: false, static: false };
   let imageFile = null, current = null;
 
   // ---------- Init ----------
   async function init() {
     $('#pill-local').classList.add('on');
-    try { server = { ...(await (await fetch('/api/status')).json()), online: true }; } catch { }
+    // Static hosting (GitHub Pages, any file server): no /api, so every server feature steps aside and the
+    // on-device engines + the claude.ai handoff carry the case. Modules check ScamBunker.isStatic().
+    try {
+      const r = await fetch('/api/status', { cache: 'no-store' });
+      if (!r.ok || !(r.headers.get('content-type') || '').includes('json')) throw new Error('no api');
+      server = { ...(await r.json()), online: true, static: false };
+    } catch { server = { ...server, online: false, static: true }; }
+    document.documentElement.toggleAttribute('data-static', server.static);
+    document.dispatchEvent(new CustomEvent('sb:ready', { detail: { static: server.static } }));
     $('#pill-agents').classList.toggle('on', !!server.ai);
     $('#pill-agents').lastChild.textContent = server.ai ? `Agents · ${server.provider}` : 'Agents via claude.ai';
     $('#pill-agents').title = server.ai ? `Lead: ${server.leadModel} · specialists: ${server.agentModel}` : 'No AI provider on the server. Use "Investigate with Claude" to run the agent team in claude.ai, or install Ollama for free local agents.';
@@ -411,7 +419,9 @@ How I want you to work:
     const c = current; if (!c) return;
     let prompt;
     try {
-      ({ prompt } = await post('/api/prompt', { hasImage: !!c.forensics, case: { persona: c.persona, platform: c.platform, url: c.url, text: c.text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown || null, corroboration: c.corroboration, video: c.video ? VID().summarize(c.video) : null, ...c.caseExtras } }));
+      const body = { hasImage: !!c.forensics, case: { persona: c.persona, platform: c.platform, url: c.url, text: c.text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown || null, corroboration: c.corroboration, video: c.video ? VID().summarize(c.video) : null, ...c.caseExtras } };
+      // Same prompt either way: the server and the browser share public/shared/prompt.js.
+      ({ prompt } = server.static ? { prompt: window.ScamBunkerPrompt.buildHandoffPrompt(body) } : await post('/api/prompt', body));
     } catch (e) { toast('Could not build the prompt: ' + e.message); return; }
     let copied = false; try { await navigator.clipboard.writeText(prompt); copied = true; } catch { }
     const short = prompt.length < 7000;
@@ -465,7 +475,7 @@ How I want you to work:
   function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); }
 
   // Public API for feature modules (public/*.js) — see CONTRIBUTING.md
-  window.ScamBunker = { get current() { return current; }, esc, post, toast, panel, showTab, store, renderAll: () => current && renderAll(current), openCase, server: () => server };
+  window.ScamBunker = { get current() { return current; }, esc, post, toast, panel, showTab, store, renderAll: () => current && renderAll(current), openCase, server: () => server, isStatic: () => !!server.static };
 
   init();
 })();
