@@ -65,7 +65,7 @@ How I want you to work:
   $('#file').addEventListener('change', e => { const f = e.target.files[0]; if (f) VID()?.isVideo(f) ? setVideo(f) : setImage(f); });
   function setVideo(f) { imageFile = null; VID().setFile(f); }
   document.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) setImage(it.getAsFile()); });
-  $('#clear-img').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); imageFile = null; $('#file').value = ''; $('#drop-full').hidden = true; $('#drop-empty').hidden = false; });
+  $('#clear-img').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); imageFile = null; VID()?.setFile(null); $('#file').value = ''; $('#drop-full').hidden = true; $('#drop-empty').hidden = false; });
   function setImage(f) {
     VID()?.setFile(null); imageFile = f; $('#preview').src = URL.createObjectURL(f); $('#file-name').textContent = `${f.name} · ${(f.size / 1024).toFixed(0)} KB`;
     $('#drop-full').hidden = false; $('#drop-empty').hidden = true;

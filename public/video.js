@@ -621,7 +621,7 @@
   // ---------- Intake ----------
   function setFile(f) {
     file = f && isVideo(f) ? f : null;
-    if (!file) return;
+    if (!file) { const img = $('#preview'); if (img && /^Video preview/.test(img.alt)) img.alt = 'Evidence preview'; return; }
     $('#file-name').textContent = `${f.name} · ${kb(f.size)} · video`;
     $('#drop-full').hidden = false; $('#drop-empty').hidden = true;
     const img = $('#preview'); img.alt = 'Video preview (first frame)'; img.removeAttribute('src');
@@ -633,7 +633,6 @@
   api.analyze = analyze;
 
   document.addEventListener('click', e => {
-    if (e.target.closest('#clear-img')) { file = null; const img = $('#preview'); img.alt = 'Evidence preview'; return; }
     if (e.target.closest('#history-list .hist')) { setTimeout(() => { const c = SB.current; if (c && c.video) c.video.frameStatus = (frameUrls.get(c.id) ? c.video.frameStatus : 'saved'); render(c); }, 0); return; }
     const c = SB.current; if (!c || !c.video) return;
     const cp = e.target.closest('[data-vid-copy]');
