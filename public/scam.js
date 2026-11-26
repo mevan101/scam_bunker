@@ -12,7 +12,7 @@
   const GIFT = String.raw`(gift ?cards?|(itunes|steam|google play|apple|amazon|ebay|razer gold)( gift)? cards?)`;
   const SAFETY_NOTICE = /\b(never|do not|don['’]?t|won['’]?t|will not)\b[^.!?\n]{0,20}\b(share|disclose|forward|give|tell|text|read out|enter|type|input|ask (you )?for)\b[^.!?\n]{0,25}\b(codes?|otp|pin|it|this)\b|\b(never|do not|don['’]?t)\s+(share|send|disclose|forward|give|tell)\s+(it\s+|this\s+)?(with|to)\s+(anyone|anybody|others|someone)\b|\b(never|do not|don'?t)\s+send\s+(this|the|your)\s+([\w-]+\s+){0,2}(codes?|otp|pin)\b|(কাউকে|দিবেন না|দেবেন না|বলবেন না|শেয়ার করবেন না|\bkauke\b|\bdiben na\b)/i;
   // An explicit request to hand the code over (not negated) outweighs any safety footer in the same message.
-  const CODE_ASK = /(?<!(\bnever|\bnot|n['’]t)\s(ever\s|\w+ly\s)?)\b(send|share|provide|reply with|text|read|tell|give|forward)\b( (it )?(to )?(me|us|back))?[^.!?\n]{0,30}\b(codes?|otp|pin)\b|(?<!(\bnever|\bnot|n['’]t)\s(ever\s|\w+ly\s)?)\b(enter|input|type|submit)\b[^.!?\n]{0,30}\b(codes?|otp|pin)\b[^.!?\n]{0,30}\b(link\w*|url)\b/i;
+  const CODE_ASK = /(?<!(\bnever|\bnot|n['’]t)\s(ever\s|\w+ly\s)?)\b(send|share|provide|reply with|text|read|tell|give|forward)\b( (it )?(to )?(me|us|back))?[^.!?\n]{0,30}\b(codes?|otp|pin)\b|(?<!(\bnever|\bnot|n['’]t)\s(ever\s|\w+ly\s)?)\b(enter|input|type|submit)\b[^.!?\n]{0,30}\b(codes?|otp|pin)\b[^.!?\n]{0,30}\b(link\w*|url|form)\b|\b(click|tap)\b[^.!?\n]{0,40}\b(enter|input|type|submit)\b[^.!?\n]{0,30}\b(codes?|otp|pin)\b/i;
   const OTP_GUARD = new RegExp(String.raw`^(?![\s\S]*(?:${CODE_ASK.source}))[\s\S]*(?:${SAFETY_NOTICE.source})`, 'iu');
   const RULES = [
     // ----- Phishing -----
