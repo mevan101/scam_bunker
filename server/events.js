@@ -1,7 +1,7 @@
 // Event-listing extraction: fetch a listing page through the SSRF guard and pull out scheduling facts.
 // Preference order per field: schema.org Event JSON-LD > OpenGraph/meta > .ics / Google Calendar link > visible text.
 // Every field carries its source so the UI and the claims ledger can show provenance.
-const { assertPublicUrl } = require('./net-guard');
+const { assertPublicUrl, httpError } = require('./net-guard');
 const core = require('../public/events-core');
 
 const UA = 'Mozilla/5.0 (compatible; ScamBunkerEventCheck/1.0; +https://github.com/mevan101/scam_bunker)';
@@ -311,7 +311,7 @@ function extractFromHtml(html, { baseUrl = '', fetchedYear = new Date().getUTCFu
 }
 
 async function extractFromUrl(url, opts = {}) {
-  if (!/^https?:\/\//i.test(url || '')) throw new Error('invalid url');
+  if (!/^https?:\/\//i.test(url || '')) throw httpError(400, 'Only http(s) listing URLs can be fetched');
   const page = await fetchFollow(url, opts);
   const out = { url, finalUrl: page.finalUrl, redirects: page.chain, status: page.status, contentType: page.contentType, fetchedAt: new Date().toISOString() };
   let r;

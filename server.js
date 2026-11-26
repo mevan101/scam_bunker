@@ -1,11 +1,12 @@
 // Scam Bunker — investigation server. Zero dependencies: `node server.js`
 // AI provider (first match wins): ANTHROPIC_API_KEY · LLM_BASE_URL (+LLM_API_KEY, LLM_MODEL) for any OpenAI-compatible API
 // (Groq, OpenRouter, LM Studio…) · a local Ollama, detected automatically. With none, the claude.ai handoff still works.
-// Optional: FIRECRAWL_API_KEY (web fetch + corroboration search)
+// Optional: FIRECRAWL_API_KEY (web fetch + corroboration search) · SERPAPI_API_KEY (automatic reverse image search)
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { assertPublicUrl } = require('./server/net-guard');
+const provenance = require('./server/provenance');
 const events = require('./server/events');
 
 const PORT = process.env.PORT || 4400;
@@ -179,6 +180,8 @@ async function handleLead(req, res) {
   send(res, 200, parsed ? { verdict: parsed } : { raw });
 }
 
+// SSRF guard (isPrivateIp / assertPublicUrl) lives in server/net-guard.js, shared with the provenance endpoints.
+
 // Builds a single self-contained prompt that runs the whole agent team inside one chat (claude.ai, or any assistant).
 async function handlePrompt(req, res) {
   const body = await readBody(req);
@@ -245,13 +248,14 @@ async function handleSearch(req, res) {
 const server = http.createServer(async (req, res) => {
   try {
     const u = new URL(req.url, 'http://x');
-    if (u.pathname === '/api/status') return send(res, 200, { ai: provider.kind !== 'none', provider: provider.label, vision: provider.vision, firecrawl: !!FIRECRAWL_KEY, leadModel: provider.leadModel, agentModel: provider.agentModel, agents: Object.entries(AGENTS).map(([id, a]) => ({ id, name: a.name })) });
+    if (u.pathname === '/api/status') return send(res, 200, { ai: provider.kind !== 'none', provider: provider.label, vision: provider.vision, firecrawl: !!FIRECRAWL_KEY, reverseSearch: provenance.reverseAvailable(), leadModel: provider.leadModel, agentModel: provider.agentModel, agents: Object.entries(AGENTS).map(([id, a]) => ({ id, name: a.name })) });
     if (req.method === 'POST' && u.pathname === '/api/agent') return await handleAgent(req, res);
     if (req.method === 'POST' && u.pathname === '/api/lead') return await handleLead(req, res);
     if (req.method === 'POST' && u.pathname === '/api/prompt') return await handlePrompt(req, res);
     if (req.method === 'POST' && u.pathname === '/api/fetch') return await handleFetch(req, res);
     if (req.method === 'POST' && u.pathname === '/api/search') return await handleSearch(req, res);
     if (req.method === 'POST' && u.pathname === '/api/events/extract') return send(res, 200, await events.extractFromUrl((await readBody(req)).url));
+    if (req.method === 'POST' && provenance.routes[u.pathname]) return send(res, 200, await provenance.routes[u.pathname](await readBody(req)));
     let p = path.normalize(path.join(PUB, u.pathname === '/' ? 'index.html' : u.pathname));
     if (p !== PUB && !p.startsWith(PUB + path.sep)) return send(res, 403, 'forbidden', 'text/plain');
     fs.readFile(p, (err, data) => {
@@ -260,7 +264,7 @@ const server = http.createServer(async (req, res) => {
       res.end(data);
     });
   } catch (e) {
-    send(res, 502, { error: e.cause?.code ? `${e.message} (${e.cause.code})` : e.message });
+    send(res, e.status || 502, { error: e.cause?.code ? `${e.message} (${e.cause.code})` : e.message, ...(e.code && typeof e.code === 'string' && e.status ? { code: e.code } : {}), ...(e.contentType ? { contentType: e.contentType } : {}) });
   }
 });
 
