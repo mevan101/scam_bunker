@@ -156,6 +156,8 @@ test('ordinary words are not generator names; ai_generated=false is not proof', 
   assert.strictEqual(V.parseContainer(new Uint8Array(mk('ai_generated', 'false'))).ai.verdict, 'none detected');
   assert.strictEqual(V.parseContainer(new Uint8Array(mk('ai_generated', 'true'))).ai.verdict, 'confirmed');
   assert.strictEqual(V.parseContainer(new Uint8Array(mk('ai_generated', 'yes'))).ai.verdict, 'confirmed');
+  assert.strictEqual(V.parseContainer(new Uint8Array(mk('com.apple.quicktime.title', 'Clip tagged "ai_generated": "true" trainedAlgorithmicMedia'))).ai.verdict, 'none detected');
+  assert.strictEqual(V.parseContainer(new Uint8Array(mk('com.example.DigitalSourceType', 'http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia'))).ai.verdict, 'confirmed');
   assert.deepStrictEqual(V.parseContainer(new Uint8Array(mk('com.apple.quicktime.software', 'RunwayML Gen-3'))).ai.generators, ['Runway']);
   assert.deepStrictEqual(V.parseContainer(new Uint8Array(mk('com.apple.quicktime.software', 'Runway'))).ai.generators, ['Runway']);
   assert.deepStrictEqual(V.parseContainer(new Uint8Array(mk('com.apple.quicktime.software', 'Pika 2.1'))).ai.generators, ['Pika']);
