@@ -163,8 +163,8 @@ async function sampleLog() {
 
   await test('export package: tampering with log, files, outputs or report is reported', async () => {
     const { log, outputs, id, img } = await sampleLog();
-    await C.appendEntry(log, { caseId: id, ts: ts(40), action: 'export', input: { evidence: 2 } });
     const sha = await C.sha256Hex(img);
+    await C.appendEntry(log, { caseId: id, ts: ts(40), action: 'export', input: { evidence: 2, embeddedFiles: [sha] } });
     const { html, manifest } = await C.buildPackage({ entries: log, outputs, files: { [sha]: img } });
     const repack = m => html.replace(/(id="sb-manifest">)[\s\S]*?(<\/script>)/, (_, a, b) => a + JSON.stringify(m).replace(/</g, '\\u003c') + b);
     const m1 = clone(manifest); m1.log[5].input.verdict = 'No strong red flags';
@@ -178,6 +178,16 @@ async function sampleLog() {
     const r5 = await C.verifyPackage(html.replace('Invented headline', 'Edited headline'));
     assert.ok(kinds(r5).includes('report')); assert.strictEqual(r5.report, 'mismatch');
     assert.ok(kinds(await C.verifyPackage(html, { expectedHead: 'a'.repeat(64) })).includes('head'));
+    const m6 = clone(manifest); delete m6.files[sha];
+    const r6 = await C.verifyPackage(repack(m6)); assert.ok(kinds(r6).includes('file')); assert.strictEqual(r6.evidence.find(e => e.sha256 === sha).status, 'missing');
+    const m7 = clone(manifest); delete m7.outputs[log[4].outputDigest];
+    assert.ok(kinds(await C.verifyPackage(repack(m7))).includes('output'), 'stripped output bodies are reported');
+    const edited = html.replace('Invented headline', 'Edited headline'), editedReport = edited.match(/<!--sb-report-start-->([\s\S]*?)<!--sb-report-end-->/)[1];
+    const m8 = clone(manifest); m8.reportSha256 = await C.sha256Hex(editedReport);
+    const r8 = await C.verifyPackage(edited.replace(/(id="sb-manifest">)[\s\S]*?(<\/script>)/, (_, a, b) => a + JSON.stringify(m8).replace(/</g, '\\u003c') + b), { expectedHead: manifest.head });
+    assert.strictEqual(r8.report, 'mismatch', 'an edited report with a recomputed reportSha256 is still caught');
+    const m9 = clone(manifest); m9.exportedAt = '2020-01-01T00:00:00.000Z';
+    assert.ok(kinds(await C.verifyPackage(repack(m9))).includes('manifest'));
     assert.ok(!(await C.verifyPackage('<html>nothing here</html>')).ok);
   });
 
@@ -191,6 +201,10 @@ async function sampleLog() {
     vm.createContext(sandbox); vm.runInContext(script, sandbox);
     const ok = await sandbox.window.SBVerify(sandbox.window.SBManifest, { expectedHead: manifest.head });
     assert.ok(ok.ok, JSON.stringify(ok.problems));
+    const report = html.match(/<!--sb-report-start-->([\s\S]*?)<!--sb-report-end-->/)[1];
+    const same = x => y => y === x;
+    assert.strictEqual((await sandbox.window.SBVerify(manifest, { sameReport: same(report) })).report, 'match');
+    assert.strictEqual((await sandbox.window.SBVerify(manifest, { sameReport: same(report.replace('Invented headline', 'Edited')) })).report, 'mismatch');
     const bad = clone(manifest); bad.log[1].input.size = 1;
     assert.ok(!(await sandbox.window.SBVerify(bad, {})).ok);
   });

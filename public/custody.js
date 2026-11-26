@@ -134,8 +134,15 @@
     const fromLog = m.log.filter(e => e && e.action === 'evidence-added').map(e => ({ seq: e.seq, ...e.input }));
     if (canonicalJSON(fromLog) !== canonicalJSON(m.evidence || [])) problems.push({ kind: 'manifest', message: 'The evidence list in the manifest differs from the evidence recorded in the log.' });
     const files = m.files || {}, evidence = [];
+    const lastExport = [...m.log].reverse().find(e => e && e.action === 'export');
+    const mustEmbed = (lastExport && lastExport.input && Array.isArray(lastExport.input.embeddedFiles)) ? lastExport.input.embeddedFiles : [];
     for (const ev of fromLog) {
-      if (!files[ev.sha256]) { evidence.push({ name: ev.name, sha256: ev.sha256, status: 'not included' }); continue; }
+      if (!files[ev.sha256]) {
+        const removed = mustEmbed.includes(ev.sha256);
+        evidence.push({ name: ev.name, sha256: ev.sha256, status: removed ? 'missing' : 'not included' });
+        if (removed) problems.push({ kind: 'file', message: `The log says the original of "${ev.name}" was embedded at export, but it has been removed from the package.` });
+        continue;
+      }
       let got = null; try { got = await sha256Hex(b64ToBytes(files[ev.sha256])); } catch (e) { }
       const ok = got === ev.sha256;
       evidence.push({ name: ev.name, sha256: ev.sha256, status: ok ? 'match' : 'mismatch', found: got });
@@ -144,13 +151,19 @@
     const outputs = m.outputs || {};
     let checkedOutputs = 0;
     for (const e of m.log) {
-      if (!e || !e.outputDigest || !(e.outputDigest in outputs)) continue;
+      if (!e || !e.outputDigest) continue;
+      if (!(e.outputDigest in outputs)) { problems.push({ seq: e.seq, kind: 'output', message: `The stored output of entry #${e.seq} (${e.action}) has been removed from the package.` }); continue; }
       checkedOutputs++;
       if (await sha256Hex(canonicalJSON(outputs[e.outputDigest])) !== e.outputDigest) problems.push({ seq: e.seq, kind: 'output', message: `The stored output of entry #${e.seq} (${e.action}) was changed.` });
     }
+    const last = m.log[m.log.length - 1];
+    if (last && m.exportedAt !== last.ts) problems.push({ kind: 'manifest', message: 'The manifest export time does not match its log.' });
+    if ((m.sha256sums || '') !== fromLog.map(x => `${x.sha256}  ${x.name}`).join('\n')) problems.push({ kind: 'manifest', message: 'The SHA256SUMS list differs from the evidence recorded in the log.' });
+    // The readable report is a pure function of the checked manifest, so it is re-rendered and compared rather than trusted.
     let report = 'not checked';
-    if (typeof opts.report === 'string' && m.reportSha256) {
-      report = (await sha256Hex(opts.report)) === m.reportSha256 ? 'match' : 'mismatch';
+    if (typeof opts.report === 'string' || typeof opts.sameReport === 'function') {
+      const expected = renderReport(m);
+      report = (typeof opts.sameReport === 'function' ? opts.sameReport(expected) : opts.report === expected) ? 'match' : 'mismatch';
       if (report === 'mismatch') problems.push({ kind: 'report', message: 'The readable report was edited after export: it no longer matches the manifest.' });
     }
     return { ok: !problems.length, problems, notes, evidence, chain, checkedOutputs, report, head: chain.head };
@@ -220,7 +233,8 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
   const PACKAGE_CSS = 'body{font:15px/1.55 Georgia,serif;max-width:980px;margin:32px auto;padding:0 20px;color:#1b1d22;background:#fffdf8}h1,h2,h3{font-family:Georgia,serif;line-height:1.2}h2{margin-top:32px;border-bottom:1px solid #d2c9b5;padding-bottom:4px}table{border-collapse:collapse;width:100%;font:13px/1.4 system-ui,sans-serif}th,td{border:1px solid #d2c9b5;padding:6px 8px;text-align:left;vertical-align:top;overflow-wrap:break-word}th{background:#f2ede2}code,pre{font:12.5px/1.5 ui-monospace,monospace;overflow-wrap:anywhere;white-space:pre-wrap}.eyebrow{font:600 12px system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#5f6673}.note{border-left:4px solid #94570a;padding:8px 12px;background:#f7f3ea}#sb-verify-box{margin-top:40px;padding:16px;border:2px solid #94570a;border-radius:10px}button{font:600 14px system-ui,sans-serif;padding:8px 14px;border-radius:8px;border:1px solid #94570a;background:#94570a;color:#fff;cursor:pointer}button:focus-visible,input:focus-visible{outline:3px solid #2259b8;outline-offset:2px}input{font:13px ui-monospace,monospace;padding:6px;width:100%;max-width:640px;box-sizing:border-box}.ok{color:#146b46;font-weight:700}.bad{color:#a8241d;font-weight:700}@media print{#sb-verify-box{display:none}}';
 
   function embeddedVerifier() {
-    const fns = [canonicalJSON, sha256Hex, entryBody, entryHash, verifyChain, b64ToBytes, verifyManifest].map(f => f.toString()).join('\n');
+    const fns = [canonicalJSON, sha256Hex, entryBody, entryHash, verifyChain, b64ToBytes, effectiveFindings, summarizeEntry, renderReport, verifyManifest].map(f => f.toString()).join('\n')
+      + `\nconst esc = ${esc.toString()};\nconst val = ${val.toString()};\nconst short = ${short.toString()};\nconst AGENT_NAMES = ${JSON.stringify(AGENT_NAMES)};\nconst ACTION_LABEL = ${JSON.stringify(ACTION_LABEL)};`;
     const boot = function () {
       const m = JSON.parse(document.getElementById('sb-manifest').textContent);
       window.SBVerify = verifyManifest; window.SBManifest = m;
@@ -229,7 +243,9 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
       btn.addEventListener('click', async () => {
         out.textContent = 'Checking…';
         try {
-          const r = await verifyManifest(m, { expectedHead: head.value.trim() || null });
+          const shown = document.getElementById('sb-report');
+          const sameReport = html => { const t = document.createElement('div'); t.innerHTML = '<!--sb-report-start-->' + html + '<!--sb-report-end-->'; return !!shown && t.innerHTML === shown.innerHTML; };
+          const r = await verifyManifest(m, { expectedHead: head.value.trim() || null, sameReport });
           out.textContent = '';
           const p = document.createElement('p'); p.className = r.ok ? 'ok' : 'bad';
           p.textContent = r.ok ? `Intact: ${r.chain.length} entries re-hashed, ${r.evidence.filter(e => e.status === 'match').length} embedded files match their SHA-256.` : `Tampering detected: ${r.problems.length} problem${r.problems.length === 1 ? '' : 's'}.`;
@@ -256,9 +272,9 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
     const report = renderReport(m);
     m.reportSha256 = await sha256Hex(report);
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Scam Bunker evidence package · case ${esc(m.caseId)}</title><style>${PACKAGE_CSS}</style></head><body><main>
-<!--sb-report-start-->${report}<!--sb-report-end-->
+<div id="sb-report"><!--sb-report-start-->${report}<!--sb-report-end--></div>
 <section id="sb-verify-box" aria-labelledby="sb-verify-h"><h2 id="sb-verify-h">Verify this package</h2>
-<p>This file contains its own manifest. The check re-hashes every log entry, the link to the entry before it, and every embedded original file, entirely inside your browser.</p>
+<p>This file contains its own manifest. The check re-hashes every log entry, the link to the entry before it, and every embedded original file, and checks the readable report above against the manifest, entirely inside your browser. For a check that does not rely on code inside this file, use “Verify a package” in Scam Bunker.</p>
 <p><label for="sb-head">Head hash received separately from the sender (optional, recommended)</label><br><input id="sb-head" autocomplete="off" spellcheck="false" placeholder="64 hex characters"></p>
 <button type="button" id="sb-verify">Check integrity</button><div id="sb-verify-out" role="status" aria-live="polite"></div></section></main>
 <script type="application/json" id="sb-manifest">${jsonForScript(m)}</script>
@@ -294,10 +310,13 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
     const lsIndex = () => SB.store.get(LS + 'index', []);
     return {
       mode: () => mode,
+      // A failed IndexedDB write falls back to localStorage, so the copy with the most entries is the newest.
       async getLog(id) {
         const db = await open();
-        if (db) try { const r = await req(db, 'logs', 'get', id); if (r) return r; } catch { }
-        return mem.get(id) || SB.store.get(LS + id, null);
+        let idb = null;
+        if (db) try { idb = await req(db, 'logs', 'get', id); } catch { }
+        const all = [idb, SB.store.get(LS + id, null), mem.get(id)].filter(r => r && Array.isArray(r.entries));
+        return all.reduce((a, r) => (!a || r.entries.length > a.entries.length ? r : a), null);
       },
       async putLog(rec) {
         mem.set(rec.caseId, rec);
@@ -319,6 +338,13 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
         if (db) try { await req(db, 'files', 'put', f); return true; } catch { }
         memFiles.set(f.sha256, f); return false;
       },
+      async clear() {
+        mem.clear(); memFiles.clear();
+        lsIndex().forEach(id => { try { localStorage.removeItem(LS + id); } catch { } });
+        try { localStorage.removeItem(LS + 'index'); } catch { }
+        const db = await open();
+        if (db) for (const s of ['logs', 'files']) try { await req(db, s, 'clear'); } catch { }
+      },
       async getFile(sha) {
         const db = await open();
         if (db) try { const r = await req(db, 'files', 'get', sha); if (r) return r; } catch { }
@@ -327,10 +353,11 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
     };
   })();
 
-  // One promise chain per case, so the entries of concurrent events never interleave.
+  // One promise chain per case, plus a Web Lock across tabs, so concurrent appends never extend the same head.
   const queues = new Map();
   function caseTask(id, fn) {
-    const p = (queues.get(id) || Promise.resolve()).then(fn).catch(e => { console.warn('[custody]', e); SB.toast('Custody log: ' + e.message); });
+    const locked = () => (navigator.locks && navigator.locks.request) ? navigator.locks.request('scambunker-custody:' + id, fn) : fn();
+    const p = (queues.get(id) || Promise.resolve()).then(locked).catch(e => { console.warn('[custody]', e); SB.toast('Custody log: ' + e.message); });
     queues.set(id, p);
     return p;
   }
@@ -540,7 +567,7 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
         if (!fi || !fi.blob || total + fi.blob.size > 40 * 1048576) { missing++; continue; }
         files[x.sha256] = new Uint8Array(await fi.blob.arrayBuffer()); total += fi.blob.size;
       }
-      await add(rec, { action: 'export', input: { format: FORMAT, embedsFiles: Object.keys(files).length > 0, embedded: Object.keys(files).length, evidence: evidence.length } });
+      await add(rec, { action: 'export', input: { format: FORMAT, embedsFiles: Object.keys(files).length > 0, embedded: Object.keys(files).length, embeddedFiles: Object.keys(files).sort(), evidence: evidence.length } });
       const v = V(c);
       out = await buildPackage({ entries: rec.entries, outputs: rec.outputs, files, caseMeta: { platform: c.platform || null, url: safeUrl(c.url), openedAt: c.at, verdictAtExport: v.verdict || null } });
       out.missing = missing;
@@ -569,7 +596,7 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
   async function verifyFile(file) {
     const o = $('#cust-verify-out'); if (o) o.textContent = 'Checking…';
     const r = await verifyPackage(await file.text(), { expectedHead: ($('#cust-head') && $('#cust-head').value.trim()) || null });
-    const ev = (r.evidence || []).map(e => `<li>${escH(e.name)}: ${escH(e.status === 'match' ? 'embedded file matches its SHA-256' : e.status === 'mismatch' ? 'embedded file does NOT match its SHA-256' : 'original not embedded (hash only)')}</li>`).join('');
+    const ev = (r.evidence || []).map(e => `<li>${escH(e.name)}: ${escH(e.status === 'match' ? 'embedded file matches its SHA-256' : e.status === 'mismatch' ? 'embedded file does NOT match its SHA-256' : e.status === 'missing' ? 'embedded original was removed from the package' : 'original not embedded (hash only)')}</li>`).join('');
     verifyHtml = 'pkg:' + `<div class="cust-chain ${r.ok ? 'ok' : 'bad'}"><b>${r.ok ? 'Package intact' : 'Tampering detected'}</b><span>${escH(file.name)}${r.chain ? ` · ${r.chain.length} entries · report ${escH(r.report)}` : ''}</span></div>${problemsHtml(r)}${ev ? `<ul>${ev}</ul>` : ''}${!($('#cust-head') && $('#cust-head').value.trim()) && r.chain ? '<p class="muted">Without a head hash from the sender, removal of the newest entries or a fully rebuilt chain cannot be detected.</p>' : ''}`;
     if (o) o.innerHTML = verifyHtml.slice(4);
   }
@@ -586,7 +613,10 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
       else if (!corrected && field !== 'finding') throw new Error('Enter the corrected value.');
       const rec0 = await loadRecord(c.id);
       const lastVerdict = [...rec0.entries].reverse().find(e => e.action === 'verdict');
-      if (lastVerdict && ['verdict', 'category', 'risk', 'finding'].includes(field)) correctsSeq = lastVerdict.seq;
+      if (['verdict', 'category', 'risk', 'finding'].includes(field)) {
+        if (!lastVerdict) throw new Error('Wait until the verdict is logged, then correct it.');
+        correctsSeq = lastVerdict.seq;
+      }
       if (field === 'finding') {
         const obs = (lastVerdict && rec0.outputs[lastVerdict.outputDigest] && rec0.outputs[lastVerdict.outputDigest].observations) || [];
         const o = obs[Number($('#cust-finding').value)];
@@ -614,6 +644,7 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
   document.addEventListener('click', e => {
     if (e.target.closest('#history-list .hist')) { setTimeout(() => render(SB.current), 0); return; }
     if (e.target.closest('#btn-history')) { setTimeout(annotateHistory, 0); return; }
+    if (e.target.closest('#history-clear')) { Store.clear().then(() => render(SB.current)); return; }
     const c = SB.current; if (!c) return;
     if (e.target.closest('#cust-start')) { caseTask(c.id, () => startLate(c)).then(() => render(SB.current)); return; }
     if (e.target.closest('#cust-export')) { exportPackage(c); return; }
