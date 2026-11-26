@@ -355,7 +355,7 @@
     // Only structured declarations count: XMP, or a metadata key named ai_generated / DigitalSourceType (never free text like a title).
     const tagged = Object.entries({ ...(raw.udta || {}), ...(raw.keys || {}), ...(raw.tags || {}) });
     const declared = /trainedAlgorithmicMedia|c2pa\.ai_generat/i.test(raw.xmp || '')
-      || tagged.some(([k, val]) => /(^|[._:])ai_?generated$/i.test(k) && /^(true|yes|1)$/i.test(String(val).trim()))
+      || tagged.some(([k, val]) => /(^|[.:])ai_?generated$/i.test(k) && /^(true|yes|1)$/i.test(String(val).trim()))
       || tagged.some(([k, val]) => /digital_?source_?type$/i.test(k) && /trainedAlgorithmicMedia/i.test(String(val)));
     if (declared) v.ai.signals.push({ label: 'Metadata declares AI generation (IPTC trainedAlgorithmicMedia / C2PA assertion)', strength: 'proof' });
     for (const g of VIDEO_GENERATORS) if (g.re.test(hay)) { v.ai.signals.push({ label: `${g.gen} named in the metadata`, strength: 'strong' }); v.ai.generators.push(g.gen); }
