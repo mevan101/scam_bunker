@@ -57,8 +57,8 @@
 
   function clearMarks() { marked.forEach(el => el.classList.remove('tour-target')); marked = []; }
 
-  // Never overwrite what the visitor has typed or attached. If the tour loads an example, the fields it changed are
-  // put back when the tour closes.
+  // Never overwrite what the visitor has typed or attached. If the tour loads an example, the fields it filled are put
+  // back when the tour closes, unless the visitor has since changed them.
   const DRAFT_FIELDS = '#s-text, #text, #url, #platform, [data-tour="input"] textarea, [data-tour="input"] input:not([type=file])';
   let saved = null;
   function hasDraft() {
@@ -69,7 +69,7 @@
   const snapshot = () => [...document.querySelectorAll(DRAFT_FIELDS)].map(el => [el, el.value]);
   function restoreDraft() {
     if (!saved) return;
-    for (const [el, v] of saved) if (document.contains(el)) el.value = v;
+    for (const [el, before, loaded] of saved) if (document.contains(el) && el.value === loaded) el.value = before;
     saved = null;
   }
 
@@ -81,7 +81,11 @@
     loading = true;
     return new Promise(resolve => {
       let done = false;
-      const finish = () => { if (done) return; done = true; loading = false; document.removeEventListener('sb:case', finish); setTimeout(resolve, 50); };
+      const finish = () => {
+        if (done) return; done = true; loading = false; document.removeEventListener('sb:case', finish);
+        // Read the filled values after the click handlers have all run (sb:case can fire inside the first one).
+        setTimeout(() => { if (saved) saved = saved.map(([el, before]) => [el, before, el.value]); resolve(); }, 50);
+      };
       document.addEventListener('sb:case', finish);
       setTimeout(finish, 5000);
       chip.click();
