@@ -160,7 +160,7 @@
   }
 
   // Items that bear on AI involvement: only these can confirm it.
-  const aboutAI = i => i.kind === 'image-meta' || i.kind === 'detector' || (i.kind === 'agent' && /\b(ai|a\.i\.|generat\w*|synthetic|c2pa|content credentials|diffusion|midjourney|dall-?e|dall·e|deepfake|comfyui|flux|firefly|imagen|gemini|ideogram|leonardo|novelai|sora|runway|grok|bing image creator|microsoft designer|gpt[- ]?image)\b/i.test(`${i.o.fact} ${i.o.inference}`));
+  const aboutAI = i => i.kind === 'image-meta' || i.kind === 'detector' || (i.kind === 'agent' && /\b(ai|a\.i\.|generat\w*|synthetic|c2pa|content credentials|diffusion|midjourney|dall-?e|dall·e|deepfake|comfyui|novelai|adobe firefly|ideogram\.ai|flux\.\d|runway gen-?\d|bing image creator|gpt[- ]?image-?\d?)\b/i.test(`${i.o.fact} ${i.o.inference}`));
 
   // Nothing may be labelled "confirmed" without passing isConfirmed (BACKLOG P1-2). Reversible: the raw value is kept.
   function enforceConfirmed(v, confirmed) {
