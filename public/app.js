@@ -153,15 +153,17 @@ How I want you to work:
 
   // ---------- Repeat-offender profiling ----------
   // Identifiers a scammer reuses across campaigns. Big platforms and shorteners are excluded: they identify nobody.
+  const SHARED_HOST_PARENT = /^(www\.)?(github\.io|pages\.dev|vercel\.app|netlify\.app|web\.app|firebaseapp\.com|blogspot\.com|wixsite\.com|square\.site|carrd\.co|notion\.site|linktr\.ee|beacons\.ai|bio\.link)$/i; // the parent itself is shared; subdomains (scam-x.vercel.app) still identify
   const NOT_IDENTIFYING = /(^|\.)(facebook|instagram|linkedin|twitter|x|tiktok|youtube|google|whatsapp|telegram|reddit|threads|bsky|discord|snapchat|bit|t|lnkd|tinyurl|goo|ow|is|buff|rebrand|cutt|rb|linktr|wa)\.(com|net|org|ly|me|in|gl|gd|co|ee|app)$/i;
   function indicators(h, f) {
     const out = [];
     const add = (type, value, label) => value && out.push({ type, key: `${type}:${value}`, label: label || value });
     (h.entities.wallets || []).forEach(w => add('wallet', w.addr, `${w.chain} wallet ${w.addr}`));
+    // Handles are weak indicators only (trivially re-registered / impersonated): they never trigger the confirmed repeat-offender escalation below.
     (h.entities.handles || []).forEach(x => add('handle', x.replace(/^@/, '').toLowerCase(), x));
     (h.entities.phones || []).forEach(x => { const d = x.replace(/\D/g, ''); if (d.length >= 9) add('phone', d.slice(-10), x); });
     (h.entities.emails || []).forEach(x => add('email', x.toLowerCase()));
-    (h.links || []).forEach(l => { if (l.host && !NOT_IDENTIFYING.test(l.host)) add('domain', l.host.replace(/^www\./, '')); });
+    (h.links || []).forEach(l => { if (l.host && !NOT_IDENTIFYING.test(l.host) && !SHARED_HOST_PARENT.test(l.host)) add('domain', l.host.replace(/^www\./, '')); });
     if (f?.sha256) add('image', f.sha256, `Identical image (SHA-256 ${f.sha256.slice(0, 12)}…)`);
     if (f?.exif?.BodySerialNumber) add('camera', f.exif.BodySerialNumber, `Camera serial ${f.exif.BodySerialNumber}`);
     const seen = new Set(); return out.filter(i => !seen.has(i.key) && seen.add(i.key));

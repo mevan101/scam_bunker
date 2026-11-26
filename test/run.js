@@ -4,10 +4,13 @@ const ctx = { window: {}, URL }; vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '../public/scam.js'), 'utf8'), ctx);
 const H = ctx.window.DeduceHeuristics;
 const cases = [
-  ['pig-butchering DM', { text: 'Sorry, wrong number. My uncle is an expert trader, guaranteed 30% daily profit on USDT. Send to TJYeasTPa6gpEEfYqCP9sMBc7NJqKPDJvT. Act now!' }, v => ['Scam', 'Likely scam'].includes(v.verdict)],
+  ['pig-butchering DM', { text: 'Sorry, wrong number. My uncle is an expert trader, guaranteed 30% daily profit on USDT. Send to TLVKmCi9zZ5MMLmM3xzN3MhNLhscYPMZUm. Act now!' }, v => ['Scam', 'Likely scam'].includes(v.verdict)],
   ['phishing SMS', { text: 'Your account has been suspended. Verify your identity now', url: 'http://chase.com.secure-verify-account.top/signin' }, v => ['Scam', 'Likely scam'].includes(v.verdict)],
   ['job scam', { text: 'Remote job, no experience needed, earn $300 per day. Pay a training fee for the starter kit. Contact us on Telegram' }, v => ['Scam', 'Likely scam'].includes(v.verdict)],
   ['misinformation', { text: "SHARE BEFORE IT'S DELETED! Doctors don't want you to know this miracle cure. Wake up, do your own research" }, v => v.verdict === 'Misleading / manipulated'],
+  ['wrong-number opener', { text: 'Hello, is this Anna?' }, v => v.hits.some(h => h.id === 'wrong-number')],
+  ['date is not a phone', { text: 'Meeting moved to 2024-11-26 10 in room 4' }, v => v.entities.phones.length === 0],
+  ['invalid TRON wallet ignored', { text: 'Send to TJYeasTPa6gpEEfYqCP9sMBc7NJqKPDJvT' }, v => v.entities.wallets.length === 0],
   ['benign message', { text: 'Hey, are we still on for lunch on Thursday at the usual place?' }, v => v.verdict === 'No strong red flags'],
 ];
 let fail = 0;
