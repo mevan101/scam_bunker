@@ -205,5 +205,19 @@ test('coordinator rule: unconfirmed copies only give weak, labelled leads; page 
   assert.strictEqual(T.plain(conf).reasons.length, 2);
 });
 
+test('unconfirmed copy metadata never bounds the date or warns in Simple mode', () => {
+  const pc = provCase(); pc.forensics = null; pc.provenance.items[0].compare = { relation: 'mirrored' };
+  pc.provenance.items[0].exifModify = '2015-01-01T00:00:00';
+  pc.provenance.verdict.dates.push({ date: '2016-06-01T10:00:00', kind: 'capture', trust: 'medium', source: 'EXIF DateTimeOriginal (embedded, editable)', item: 'Copy 1', itemId: 'c1', note: '' });
+  const rows = T.collect(pc, opts);
+  assert.strictEqual(T.bounds(rows).early, null);
+  const m = rows.find(r => r.kind === 'modified'); assert(m.flags.length && m.flags.every(f => f.weight === 'weak'));
+  assert(!T.plain(rows).reasons.some(r => /edited before it was taken/.test(r.text)));
+  pc.provenance.items[0].compare = { relation: 'same', strength: 'same' };
+  const r2 = T.collect(pc, opts);
+  assert.strictEqual(T.bounds(r2).early.origin, 'Provenance');
+  assert(!T.plain(r2).reasons.some(r => /edited before it was taken/.test(r.text)), 'copy dates never phrased as the case file');
+});
+
 console.log(failed ? `✗ timeline: ${failed} failed` : 'timeline: all tests passed');
 process.exit(failed ? 1 : 0);

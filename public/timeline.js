@@ -180,13 +180,13 @@
 
   // ---------- Contradictions (attached to the rows they concern) ----------
   const fmt = r => `${fmtWhen(r)}${r.precision === 'second' || r.precision === 'minute' ? ' ' + zoneLabel(r) : ''}`;
+  const own = r => r.origin === 'Image file' || r.origin === 'Video file';
+  const sameMedia = r => own(r) || (r.origin === 'Provenance' && r.confirmed);
   function contradictions(rows, now) {
     const flag = (r, weight, text, other) => { if (!r.flags.some(f => f.text === text)) r.flags.push({ weight, text, other: other ? other.id : null }); };
     // Only dates about the case's own media count: the case file, or a copy confirmed as the same image (match verdict
     // same / likely same). An unconfirmed copy only ever gives a weak, labelled lead. Page dates never count (the image
     // may have been added to the page later). False alarms are worse than misses (METHODOLOGY combination rules).
-    const own = r => r.origin === 'Image file' || r.origin === 'Video file';
-    const sameMedia = r => own(r) || (r.origin === 'Provenance' && r.confirmed);
     const RANK = { strong: 0, moderate: 1, weak: 2 };
     const pick = (list, w) => list.map(e => [e, w(e)]).sort((a, b) => RANK[a[1]] - RANK[b[1]] || a[0].ms - b[0].ms)[0];
     const unconf = e => (sameMedia(e) || own(e) ? '' : ' Unconfirmed: this copy is not a confirmed visual match of the case media.');
@@ -211,7 +211,7 @@
       const firstCap = caps.length ? caps.reduce((a, b) => (a.ms <= b.ms ? a : b)) : g.filter(r => r.kind === 'created').sort((a, b) => a.ms - b.ms)[0];
       if (!firstCap) continue;
       const sameZone = r => (r.zone.kind === 'unknown') === (firstCap.zone.kind === 'unknown');
-      for (const m of g.filter(r => r.kind === 'modified' && sameZone(r) && r.ms < firstCap.ms - 60e3)) flag(m, 'moderate', `Modified before it was ${firstCap.kind === 'capture' ? 'captured' : 'created'} (${firstCap.src}, ${fmt(firstCap)}). The clock or the metadata was tampered with.`, firstCap);
+      for (const m of g.filter(r => r.kind === 'modified' && sameZone(r) && r.ms < firstCap.ms - 60e3)) flag(m, sameMedia(firstCap) ? 'moderate' : 'weak', `Modified before it was ${firstCap.kind === 'capture' ? 'captured' : 'created'} (${firstCap.src}, ${fmt(firstCap)}). The clock or the metadata was tampered with.`, firstCap);
     }
     // 4. File dates after the case was opened (impossible unless the device clock was wrong or the dates forged)
     const opened = rows.find(r => r.kind === 'case');
@@ -229,7 +229,7 @@
     // excluded: the image may have been added to the page later.
     const late = rows.filter(r => r.kind === 'case' || (r.kind === 'existed' && (r.origin !== 'Provenance' || r.confirmed))).sort((a, b) => a.ms - b.ms || rank(a.grade) - rank(b.grade))[0] || null;
     // Earliest possible: the earliest date the file itself claims (editable) or, for text cases, the linked domain's registration.
-    const fileClaims = rows.filter(r => ['capture', 'created'].includes(r.kind) && ok(r)).sort((a, b) => a.ms - b.ms);
+    const fileClaims = rows.filter(r => ['capture', 'created'].includes(r.kind) && sameMedia(r) && ok(r)).sort((a, b) => a.ms - b.ms);
     const early = fileClaims[0] || (media ? null : rows.filter(r => r.kind === 'domain').sort((a, b) => a.ms - b.ms)[0]) || null;
     return { early: early && (!late || early.ms <= late.ms) ? early : null, late };
   }
@@ -297,7 +297,7 @@
     const has = (kind, re) => rows.some(r => r.kind === kind && r.flags.some(f => f.weight !== 'weak' && re.test(f.text)));
     if (has('claimed', /claims/)) reasons.push({ text: 'This picture or video already existed before the event the post talks about. It may be old media reused to tell a new story.', weight: rows.some(r => r.kind === 'claimed' && r.flags.some(f => f.weight === 'strong')) ? 'strong' : 'moderate', source: 'timeline' });
     if (has('capture', /already existed/)) reasons.push({ text: 'The date saved inside the file is later than the date a copy was first seen online, so that date was probably changed.', weight: 'strong', source: 'timeline' });
-    if (rows.some(r => r.kind === 'modified' && r.flags.some(f => f.weight !== 'weak'))) reasons.push({ text: 'The dates saved inside the file do not make sense (it was edited before it was taken), so they may have been changed.', weight: 'moderate', source: 'timeline' });
+    if (rows.some(r => r.kind === 'modified' && own(r) && r.flags.some(f => f.weight !== 'weak'))) reasons.push({ text: 'The dates saved inside the file do not make sense (it was edited before it was taken), so they may have been changed.', weight: 'moderate', source: 'timeline' });
     if (reasons.length) actions.push({ text: 'Before you share it, search for older copies of the picture (Google Lens or TinEye, sorted by oldest) to see where and when it first appeared.', href: 'https://tineye.com/' });
     return { reasons, actions };
   }
