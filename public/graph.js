@@ -401,12 +401,13 @@
     const ks = g.adj[i];
     ks.forEach(k => { const e = g.edges[k]; lines[k]?.classList.add('lg-hl'); nodes[e.source].classList.add('lg-hl'); nodes[e.target].classList.add('lg-hl'); });
     labels.innerHTML = ks.slice(0, 60).map(k => { const e = g.edges[k], a = P[e.source], b = P[e.target]; return `<text class="lg-el" x="${(a.x + b.x) / 2}" y="${(a.y + b.y) / 2}" dy="-3">${EDGE_LABEL}</text>`; }).join('');
-    // Draw the selection on top.
+    // Draw the selection on top; re-appending blurs a focused node, so restore focus.
+    const hadFocus = document.activeElement === nodes[i];
     nodes[i].parentNode.append(nodes[i]);
     setRoving(i);
     renderSide();
     if (opts.pan) ensureVisible(i);
-    if (opts.focus) nodes[i].focus({ preventScroll: true });
+    if (opts.focus || hadFocus) nodes[i].focus({ preventScroll: true });
   }
 
   // ---------- Pan / zoom ----------
