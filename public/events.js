@@ -142,6 +142,7 @@
     const changed = k => !editing || val(k) !== String(pre[k] ?? '');
     const set = (formKey, prop, value, srcKey = prop) => { if (changed(formKey)) { l[prop] = value; l.sources[srcKey] = 'manual'; } };
     for (const [fk, prop] of FORM_MAP) set(fk, prop, val(fk));
+    if (editing && changed('url')) { delete l.finalUrl; delete l.redirects; delete l.fetchedAt; } // redirect evidence belonged to the old URL
     const timeChanged = changed('start') || changed('end') || changed('tz');
     if (timeChanged) {
       l.tz = tz; l.sources.timeZone = 'manual';
@@ -260,7 +261,11 @@
 
   // ---------- Events ----------
   $('#ev-fetch').addEventListener('click', fetchAll);
-  $('#ev-demo').addEventListener('click', () => { raw = JSON.parse(JSON.stringify(DEMO)); save(); render(); toast('Loaded 5 fictional listings'); });
+  $('#ev-demo').addEventListener('click', () => {
+    if (raw.length && !confirm(`Replace the ${raw.length} current listing(s) with the fictional demo?`)) return;
+    raw = JSON.parse(JSON.stringify(DEMO)); save(); resetForm(); render(); toast('Loaded 5 fictional listings');
+  });
+  window.addEventListener('storage', e => { if (e.key === KEY) { raw = store.get(KEY, []); render(); } }); // another tab changed the comparison
   $('#ev-clear').addEventListener('click', () => { if (!raw.length || confirm('Remove all listings from this comparison?')) { raw = []; save(); resetForm(); render(); $('#ev-status').innerHTML = ''; } });
   $('#ev-form').addEventListener('submit', submitForm);
   $('#ev-cancel').addEventListener('click', resetForm);
