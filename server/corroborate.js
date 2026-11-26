@@ -27,12 +27,12 @@ async function getJson(url, opts) {
 }
 
 // ---------- domain helpers ----------
-function normalizeDomain(input) {
+function normalizeDomain(input, { keepWww = false } = {}) {
   let s = String(input || '').trim().toLowerCase();
   if (!s) throw httpError(400, 'Enter a domain', 'bad_input');
   if (/^[a-z][a-z0-9+.-]*:\/\//.test(s)) { try { s = new URL(s).hostname; } catch { throw httpError(400, 'Not a valid URL or domain', 'bad_input'); } }
   s = s.replace(/^\*\./, '').replace(/[/?#].*$/, '').replace(/:\d+$/, '').replace(/\.$/, '');
-  if (s.startsWith('www.')) s = s.slice(4);
+  if (!keepWww && s.startsWith('www.')) s = s.slice(4);
   if (s.length > 253 || !/^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$/.test(s) || /^\d+(\.\d+){3}$/.test(s))
     throw httpError(400, 'Not a valid domain name', 'bad_input');
   return s;
@@ -195,7 +195,7 @@ async function loadScamList() {
       .then(arr => {
         if (!Array.isArray(arr)) throw httpError(502, 'Unexpected ScamSniffer list format', 'upstream');
         const set = new Set();
-        for (const d of arr) if (typeof d === 'string' && d) set.add(d.trim().toLowerCase().replace(/^www\./, ''));
+        for (const d of arr) if (typeof d === 'string' && d) set.add(d.trim().toLowerCase().replace(/\.$/, ''));
         return (scamList = { t: Date.now(), set });
       })
       .finally(() => { scamLoading = null; });
@@ -212,7 +212,7 @@ function matchDomain(set, domain) {
 }
 
 async function scamsniffer(body = {}) {
-  const domains = [...new Set((Array.isArray(body.domains) ? body.domains : [body.domain]).filter(Boolean).slice(0, 50).map(d => { try { return normalizeDomain(d); } catch { return null; } }).filter(Boolean))];
+  const domains = [...new Set((Array.isArray(body.domains) ? body.domains : [body.domain]).filter(Boolean).slice(0, 50).map(d => { try { return normalizeDomain(d, { keepWww: true }); } catch { return null; } }).filter(Boolean))];
   if (!domains.length) throw httpError(400, 'Enter a domain', 'bad_input');
   const list = await loadScamList();
   return {

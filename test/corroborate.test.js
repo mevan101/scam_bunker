@@ -125,12 +125,13 @@ const fixture = f => fs.readFileSync(path.join(__dirname, 'fixtures', f));
     const list = ['phish-wallet-claim.invalid', 'www.fake-airdrop.invalid', 'evil-mint.invalid']; // invented sample in the list's format
     S._setRequest(fake({ [S.SCAMSNIFFER_URL]: list })); calls.length = 0;
     const [a, b] = await Promise.all([
-      S.scamsniffer({ domains: ['login.phish-wallet-claim.invalid', 'fake-airdrop.invalid', 'example.com'] }),
+      S.scamsniffer({ domains: ['login.phish-wallet-claim.invalid', 'https://www.fake-airdrop.invalid/claim', 'fake-airdrop.invalid', 'example.com'] }),
       S.scamsniffer({ domain: 'evil-mint.invalid' }),
     ]);
     assert.strictEqual(calls.length, 1, 'concurrent lookups share one download');
     assert.deepStrictEqual(a.results.map(x => [x.domain, x.listed, x.matched]), [
-      ['login.phish-wallet-claim.invalid', true, 'phish-wallet-claim.invalid'], ['fake-airdrop.invalid', true, 'fake-airdrop.invalid'], ['example.com', false, null]]);
+      ['login.phish-wallet-claim.invalid', true, 'phish-wallet-claim.invalid'], ['www.fake-airdrop.invalid', true, 'www.fake-airdrop.invalid'], ['fake-airdrop.invalid', false, null], ['example.com', false, null]]);
+    // a listed www host does not make the bare parent domain listed
     assert.strictEqual(b.results[0].listed, true);
     assert.strictEqual(a.source.license, 'GPL-3.0'); assert.ok(/scamsniffer/.test(a.source.url));
     assert.strictEqual(S.matchDomain(new Set(['invalid']), 'x.invalid'), null, 'a bare TLD on the list never matches');

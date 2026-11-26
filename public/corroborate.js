@@ -173,7 +173,7 @@
     if (ex.OffsetTimeOriginal || ex.OffsetTime) out.offset = ex.OffsetTimeOriginal || ex.OffsetTime;
     if (ex.GPSDecimal && isFinite(ex.GPSDecimal.lat)) { out.lat = (+ex.GPSDecimal.lat).toFixed(5); out.lon = (+ex.GPSDecimal.lon).toFixed(5); }
     const urls = [c && c.url, ...((c && c.heuristics && c.heuristics.links) || []).map(l => l.url || l)].filter(Boolean);
-    for (const u of urls) { try { const h = new URL(/^https?:/i.test(u) ? u : 'https://' + u).hostname.replace(/^www\./, ''); if (h && !PLATFORM_HOSTS.test(h) && !out.domains.includes(h)) out.domains.push(h); } catch { } }
+    for (const u of urls) { try { const h = new URL(/^https?:/i.test(u) ? u : 'https://' + u).hostname; if (h && !PLATFORM_HOSTS.test(h) && !out.domains.includes(h)) out.domains.push(h); } catch { } }
     return out;
   }
 
