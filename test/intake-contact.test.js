@@ -161,13 +161,18 @@ test('scan of a message finds phones and emails with reasons and actions', () =>
   const r = C.scan('Nagad alert: your account will be blocked. Call +44 7700 900123 or email nagad.help.invented@gmail.com', { home: 'BD' });
   assert.strictEqual(r.phones.length, 1); assert.strictEqual(r.emails.length, 1);
   assert(r.reasons.length >= 2); assert.strictEqual(r.reasons[0].strength, 'strong');
-  assert(r.actions.some(a => /16167/.test(a.text) && a.href === 'tel:16167'));
+  assert(r.actions.some(a => /16167/.test(a.text)));
+  assert(r.actions.every(a => !a.href || /^https?:/.test(a.href)), 'only http(s) links');
 });
 test('scan of headers uses the header addresses and the body, not Received lines', () => {
   const r = C.scan(fx('spoofed-paypal.eml'), { home: null });
   assert(r.headers); assert.deepStrictEqual(plain(r.emails.map(e => e.role)), ['From', 'Reply-To', 'Return-Path']);
   assert.strictEqual(r.phones.length, 0, 'no phone numbers invented from header ids or dates');
   assert(r.actions.some(a => /Report it as phishing/.test(a.text)));
+});
+test('Bangla numerals are converted before phone matching', () => {
+  const r = C.scan('আমি বিকাশ অফিস থেকে বলছি, ০১৯০০-০০০১২৩ নম্বরে পিন পাঠান', { home: 'BD' });
+  assert.strictEqual(r.phones.length, 1); assert.strictEqual(r.phones[0].e164, '+8801900000123');
 });
 test('a benign message produces nothing', () => {
   const r = C.scan('Hey, are we still on for lunch on Thursday at the usual place?', { home: 'GB' });

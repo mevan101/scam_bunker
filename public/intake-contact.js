@@ -307,6 +307,7 @@
     if (out.headers) { const h = out.headers; if (h.from) addEmail(h.from.raw, 'From'); if (h.replyTo) addEmail(h.replyTo.raw, 'Reply-To'); if (h.returnPath) addEmail(h.returnPath.address, 'Return-Path'); if (h.sender) addEmail(h.sender.raw, 'Sender'); }
     for (const m of rest.match(EMAIL_RE) || []) { if (out.emails.length >= 10) break; addEmail(m, ''); }
     const seenP = new Set();
+    rest = rest.replace(/[০-৯]/g, d => String(d.charCodeAt(0) - 0x09E6));
     for (const m of rest.matchAll(PHONE_RE)) {
       if (out.phones.length >= 10) break;
       const h = H(); if (h && h.normalizePhone && !h.normalizePhone(m[0], rest.slice(Math.max(0, m.index - 25), m.index))) continue;
@@ -334,9 +335,9 @@
       a.push({ text: 'Do not reply, click links or open attachments in this email.' });
       a.push({ text: 'Report it as phishing in your email app (Gmail: ⋮ › Report phishing; Outlook: Report › Report phishing), then delete it.' });
     }
-    if (r.headers && r.headers.passed && !bad(r.headers.signals)) a.push({ text: 'The sender checks passed. That proves the email came from the domain shown, not that the domain is honest: still check the domain itself.' });
+    if (r.headers && r.headers.passed && !bad(r.headers.signals)) a.push({ text: 'Your email provider reports that the sender checks passed. If you copied the full headers, that means the email came from the domain shown, not that the domain is honest: still check the domain itself.' });
     const mfs = r.phones.find(p => p.mfs);
-    if (mfs) a.push({ text: `Never share your ${mfs.mfs.name} PIN or OTP with anyone. If you are worried, call ${mfs.mfs.name} yourself on ${mfs.mfs.helpline}.`, href: 'tel:' + mfs.mfs.helpline });
+    if (mfs) a.push({ text: `Never share your ${mfs.mfs.name} PIN or OTP with anyone. If you are worried, call ${mfs.mfs.name} yourself on ${mfs.mfs.helpline}.` });
     if (r.phones.some(p => bad(p.signals))) a.push({ text: 'Do not call back or reply to this number. Block it and report it to your mobile operator.' });
     if (r.phones.some(p => p.signals.some(s => /bank/i.test(s.text)))) a.push({ text: 'Call your bank on the number printed on your card or its official website, not a number from the message.' });
     if (r.emails.some(e => bad(e.signals)) && !(r.headers && bad(r.headers.signals))) a.push({ text: 'Do not reply to this address or send it money, documents or codes.' });
@@ -379,7 +380,7 @@
   // ======================= UI =======================
   const SB = W.ScamBunker, esc = SB.esc;
   const $ = s => document.querySelector(s);
-  const safeHref = u => /^(https?:|tel:)/i.test(String(u || '')) ? esc(u) : '#';
+  const safeHref = u => /^https?:/i.test(String(u || '')) ? esc(u) : '#';
   let extraDisposable = null;
 
   // Register with the Simple-mode shell whenever it exists (it may land in a parallel PR and load after this file).
@@ -400,12 +401,24 @@
     if (v === c.local && top.some(r => r.strength === 'strong') && ['No strong red flags', 'Insufficient evidence', 'Likely legitimate'].includes(v.verdict)) {
       v.verdict = 'Suspicious'; v.category = c.contact.headers ? 'Sender looks spoofed' : 'Contact details look suspicious'; v.risk = Math.max(+v.risk || 0, 45);
       v.headline = 'The sender details show warning signs: ' + top[0].text;
+      v.advice = 'Pause. Do not reply, call back or click anything in this message. Contact the company or person through a channel you find yourself, such as their official website or a number you already have.';
     }
   }
 
+  // Saved cases keep only a text excerpt, so the full contact result is stored per case id and reused on reopen.
+  const SAVE_KEY = 'scambunker.contact';
+  const saved = id => (SB.store.get(SAVE_KEY, {}) || {})[id];
+  function save(c) {
+    if (!c || !c.id || !c.contact) return;
+    const all = SB.store.get(SAVE_KEY, {}) || {};
+    delete all[c.id];
+    if (c.contact.found) all[c.id] = { ...c.contact, headers: c.contact.headers && { ...c.contact.headers, body: '' } };
+    const keep = Object.keys(all).slice(-200); SB.store.set(SAVE_KEY, Object.fromEntries(keep.map(k => [k, all[k]])));
+  }
   function apply(c, fresh) {
     if (!c) return;
-    c.contact = scan([c.text, c.url && !/^https?:/i.test(c.url) ? c.url : ''].filter(Boolean).join('\n'), { disposable: extraDisposable });
+    c.contact = (!fresh && !extraDisposable && saved(c.id)) || scan([c.text, c.url && !/^https?:/i.test(c.url) ? c.url : ''].filter(Boolean).join('\n'), { disposable: extraDisposable });
+    if (fresh) save(c);
     c.caseExtras = { ...(c.caseExtras || {}), contact: c.contact.found ? { reasons: c.contact.reasons.slice(0, 8).map(r => `[${r.strength}] ${r.text}`), auth: c.contact.headers && c.contact.headers.auth, phones: c.contact.phones.map(p => ({ number: p.display, country: p.country, operator: p.operator })), emails: c.contact.emails.map(e => ({ address: e.address, kind: e.kind })) } : undefined };
     if (fresh && !c._contactShared) { addReasons(c, c.contact.reasons.slice(0, 5)); addActions(c, c.contact.actions); c._contactShared = true; }
     observations(c);
@@ -434,7 +447,7 @@
     </section>
     <section aria-labelledby="ct-h-auth"><h3 id="ct-h-auth">Sender checks by your email provider</h3>
       ${a.present ? `<div class="kv"><div>Server allowed to send (SPF)</div><div>${authCell(a.spf)}${a.spfDomain ? ` · <code>${esc(a.spfDomain)}</code>` : ''}</div><div>Digital signature (DKIM)</div><div>${authCell(a.dkim)}${a.dkimDomains.length ? ` · <code>${esc(a.dkimDomains.join(', '))}</code>` : ''}</div><div>Anti-spoofing policy (DMARC)</div><div>${authCell(a.dmarc)}</div>${a.server ? `<div>Checked by</div><div><code>${esc(a.server)}</code></div>` : ''}</div>
-      <p class="muted">Passed checks prove the email really came from the domain shown, nothing more. Scammers can register a lookalike domain and pass every check.</p>` : '<p class="empty">No Authentication-Results line was pasted, so we cannot see the checks.</p>'}
+      <p class="muted">We read the top Authentication-Results line, which your own provider adds when you copy the full headers; a sender can fake lines lower down. A pass means the email came from the domain shown, nothing more. Scammers can register a lookalike domain and pass every check.</p>` : '<p class="empty">No Authentication-Results line was pasted, so we cannot see the checks.</p>'}
       ${h.signals.some(s => s.strength === 'weak') ? `<details><summary>Minor notes (${h.signals.filter(s => s.strength === 'weak').length})</summary>${sigList(h.signals.filter(s => s.strength === 'weak'))}</details>` : ''}
     </section>
     <section aria-labelledby="ct-h-hops"><h3 id="ct-h-hops">Delivery route (${h.hops.length} hop${h.hops.length === 1 ? '' : 's'})</h3>${hops}</section>`;
@@ -478,4 +491,5 @@
   document.addEventListener('sb:case', e => apply(e.detail, true));
   document.addEventListener('sb:case-complete', e => { if (e.detail && e.detail.contact) { observations(e.detail); SB.renderAll(); render(e.detail); } });
   document.addEventListener('click', e => { if (e.target.closest('#history-list .hist')) setTimeout(() => apply(SB.current, false), 0); });
+  if (typeof SB.openCase === 'function') { const open = SB.openCase; SB.openCase = id => { const ok = open(id); if (ok) apply(SB.current, false); return ok; }; }
 })();
