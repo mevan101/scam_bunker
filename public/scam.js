@@ -456,11 +456,12 @@
     take_your_time: { action: 'Slow down. A real company or person will still be there tomorrow; talk to someone you trust first.', report: false },
     check_before_sharing: { action: 'Check the claim with a trusted news source or fact-checker before sharing it.', report: false },
   };
+  // Official reporting routes per country. `links` are https only; `phones` are numbers to show as text or tel: links.
   const REPORTING = {
     US: { name: 'United States', links: [{ label: 'FTC: report fraud', url: 'https://reportfraud.ftc.gov/' }, { label: 'FBI IC3: report internet crime', url: 'https://www.ic3.gov/' }] },
-    UK: { name: 'United Kingdom', links: [{ label: 'Report Fraud (formerly Action Fraud), 0300 123 2040', url: 'https://www.reportfraud.police.uk/' }, { label: 'NCSC: report a scam email, text or website', url: 'https://www.ncsc.gov.uk/collection/phishing-scams/report-scam-email' }] },
-    IN: { name: 'India', links: [{ label: 'National Cyber Crime Reporting Portal', url: 'https://cybercrime.gov.in/' }, { label: 'Cyber crime helpline 1930', url: 'tel:1930' }, { label: 'Sanchar Saathi: report fraud calls and SMS', url: 'https://sancharsaathi.gov.in/' }] },
-    BD: { name: 'Bangladesh', links: [{ label: 'National emergency service 999', url: 'tel:999' }, { label: 'Police Cyber Support for Women (Facebook)', url: 'https://www.facebook.com/PCSW.PHQ' }, { label: 'bKash helpline 16247 (bKash fraud)', url: 'tel:16247' }, { label: 'BGD e-GOV CIRT: report a cyber incident', url: 'https://www.cirt.gov.bd/' }] },
+    UK: { name: 'United Kingdom', links: [{ label: 'Report Fraud (formerly Action Fraud)', url: 'https://www.reportfraud.police.uk/' }, { label: 'NCSC: report a scam email, text or website', url: 'https://www.ncsc.gov.uk/collection/phishing-scams/report-scam-email' }], phones: [{ label: 'Report Fraud', number: '0300 123 2040' }, { label: 'Forward scam texts to', number: '7726' }] },
+    IN: { name: 'India', links: [{ label: 'National Cyber Crime Reporting Portal', url: 'https://cybercrime.gov.in/' }, { label: 'Sanchar Saathi: report fraud calls and SMS', url: 'https://sancharsaathi.gov.in/' }], phones: [{ label: 'Cyber crime helpline', number: '1930' }] },
+    BD: { name: 'Bangladesh', links: [{ label: 'Police Cyber Support for Women (Facebook)', url: 'https://www.facebook.com/PCSW.PHQ' }, { label: 'BGD e-GOV CIRT: report a cyber incident', url: 'https://www.cirt.gov.bd/' }], phones: [{ label: 'National emergency service', number: '999' }, { label: 'bKash helpline (bKash fraud)', number: '16247' }] },
     EU: { name: 'European Union', links: [{ label: 'Europol: find your country\'s cybercrime reporting site', url: 'https://www.europol.europa.eu/report-a-crime/report-cybercrime-online' }] },
   };
   // Plain reasons + tailored actions for a result, strongest hit first. `country` is a REPORTING key (omit for none).

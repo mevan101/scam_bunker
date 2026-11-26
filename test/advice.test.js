@@ -14,7 +14,7 @@ const used = new Set(H.RULES.map(r => r.advice));
 check(Object.keys(H.ADVICE).every(k => used.has(k) || ['block_report', 'contact_bank'].includes(k)), 'every ADVICE key is used by a rule (or is a general fallback)');
 for (const cc of ['US', 'UK', 'IN', 'BD', 'EU']) {
   const r = H.REPORTING[cc];
-  check(!!r && r.links.length > 0 && r.links.every(l => l.label && /^(https:\/\/[^\s]+|tel:\d+)$/.test(l.url)), `REPORTING.${cc}: ${r ? r.links.map(l => l.url).join(' ') : 'missing'}`);
+  check(!!r && r.links.length > 0 && r.links.every(l => l.label && /^https:\/\/[^\s]+$/.test(l.url)) && (r.phones || []).every(ph => ph.label && /^\+?[\d ]{3,15}$/.test(ph.number)), `REPORTING.${cc}: ${r ? r.links.map(l => l.url).join(' ') : 'missing'}`);
 }
 
 const v = H.analyze({ text: 'Your parcel is held at the depot. Pay the customs fee of $3.99 to release it: http://parcel-hold.top/pay' });
