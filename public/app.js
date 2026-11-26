@@ -161,7 +161,7 @@ How I want you to work:
     (h.entities.wallets || []).forEach(w => add('wallet', w.addr, `${w.chain} wallet ${w.addr}`));
     // Handles are weak indicators only (trivially re-registered / impersonated): they never trigger the confirmed repeat-offender escalation below.
     (h.entities.handles || []).forEach(x => add('handle', x.replace(/^@/, '').toLowerCase(), x));
-    (h.entities.phones || []).forEach(x => { const d = x.replace(/\D/g, ''); if (d.length >= 9) add('phone', d.slice(-10), x); });
+    (h.entities.phones || []).forEach(x => { const d = x.replace(/\D/g, ''); if (d.length >= 9) add('phone', x.startsWith('+') ? d : d.slice(-10), x); });
     (h.entities.emails || []).forEach(x => add('email', x.toLowerCase()));
     (h.links || []).forEach(l => { if (l.host && !NOT_IDENTIFYING.test(l.host) && !SHARED_HOST_PARENT.test(l.host)) add('domain', l.host.replace(/^www\./, '')); });
     if (f?.sha256) add('image', f.sha256, `Identical image (SHA-256 ${f.sha256.slice(0, 12)}…)`);
