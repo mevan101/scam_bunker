@@ -34,6 +34,15 @@ Verdict colour is passed to `#verdict` as `--v` (see `VERDICT_COLOR` in `app.js`
 - **Top bar** (52px, sticky on desktop): brand, connection status (dot + text), actions, theme toggle.
 - **Shell:** a 384px intake sidebar on the left and the report sheet on the right (max 1160px). Below 1020px they stack. Below 640px every multi-column component collapses to one column, with 16px gutters.
 - **Report sheet (`#report`):** a toolbar (`.report-bar`), then the verdict summary (`.verdict`: source line, verdict, one-line finding, category · confidence · platform, risk meter), then tabs, then the panel.
+- **Report sections (`#tabs`):** one ARIA tablist, grouped by presentational `.tab-group` labels (`aria-hidden`):
+  - **Report:** Deduction, Links & entities, Claims & matches, Timeline, Next moves, Agents
+  - **Media:** Image lab, Video lab, Provenance
+  - **Tools:** Corroborate, Events, Checklist, Custody log
+
+  At ≥ 1280px it is a sticky 208px section nav on the left of the panel. Below that it is a single scrolling row with group dividers. A small script in `index.html` sets `aria-orientation`, handles Up/Down/Left/Right/Home/End and skips hidden tabs (video, provenance).
+
+  **Adding a section:** add `<button role="tab" data-tab="x" id="tab-x" aria-controls="panel-x">` under the right group and a matching `<div class="panel card" role="tabpanel" data-panel="x" id="panel-x" aria-labelledby="tab-x" tabindex="0" hidden>`. Modules call `ScamBunker.showTab('x')` and `panel('x')`.
+- **Dialogs:** `.drawer` (case files, investigator profile) and `.drawer.osint` (Subjects workspace). A dialog's own `<header>` gets `role="none"` so it doesn't add a second banner landmark.
 
 ## Components
 
@@ -62,12 +71,23 @@ Verdict colour is passed to `#verdict` as `--v` (see `VERDICT_COLOR` in `app.js`
 | `.ent` | Grid of `.box` entity groups (wallets, handles, phones…). |
 | `.empty` | One-line muted empty message inside a panel. |
 | `.drawer` | Modal `<dialog>` with header, body and footer. |
+| Form elements | `.field` (label + control), `.row` (fields side by side; they stack on mobile), and the text, url, date, time, number, select and textarea inputs (36px, 6px radius). Also `fieldset.box` with `legend`, `details > summary` (≥ 24px target), 24px checkboxes (WCAG 2.2 target size) and a styled file-picker button. |
+| `.ghost.sm`, `.primary.sm` | Compact actions inside panels. |
+
+### Module stylesheets
+
+Feature modules may ship their own stylesheet, but only if it is scoped to the module's prefix and uses these tokens and components. No new colours, radii or fonts.
+
+- `public/osint.css` (`.os-*`): Subjects workspace, username sweep grid, dossier cards, identifier table.
+- `public/events.css` (`#panel-events .ev-*`).
+
+Styles injected by `custody.js` and `video.js` are normalised from `app.css` under "Module consistency".
 
 The risk meter (`#gauge`) is a segmented scale. Its bands (Low 0–24, Elevated 25–49, High 50–69, Critical 70–100) match the rule engine's verdict thresholds. `app.js` fills it by setting `stroke-dashoffset` on `#g-fg`, a 314-unit line.
 
 ## Accessibility
 
-- Text contrast is ≥ 4.5:1 in both themes, checked with axe-core: zero violations across all tabs, samples, an image case and both dialogs, at 1440 and 390, under system and forced themes.
+- Text contrast is ≥ 4.5:1 in both themes, checked with axe-core: zero violations across every report section, all samples, an image case, the case-files, profile and Subjects dialogs and the dossier view, at 1440 and 390, under system and forced themes.
 - Every interactive element gets a 2px `--focus` outline on `:focus-visible`.
 - `prefers-reduced-motion` disables all animation and transitions.
 - `forced-colors` keeps badge outlines and the meter visible.
