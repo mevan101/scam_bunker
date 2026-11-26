@@ -14,6 +14,7 @@ document.documentElement.dataset.mode = 'simple'; try { if (localStorage.getItem
 <link rel="stylesheet" href="osint.css">
 <link rel="stylesheet" href="events.css">
 <link rel="stylesheet" href="pwa.css">
+<link rel="stylesheet" href="guide.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%2316181d'/><circle cx='14' cy='14' r='6.5' fill='none' stroke='%23fff' stroke-width='2.6'/><path d='M19 19l6 6' stroke='%23fff' stroke-width='2.8' stroke-linecap='square'/></svg>">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -48,6 +49,8 @@ document.documentElement.dataset.mode = 'simple'; try { if (localStorage.getItem
     <span class="pill" id="pill-web"><i></i>Web</span>
   </div>
   <nav class="actions">
+    <button class="ghost" type="button" data-tour-start>Take the tour</button>
+    <a class="ghost" href="guide.html">Guide</a>
     <button class="ghost" id="btn-subjects" aria-haspopup="dialog">Subjects</button>
     <button class="ghost" id="btn-history">Case files</button>
     <button class="ghost" id="btn-persona">Investigator profile</button>
@@ -309,5 +312,6 @@ document.documentElement.dataset.mode = 'simple'; try { if (localStorage.getItem
 <script src="events-core.js"></script>
 <script src="events.js"></script>
 <script src="pwa.js"></script>
+<script src="tour.js"></script>
 </body>
 </html>

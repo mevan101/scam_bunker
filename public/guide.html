@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>User guide · Scam Bunker</title>
+<meta name="description" content="How to check whether a message, link or image is a scam or false with Scam Bunker, and how to read and use its findings responsibly.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>try { var t = localStorage.getItem('scambunker.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) { }</script>
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="guide.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%2316181d'/><circle cx='14' cy='14' r='6.5' fill='none' stroke='%23fff' stroke-width='2.6'/><path d='M19 19l6 6' stroke='%23fff' stroke-width='2.8' stroke-linecap='square'/></svg>">
+</head>
+<body class="gd-page">
+<a class="gd-skip" href="#guide">Skip to the guide</a>
+<header class="topbar">
+  <a class="brand gd-brand" href="./">
+    <svg viewBox="0 0 32 32" class="mark" aria-hidden="true"><rect width="32" height="32" rx="6" fill="currentColor"/><circle cx="14" cy="14" r="6.5" fill="none" stroke="var(--on-ink)" stroke-width="2.6"/><path d="M19 19l6 6" stroke="var(--on-ink)" stroke-width="2.8" stroke-linecap="square"/></svg>
+    <div><div class="brand-name">Scam Bunker</div><div class="brand-sub">User guide</div></div>
+  </a>
+  <nav class="actions" aria-label="Main">
+    <a class="ghost" href="./">Open the lab</a>
+    <a class="ghost" href="guide.html" aria-current="page">Guide</a>
+    <div class="theme-toggle" role="group" aria-label="Colour theme">
+      <button type="button" data-theme-set="system" aria-pressed="true" title="Match system"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="8.5" rx="1"/><path d="M5.5 13.75h5M8 11.25v2.5"/></svg><span class="sr-only">System theme</span></button>
+      <button type="button" data-theme-set="light" aria-pressed="false" title="Light"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.75M8 12.75v1.75M1.5 8h1.75M12.75 8h1.75M3.4 3.4l1.24 1.24M11.36 11.36l1.24 1.24M3.4 12.6l1.24-1.24M11.36 4.64l1.24-1.24"/></svg><span class="sr-only">Light theme</span></button>
+      <button type="button" data-theme-set="dark" aria-pressed="false" title="Dark"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A5.75 5.75 0 016.4 2.5a5.75 5.75 0 107.1 7.1z"/></svg><span class="sr-only">Dark theme</span></button>
+    </div>
+  </nav>
+</header>
+
+<div class="gd-shell">
+  <nav class="gd-toc" aria-labelledby="toc-h">
+    <h2 id="toc-h" class="gd-label">On this page</h2>
+    <ol>
+      <li><a href="#what">What Scam Bunker is and is not</a></li>
+      <li><a href="#submit">Check something</a></li>
+      <li><a href="#modes-two">Simple and Investigator mode</a></li>
+      <li><a href="#read">Read the answer</a></li>
+      <li><a href="#images">Date an image, find the original</a></li>
+      <li><a href="#people">Offender index and Subjects</a></li>
+      <li><a href="#claude">Investigate with Claude</a></li>
+      <li><a href="#modes">Hosted site or local app</a></li>
+      <li><a href="#report">Where to report a scam</a></li>
+      <li><a href="#tour">Take the tour</a></li>
+    </ol>
+  </nav>
+
+  <main id="guide" class="gd-doc card" tabindex="-1">
+    <div class="gd-label">User guide</div>
+    <h1>Checking whether something is a scam or false</h1>
+    <p class="gd-lede">This guide is for anyone who has received a message, link, job offer, photo or claim and wants to know if it can be trusted. You do not need any technical knowledge. Every example in this guide is invented.</p>
+
+    <section aria-labelledby="what">
+      <h2 id="what">1. What Scam Bunker is, and what it is not</h2>
+      <p>Scam Bunker is a free, open-source tool that looks for the warning signs of scams and false information. You give it a message, a link or an image. It shows you what it found, why that matters, and how strong each finding is.</p>
+      <div class="grid2 gd-grid">
+        <div class="box">
+          <div class="k">It is</div>
+          <ul class="gd-list">
+            <li>A second pair of eyes that points out warning signs you might miss.</li>
+            <li>A way to see the evidence behind each finding, not just a score.</li>
+            <li>Private by default: your material is checked in your own browser.</li>
+          </ul>
+        </div>
+        <div class="box">
+          <div class="k">It is not</div>
+          <ul class="gd-list">
+            <li>A court, the police or a final judgement about any person.</li>
+            <li>Proof that someone committed a crime.</li>
+            <li>A guarantee that something is safe when it finds nothing.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="advice"><b>Leads, not verdicts.</b> Everything Scam Bunker shows is a lead to check further. A message can be a scam even if no warning sign matched, and an honest message can share some words with scams. Use the findings to decide what to check next, not to accuse anyone.</div>
+    </section>
+
+    <section aria-labelledby="submit">
+      <h2 id="submit">2. Check something</h2>
+      <ol class="gd-steps">
+        <li><b>Keep the original.</b> Before anything else, take a screenshot, save the file, copy the link and note the date and time. Scam posts are often deleted within hours.</li>
+        <li><b>Open the lab</b> and put what you have in the box. You can paste a message, post, email or SMS, a link, a phone number or an email address, or drop a screenshot, photo or video. Paste the text exactly as you received it, including names, numbers and links. If you can, use the original file rather than a screenshot of it.</li>
+        <li><b>Press <em>Check it</em></b> (in Investigator mode the button is <em>Open investigation</em>). The checks run on your device in a few seconds.</li>
+        <li><b>Read the answer, then the reasons.</b> Section 4 explains each part.</li>
+        <li><b>Do what the answer suggests.</b> The <em>What to do now</em> list gives safe next steps for that kind of message.</li>
+      </ol>
+      <p>Not sure where to start? Press one of the example buttons under the box. They load invented scam messages so you can see what an answer looks like.</p>
+      <p>Do not open a suspicious link to copy it. On a phone, long-press the link and choose <em>Copy</em>.</p>
+      <div class="callout"><b>Example.</b> A message says: "Congratulations, your number won a 50,000 taka prize. Send a 500 taka processing fee by bKash to claim it." Paste it in, and Scam Bunker points out that you are asked to pay money in order to receive money, which is a strong warning sign.</div>
+    </section>
+
+    <section aria-labelledby="modes-two">
+      <h2 id="modes-two">3. Simple and Investigator mode</h2>
+      <p>Scam Bunker has two modes. Use the switch in the top bar to change between them; your choice is remembered on this device.</p>
+      <div class="grid2 gd-grid">
+        <div class="box">
+          <div class="k">Simple mode (the default)</div>
+          <p>For anyone checking one suspicious thing. One box, one plain answer, the reasons behind it, what to do now, and ways to check it yourself. No codes or technical terms.</p>
+        </div>
+        <div class="box">
+          <div class="k">Investigator mode</div>
+          <p>For fact-checkers, journalists, moderators and community organisers. Every check, evidence grades, the image timeline, Subjects, Events, the checklist and a tamper-evident custody log.</p>
+        </div>
+      </div>
+      <p>From any answer in Simple mode, <em>Open full investigation</em> switches to Investigator mode on the same case.</p>
+    </section>
+
+    <section aria-labelledby="read">
+      <h2 id="read">4. Read the answer</h2>
+      <h3>In Simple mode</h3>
+      <dl class="gd-dl">
+        <dt>The answer</dt><dd>One plain sentence, such as "This is very likely a scam", "We found warning signs" or "No warning signs found, but stay careful", with how risky it looks: Low, Medium, High or Very high.</dd>
+        <dt>Why we think so</dt><dd>Three to five reasons, strongest first. Each one quotes the exact words or detail it is about, so you can see it for yourself.</dd>
+        <dt>What to do now</dt><dd>Safe next steps for this kind of message, with links to report it.</dd>
+        <dt>Check it yourself</dt><dd>Buttons that open the same checks a fact-checker would use, such as a reverse image search, so you learn to spot the signs.</dd>
+        <dt>Hidden in this file</dt><dd>Shown only when a photo still carries private details, such as the place it was taken.</dd>
+      </dl>
+      <p>"No warning signs found" does <b>not</b> mean it is safe. New scams appear every week. If a message asks for money, a code or your password, check with the organisation directly using a number you already trust.</p>
+
+      <h3>In Investigator mode</h3>
+      <p>The top of the report shows the <b>verdict</b>, a one-line <b>finding</b> and the <b>risk score</b>. Under them, the <em>Deduction</em> section lists the <b>evidence chain</b>, one row per finding. The verdict labels are:</p>
+      <dl class="gd-dl">
+        <dt>Scam / Likely scam</dt><dd>It matches a known scam pattern. "Scam" means very likely; "Likely scam" means more likely than not.</dd>
+        <dt>Suspicious</dt><dd>Some warning signs, but not enough to say more. Check before you act.</dd>
+        <dt>Misleading / manipulated</dt><dd>A claim or image that appears false, out of context or edited.</dd>
+        <dt>Coordinated / inauthentic</dt><dd>Many accounts posting the same thing in a way that looks organised.</dd>
+        <dt>AI-generated content / Edited image</dt><dd>The file itself carries signs of AI generation or editing.</dd>
+        <dt>No strong red flags</dt><dd>No known pattern matched. This does <b>not</b> mean it is safe; new scams appear every week.</dd>
+      </dl>
+      <p>Next to the verdict you may see a word such as <em>likely</em> or <em>roughly even chance</em>. These words have fixed meanings:</p>
+      <div class="gd-table-wrap" tabindex="0" role="region" aria-labelledby="est-cap">
+        <table class="gd-table">
+          <caption id="est-cap">Likelihood words and what they mean</caption>
+          <thead><tr><th scope="col">Word</th><th scope="col">Chance it is true</th></tr></thead>
+          <tbody>
+            <tr><td>Almost no chance</td><td>1 to 5%</td></tr>
+            <tr><td>Very unlikely</td><td>5 to 20%</td></tr>
+            <tr><td>Unlikely</td><td>20 to 45%</td></tr>
+            <tr><td>Roughly even chance</td><td>45 to 55%</td></tr>
+            <tr><td>Likely</td><td>55 to 80%</td></tr>
+            <tr><td>Very likely</td><td>80 to 95%</td></tr>
+            <tr><td>Almost certain</td><td>95 to 99%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Scam Bunker holds itself back on purpose: "very likely" needs at least two separate strong warning signs, and nothing is called "confirmed" unless two independent, well-graded sources agree.</p>
+
+      <h4>The risk score</h4>
+      <p>The number from 0 to 100 shows how many warning signs were found and how strong they are. It is not a percentage chance.</p>
+      <div class="gd-table-wrap" tabindex="0" role="region" aria-labelledby="risk-cap">
+        <table class="gd-table">
+          <caption id="risk-cap">Risk score bands</caption>
+          <thead><tr><th scope="col">Score</th><th scope="col">Band</th><th scope="col">What to do</th></tr></thead>
+          <tbody>
+            <tr><td>0 to 24</td><td>Low</td><td>No strong signs. Still verify anything that asks for money or codes.</td></tr>
+            <tr><td>25 to 49</td><td>Elevated</td><td>Slow down and check the evidence rows.</td></tr>
+            <tr><td>50 to 69</td><td>High</td><td>Do not pay, click or share until you have checked independently.</td></tr>
+            <tr><td>70 to 100</td><td>Critical</td><td>Stop contact, keep the evidence and report it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>The evidence chain</h4>
+      <p>Each row separates what was <b>seen</b> (the observation) from what it <b>suggests</b> (the inference), and gives it a weight:</p>
+      <dl class="gd-dl gd-weights">
+        <dt><span class="w proof">proof</span></dt><dd>An explicit declaration or a hard fact, for example a file that says it was made by an AI image generator.</dd>
+        <dt><span class="w strong">strong</span></dt><dd>Very telling but could be faked or explained, for example a request for your wallet recovery phrase or a lookalike web address.</dd>
+        <dt><span class="w moderate">moderate</span></dt><dd>Worth noting together with other signs, for example a shared message template.</dd>
+        <dt><span class="w weak">weak</span></dt><dd>Common in honest messages too, for example urgent wording or a missing photo date. Weak signs alone never make something a scam.</dd>
+      </dl>
+      <p>Some rows also carry a two-part grade such as <span class="tag">B3</span>. The letter says how reliable the <b>source</b> is (A is completely reliable, E is unreliable, F means it cannot be judged). The number says how believable the <b>information</b> is (1 is confirmed by others, 5 is improbable, 6 means it cannot be judged). Hover over a grade to see its meaning. A trusted source can still pass on a false claim, so the two parts are judged separately.</p>
+      <p>Read the strongest rows first. Ask: is there another explanation for this? The <em>Checklist</em> section lists the questions a careful check should answer: is this the original, who made it, when, where and why.</p>
+    </section>
+
+    <section aria-labelledby="images">
+      <h2 id="images">5. Date an image and find its original</h2>
+      <p>Old photos are often shared as if they were new, for example a flood photo from years ago posted as today's news. To find out when a picture was really taken:</p>
+      <ol class="gd-steps">
+        <li><b>Add the image</b> to a case and open the <em>Timeline</em> section. If the file still holds the camera's own date, Scam Bunker lists it with a trust level. <em>High</em> trust is the camera's capture time; <em>medium</em> is the last time software saved the file; <em>low</em> is when it was downloaded.</li>
+        <li><b>Expect missing dates.</b> Facebook, Instagram, X, WhatsApp (normal photo mode) and most other apps remove these dates. A missing date is normal and is not a sign of fakery.</li>
+        <li><b>Run a reverse image search.</b> The <em>Image lab</em> links to Google Lens, TinEye, Bing Visual Search and Yandex. Try more than one. In TinEye, sort by <em>Oldest</em>: the earliest copy shows the image existed by that date. It may be older still.</li>
+        <li><b>Look for the best copy.</b> The original is usually the largest, sharpest version with the widest crop and no added text or logos. Crop to the main subject or flip the picture if a search finds nothing.</li>
+        <li><b>Compare copies.</b> The <em>Provenance</em> section appears when you add an image. It compares copies you found and tells you whether they are the same picture, even after resizing.</li>
+        <li><b>Check the scene.</b> In <em>Corroborate</em>, sun and shadow direction and the recorded weather for a date and place can rule a claimed date in or out.</li>
+      </ol>
+      <p>Write the result as a range with its basis, for example: "Taken no later than 3 March 2024 (earliest copy found on TinEye). No camera date survived." The <em>Image lab</em> also warns when a photo still contains a GPS location or device serial number. Remove those before you share a photo of your own.</p>
+    </section>
+
+    <section aria-labelledby="people">
+      <h2 id="people">6. Use the offender index and Subjects responsibly</h2>
+      <p>Scammers change their stories but often reuse the same phone numbers, wallets, websites and templates. Scam Bunker remembers these identifiers from your past cases, in your browser only, and tells you when one appears again (<em>Repeat offender</em> in the report, and the list at the top of <em>Case files</em>). <em>Subjects</em> lets you collect identifiers into a file and check public sources about them.</p>
+      <div class="advice"><b>Rules you must follow.</b> These are not optional. False accusations ruin lives, and the person shown in a scam is often a victim too.</div>
+      <ul class="list gd-rules">
+        <li><b>Public sources only.</b> Use public profiles, public websites and public blockchain records. Do not look up home addresses, family members, workplaces or who owns a phone number, and do not try to get into private accounts.</li>
+        <li><b>Presume innocence.</b> A matching username, photo or number is a lead, not an identification. Numbers are recycled and faked, and profile photos are often stolen from innocent people.</li>
+        <li><b>Mind defamation.</b> Publicly saying that a named person or business committed a crime, without proof, can be illegal in Bangladesh and most countries. Describe the message ("this matches a job-fee scam"), not the person.</li>
+        <li><b>Never publish private people's data.</b> Do not post names, photos, numbers or screenshots of private individuals online, even of a suspected scammer. Give them to the police, your bank or the platform instead.</li>
+        <li><b>Protect victims.</b> If you share a case, remove the victim's name, number and messages first.</li>
+      </ul>
+      <p>The index and subject files never leave your browser. Clearing your browser data removes them. Use <em>Clear all</em> in <em>Case files</em> to remove cases on a shared computer.</p>
+    </section>
+
+    <section aria-labelledby="claude">
+      <h2 id="claude">7. Investigate with Claude, without an API key</h2>
+      <p>For a deeper second opinion, press <em>Ask Claude about this</em> under the answer (in Investigator mode: <em>Investigate with Claude</em> at the top of the report). Scam Bunker packs the case and the instructions for a team of specialist reviewers (image, fraud, open-source research, fact-checking and a lead investigator) into one request, and opens it in claude.ai.</p>
+      <ol class="gd-steps">
+        <li>Sign in to claude.ai with your own account. A free account works; you do not need an API key or any setup.</li>
+        <li>If the case is short, the request is filled in for you. If it is long, Scam Bunker copies it; paste it into the new chat (Ctrl + V).</li>
+        <li>If your case has an image, attach the image in the Claude chat as well.</li>
+        <li>Read Claude's answer the same way as the report: check the evidence it gives, and treat it as a lead.</li>
+      </ol>
+      <p class="gd-note">This sends the case text to Anthropic, the company that runs Claude. Remove names and numbers of innocent people before you press the button. AI reviewers can be wrong.</p>
+    </section>
+
+    <section aria-labelledby="modes">
+      <h2 id="modes">8. The hosted site or the local app</h2>
+      <p>You can use Scam Bunker in two ways. The hosted site at <a href="https://mevan101.github.io/scam_bunker/">mevan101.github.io/scam_bunker</a> needs no installation. The local app runs on your own computer and can do more, because it can contact other websites for you.</p>
+      <div class="gd-table-wrap" tabindex="0" role="region" aria-labelledby="modes-cap">
+        <table class="gd-table">
+          <caption id="modes-cap">What works where</caption>
+          <thead><tr><th scope="col">Feature</th><th scope="col">Hosted site</th><th scope="col">Local app</th></tr></thead>
+          <tbody>
+            <tr><td>Scam and false-claim checks on text and links</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td>Image and video checks, dates, AI signs</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td>Evidence grades, checklist, custody log</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td>Offender index and case files</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td>Investigate with Claude</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td>Opening a link to read the page behind it</td><td>No</td><td>Yes</td></tr>
+            <tr><td>Username sweep, domain age and wallet lookups (Subjects)</td><td>No</td><td>Yes</td></tr>
+            <tr><td>Built-in reviewers without claude.ai</td><td>No</td><td>Yes, with an API key or the free Ollama app</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Some lookups in <em>Corroborate</em>, <em>Fact-check</em> and <em>Provenance</em> also depend on the local app. On the hosted site they either run from your browser or tell you clearly that they need the local app. To install the local app, follow the <a href="https://github.com/mevan101/scam_bunker#quick-start">quick start instructions</a>; it needs Node.js 22 or newer.</p>
+    </section>
+
+    <section aria-labelledby="report">
+      <h2 id="report">9. Where to report a scam</h2>
+      <p>The <em>What to do now</em> list links to the right places for the kind of message you checked. In Investigator mode, open <em>Corroborate</em> under <em>Tools</em> and go to <em>Where to report</em>: choose your country and the platform for the full list. The main routes for Bangladesh are below.</p>
+      <div class="advice"><b>If you have lost money or are in danger:</b> call <b>999</b> for emergencies. If you paid by mobile money or a bank, call your provider first: the sooner they know, the better the chance of stopping the transfer. Never share your PIN or one-time code with anyone, including someone who says they are from your bank.</div>
+      <h3>Bangladesh</h3>
+      <ul class="gd-routes">
+        <li><a href="https://www.cid.gov.bd/public/cpc">CID Cyber Police Centre (Bangladesh Police)</a>: online fraud, hacking and impersonation, nationwide. Phone 01320010148.</li>
+        <li><a href="https://www.police.gov.bd/en/police_cyber_support_for_women">Police Cyber Support for Women (PCSW)</a>: harassment, sextortion and abuse of women online. Phone 01320000888.</li>
+        <li><a href="https://dmp.gov.bd/">DMP Cyber Crime Investigation (CTTC)</a>: cyber crime in the Dhaka Metropolitan area.</li>
+        <li><a href="https://crm.btrc.gov.bd/">BTRC Complain Box</a>: fraud calls and SMS, and complaints against mobile operators.</li>
+        <li><a href="https://www.bkash.com/en/customer-service/avoid-fraud">bKash fraud helpline</a>: a fraudulent bKash transaction or number. Phone 16247, 24 hours.</li>
+        <li><a href="https://www.bb.org.bd/en/index.php/services/cipc_procedure">Bangladesh Bank CIPC</a>: when a bank or mobile financial service has not resolved your complaint. Phone 16236.</li>
+        <li><a href="https://www.cirt.gov.bd/">BGD e-GOV CIRT</a>: phishing websites, malware and security incidents.</li>
+      </ul>
+      <h3>On the platform, and for websites</h3>
+      <ul class="gd-routes">
+        <li><a href="https://www.meta.com/safety/scam-protection-center/safety-tips/how-to-report-on-meta/">Facebook and Instagram</a> and <a href="https://faq.whatsapp.com/1142481766359885">WhatsApp</a>: use <em>Report</em> on the post, profile or chat.</li>
+        <li><a href="https://safebrowsing.google.com/safebrowsing/report_phish/">Google Safe Browsing</a>: report a fake website so browsers warn other people.</li>
+        <li><a href="https://www.chainabuse.com/">Chainabuse</a>: report a crypto wallet used in a scam.</li>
+      </ul>
+      <p>Corroborate also lists routes for the United States, United Kingdom, Canada, Australia and India, and for TikTok, Telegram, LinkedIn, YouTube, Reddit and X. When you report, include your screenshots, links, transaction IDs and the dates. Do not contact, threaten or publicly accuse the person yourself, and never pay anyone who promises to recover your money: that is a common second scam.</p>
+    </section>
+
+    <section aria-labelledby="tour">
+      <h2 id="tour">10. Take the tour</h2>
+      <p>The tour shows the five things you need, in about a minute: where to paste something, the examples, the answer and its reasons, what to do now, and the switch to Investigator mode. It opens by itself on your first visit. You can skip it at any time with <em>Skip tour</em> or the Esc key, and start it again from <em>Take the tour</em> in the top bar.</p>
+      <p><a class="primary sm gd-cta" href="./#tour">Take the tour</a></p>
+    </section>
+
+    <footer class="gd-foot">
+      <p>Scam Bunker is open source. The full method behind every check is in the <a href="https://github.com/mevan101/scam_bunker/blob/main/docs/METHODOLOGY.md">methodology</a>. Found a wrong result? <a href="https://github.com/mevan101/scam_bunker/issues">Tell us</a>, so it can be corrected openly.</p>
+    </footer>
+  </main>
+</div>
+
+<script>
+(() => {
+  const btns = document.querySelectorAll('[data-theme-set]');
+  let cur = 'system'; try { cur = localStorage.getItem('scambunker.theme') || 'system'; } catch (e) { }
+  const apply = t => {
+    cur = t;
+    if (t === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+    btns.forEach(b => b.setAttribute('aria-pressed', b.dataset.themeSet === t));
+    try { t === 'system' ? localStorage.removeItem('scambunker.theme') : localStorage.setItem('scambunker.theme', t); } catch (e) { }
+  };
+  btns.forEach(b => b.addEventListener('click', () => apply(b.dataset.themeSet)));
+  apply(cur);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+/* Scam Bunker: user guide (public/guide.html, .gd-*) and the guided first case (public/tour.js, .tour*).
+   Uses the tokens and components in app.css only. */
+
+a.ghost { text-decoration: none; }
+a.primary { text-decoration: none; }
+
+/* ---------- Guide page ---------- */
+.gd-brand { color: inherit; text-decoration: none; border-radius: var(--radius-sm); }
+.gd-skip { position: absolute; left: var(--s4); top: -48px; z-index: 20; padding: var(--s2) var(--s3); background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius); color: var(--accent); font-weight: 500; }
+.gd-skip:focus { top: var(--s2); }
+.gd-shell { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: var(--s6); max-width: 1160px; margin: 0 auto; padding: var(--s6) var(--s5) var(--s7); }
+.gd-label { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 var(--s2); }
+.gd-toc { position: sticky; top: calc(var(--topbar-h) + var(--s5)); align-self: start; }
+.gd-toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; counter-reset: gd; }
+.gd-toc li { counter-increment: gd; }
+.gd-toc a { display: flex; gap: var(--s2); padding: 6px 10px; border-radius: var(--radius-sm); color: var(--ink-2); text-decoration: none; font-size: var(--fs-md); line-height: 1.4; }
+.gd-toc a::before { content: counter(gd); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 1.2em; }
+.gd-toc a:hover { background: var(--subtle); color: var(--ink); }
+
+.gd-doc { padding: var(--s6) var(--s7) var(--s6); min-width: 0; font-size: var(--fs-lg); line-height: 1.65; color: var(--ink-2); }
+.gd-doc:focus { outline: none; }
+.gd-doc h1 { font-size: var(--fs-2xl); margin: 0 0 var(--s3); }
+.gd-doc h2 { font-size: var(--fs-xl); margin: 0 0 var(--s3); scroll-margin-top: calc(var(--topbar-h) + var(--s4)); }
+.gd-doc h3 { font-size: var(--fs-lg); margin: var(--s5) 0 var(--s2); }
+.gd-doc section { padding-top: var(--s6); margin-top: var(--s6); border-top: 1px solid var(--line); max-width: 72ch; }
+.gd-doc p { margin: 0 0 var(--s4); }
+.gd-doc b, .gd-doc dt { color: var(--ink); }
+.gd-lede { font-size: var(--fs-lg); color: var(--ink-2); max-width: 72ch; }
+.gd-doc .advice, .gd-doc .callout { font-size: var(--fs-base); line-height: 1.6; margin: var(--s4) 0; }
+.gd-doc .callout { color: var(--ink-2); }
+.gd-grid { margin: var(--s4) 0; }
+.gd-grid .box p, .gd-grid .box li { font-size: var(--fs-base); }
+.gd-list { margin: var(--s2) 0 0; padding-left: 1.2em; }
+.gd-list li + li { margin-top: var(--s1); }
+.gd-steps { margin: 0 0 var(--s4); padding-left: 1.4em; }
+.gd-steps > li { padding-left: var(--s1); }
+.gd-steps > li + li { margin-top: var(--s3); }
+.gd-dl { display: grid; grid-template-columns: minmax(10em, max-content) minmax(0, 1fr); gap: var(--s2) var(--s5); margin: 0 0 var(--s4); }
+.gd-dl dt { font-weight: 600; }
+.gd-dl dd { margin: 0; }
+.gd-weights dt { padding-top: 2px; }
+.gd-rules { margin: var(--s4) 0; font-size: var(--fs-base); }
+.gd-routes { margin: 0 0 var(--s4); padding-left: 1.2em; }
+.gd-routes li + li { margin-top: var(--s2); }
+.gd-note { font-size: var(--fs-base); color: var(--muted); }
+.gd-table-wrap { overflow-x: auto; margin: 0 0 var(--s4); border: 1px solid var(--line); border-radius: var(--radius); }
+.gd-table { border-collapse: collapse; width: 100%; font-size: var(--fs-base); line-height: 1.5; }
+.gd-table caption { text-align: left; padding: var(--s2) var(--s3); font-weight: 600; color: var(--ink); background: var(--subtle); border-bottom: 1px solid var(--line); }
+.gd-table th, .gd-table td { text-align: left; vertical-align: top; padding: var(--s2) var(--s3); border-bottom: 1px solid var(--line); }
+.gd-table thead th { font-size: var(--fs-sm); font-weight: 600; color: var(--muted); background: var(--subtle); }
+.gd-table tbody tr:last-child td { border-bottom: 0; }
+.gd-table td:first-child { color: var(--ink); }
+.gd-cta { display: inline-flex; }
+.gd-foot { margin-top: var(--s6); padding-top: var(--s5); border-top: 1px solid var(--line); font-size: var(--fs-base); color: var(--muted); max-width: 72ch; }
+
+@media (max-width: 1020px) {
+  .gd-shell { grid-template-columns: minmax(0, 1fr); gap: var(--s5); padding: var(--s5) var(--s4) var(--s7); }
+  .gd-toc { position: static; }
+  .gd-doc { padding: var(--s5); }
+}
+@media (max-width: 640px) {
+  .gd-doc { padding: var(--s5) var(--s4); font-size: var(--fs-base); }
+  .gd-doc h1 { font-size: var(--fs-xl); }
+  .gd-dl { grid-template-columns: minmax(0, 1fr); gap: var(--s1); }
+  .gd-dl dd { margin-bottom: var(--s3); }
+}
+
+/* ---------- Guided first case ---------- */
+.tour-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.tour-actions .primary { width: auto; }
+.tour { position: fixed; z-index: 40; right: var(--s5); bottom: var(--s5); width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 2 * var(--s5)); overflow-y: auto; padding: var(--s4) var(--s5); background: var(--surface); color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: var(--shadow-overlay); font-size: var(--fs-md); line-height: 1.55; }
+.tour h2 { font-size: var(--fs-lg); margin: 0 0 var(--s2); }
+.tour h2:focus { outline: none; }
+.tour h2:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
+.tour p { margin: 0 0 var(--s3); }
+.tour .tour-step { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 var(--s1); }
+.tour .tour-actions { justify-content: flex-end; margin-top: var(--s3); }
+.tour .tour-actions .link { margin-right: auto; font-size: var(--fs-md); min-height: 24px; }
+.tour-target { outline: 2px solid var(--focus) !important; outline-offset: 3px; scroll-margin-top: calc(var(--topbar-h) + var(--s4)); scroll-margin-bottom: 240px; }
+@media (max-width: 640px) {
+  .tour { left: var(--s4); right: var(--s4); bottom: var(--s4); width: auto; max-height: 46vh; padding: var(--s3) var(--s4); }
+}
+@media (forced-colors: active) { .tour-target { outline-color: Highlight !important; } }
