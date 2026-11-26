@@ -41,15 +41,16 @@ How I want you to work:
     bots: { platform: 'X / Twitter', url: '', text: `I made $27,400 in two weeks thanks to @Mrs_Jessica_Trades, she is the best!! #bitcoin #crypto #forex #trading #investing #money #wealth #btc #passiveincome\nI made $27,400 in two weeks thanks to @Mrs_Jessica_Trades, she is the best!! #bitcoin #crypto #forex\nI made $27,400 in two weeks thanks to @Mrs_Jessica_Trades, she is the best!! #bitcoin #crypto\nWow is she legit? @Mrs_Jessica_Trades\nYes 100% legit, she helped me recover my lost funds too. DM her on Telegram` },
   };
 
-  let server = { anthropic: false, firecrawl: false, online: false };
+  let server = { ai: false, firecrawl: false, online: false };
   let imageFile = null, current = null;
 
   // ---------- Init ----------
   async function init() {
     $('#pill-local').classList.add('on');
     try { server = { ...(await (await fetch('/api/status')).json()), online: true }; } catch { }
-    $('#pill-agents').classList.toggle('on', !!server.anthropic);
-    $('#pill-agents').title = server.anthropic ? `Lead: ${server.leadModel} · specialists: ${server.agentModel}` : 'Set ANTHROPIC_API_KEY on the server to enable the agent team';
+    $('#pill-agents').classList.toggle('on', !!server.ai);
+    $('#pill-agents').lastChild.textContent = server.ai ? `Agents · ${server.provider}` : 'Agents via claude.ai';
+    $('#pill-agents').title = server.ai ? `Lead: ${server.leadModel} · specialists: ${server.agentModel}` : 'No AI provider on the server. Use "Investigate with Claude" to run the agent team in claude.ai, or install Ollama for free local agents.';
     $('#pill-web').classList.toggle('on', !!server.online);
     $('#pill-web').lastChild.textContent = server.firecrawl ? 'Web + search' : server.online ? 'Web fetch' : 'Web';
     $('#persona').value = store.get('deduce.persona', DEFAULT_PERSONA);
@@ -115,7 +116,7 @@ How I want you to work:
       }
 
       // 3. Agent team
-      if (server.anthropic) {
+      if (server.ai) {
         const caseData = { persona: c.persona, platform: c.platform, url, text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown ? `${c.page.title || ''}\n${JSON.stringify(c.page.redirects || '')}\n${c.page.markdown}` : null, corroboration: c.corroboration, imageData: c.forensics?.visionData };
         const roster = ['scam', 'osint', 'factcheck']; if (c.forensics) roster.unshift('forensics');
         roster.forEach(a => c.agents[a] = { status: 'run' }); c.agents.lead = { status: 'wait' };
@@ -257,7 +258,7 @@ How I want you to work:
     $('#verdict').style.setProperty('--v', color);
     $('#v-title').textContent = v.verdict || 'Analysing…';
     $('#v-headline').textContent = v.headline || '';
-    $('#v-source').textContent = c.final ? `Final verdict · lead investigator after ${Object.keys(c.agents).length - 1} reports` : server.anthropic ? 'Preliminary · local engines, agents deliberating…' : 'Local engines · turn on agents for cross-examination';
+    $('#v-source').textContent = c.final ? `Final verdict · lead investigator after ${Object.keys(c.agents).length - 1} reports` : server.ai ? 'Preliminary · local engines, agents deliberating…' : 'Local engines · press “Investigate with Claude” for the agent team';
     const tags = [v.category, v.confidence != null && `confidence ${v.confidence}%`, c.platform, c.forensics && `AI: ${(v.ai_involvement || {}).assessment || c.forensics.ai.verdict}`].filter(Boolean);
     $('#v-tags').innerHTML = tags.map(t => `<span class="tag">${esc(t)}</span>`).join('');
     const risk = +v.risk || 0; $('#g-val').textContent = risk; $('#g-fg').style.strokeDashoffset = 314 - 314 * risk / 100;
@@ -282,7 +283,7 @@ How I want you to work:
     const ids = Object.keys(c.agents).sort((a, b) => (a === 'lead') - (b === 'lead'));
     const done = ids.filter(i => c.agents[i].status === 'done').length;
     $('#agents-count').textContent = `${done}/${ids.length}`;
-    const callout = server.anthropic ? '' : `<div class="callout">Right now only the two local engines are running. To bring in the Image Forensics, Fraud, OSINT and Fact-check specialists and the Lead Investigator, restart the server with <code>ANTHROPIC_API_KEY=… node server.js</code>. Add <code>FIRECRAWL_API_KEY</code> to let them fetch pages and search for corroboration.</div>`;
+    const callout = server.ai ? '' : `<div class="callout handoff"><div><b>Run the full agent team without an API key.</b> “Investigate with Claude” packs this case, along with the Image Forensics, Fraud, OSINT, Fact-check and Lead Investigator roles, into one prompt and opens it in claude.ai on your own Claude plan. For free agents that run offline on your machine, install <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a> and run <code>ollama pull gemma3</code>. Deduce detects it on the next start.</div><button type="button" class="primary sm" data-handoff>Investigate with Claude ↗</button></div>`;
     panel('agents').innerHTML = callout + `<div class="agents">${ids.map(id => {
       const a = c.agents[id], m = AGENT_META[id];
       const st = { run: 'Investigating', done: 'Reported', err: 'Failed', wait: 'Awaiting reports' }[a.status] || a.status;
@@ -346,6 +347,20 @@ How I want you to work:
     const v = V(c);
     panel('next').innerHTML = `<section><h3>Investigative pivots</h3><ul class="list">${(v.next_steps || []).map(s => `<li>${esc(s)}</li>`).join('')}</ul></section><section><div class="advice"><b>For the potential victim:</b> ${esc(v.advice || '')}</div></section>`;
   }
+
+  // ---------- claude.ai handoff (no API key needed) ----------
+  async function handoff() {
+    const c = current; if (!c) return;
+    let prompt;
+    try {
+      ({ prompt } = await post('/api/prompt', { hasImage: !!c.forensics, case: { persona: c.persona, platform: c.platform, url: c.url, text: c.text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown || null, corroboration: c.corroboration } }));
+    } catch (e) { toast('Could not build the prompt: ' + e.message); return; }
+    let copied = false; try { await navigator.clipboard.writeText(prompt); copied = true; } catch { }
+    const short = prompt.length < 7000;
+    window.open(short ? 'https://claude.ai/new?q=' + encodeURIComponent(prompt) : 'https://claude.ai/new', '_blank', 'noopener');
+    toast(short ? (c.forensics ? 'Opened in Claude. Attach the image there too, so Claude can examine it' : 'Opened in Claude') : copied ? 'Case copied. Paste it into the new Claude chat (⌘V)' + (c.forensics ? ', then attach the image' : '') : 'Clipboard blocked. Use Copy summary instead');
+  }
+  document.addEventListener('click', e => { if (e.target.closest('[data-handoff]')) handoff(); });
 
   // ---------- History ----------
   function saveCase(c) {

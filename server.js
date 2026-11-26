@@ -1,5 +1,7 @@
 // Deduce — investigation server. Zero dependencies: `node server.js`
-// Optional env: ANTHROPIC_API_KEY (multi-agent reasoning), FIRECRAWL_API_KEY (web fetch + corroboration search)
+// AI provider (first match wins): ANTHROPIC_API_KEY · LLM_BASE_URL (+LLM_API_KEY, LLM_MODEL) for any OpenAI-compatible API
+// (Groq, OpenRouter, LM Studio…) · a local Ollama, detected automatically. With none, the claude.ai handoff still works.
+// Optional: FIRECRAWL_API_KEY (web fetch + corroboration search)
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -12,8 +14,32 @@ const PUB = path.join(__dirname, 'public');
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const ANTHROPIC_URL = (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/$/, '') + '/v1/messages';
 const FIRECRAWL_KEY = process.env.FIRECRAWL_API_KEY || '';
-const LEAD_MODEL = process.env.DEDUCE_LEAD_MODEL || 'claude-opus-5-5';
-const AGENT_MODEL = process.env.DEDUCE_AGENT_MODEL || 'claude-sonnet-5-5';
+const LLM_BASE_URL = (process.env.LLM_BASE_URL || '').replace(/\/$/, '');
+const LLM_API_KEY = process.env.LLM_API_KEY || '';
+const OLLAMA_URL = (process.env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
+
+// Resolved at startup by detectProvider()
+const provider = { kind: 'none', label: 'none', leadModel: '', agentModel: '', vision: false };
+async function detectProvider() {
+  if (ANTHROPIC_KEY) {
+    Object.assign(provider, { kind: 'anthropic', label: 'Claude API', vision: true,
+      leadModel: process.env.DEDUCE_LEAD_MODEL || 'claude-opus-5-5', agentModel: process.env.DEDUCE_AGENT_MODEL || 'claude-sonnet-5-5' });
+  } else if (LLM_BASE_URL) {
+    const m = process.env.LLM_MODEL || process.env.DEDUCE_AGENT_MODEL || '';
+    Object.assign(provider, { kind: 'openai', label: new URL(LLM_BASE_URL).hostname, base: LLM_BASE_URL, key: LLM_API_KEY,
+      leadModel: process.env.DEDUCE_LEAD_MODEL || m, agentModel: m, vision: process.env.LLM_VISION === '1' });
+  } else {
+    try {
+      const r = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(1500) });
+      const models = ((await r.json()).models || []).map(x => x.name);
+      if (models.length) {
+        const pref = process.env.OLLAMA_MODEL || models.find(n => /vision|llava|gemma3|qwen2\.5vl|minicpm-v|llama4/i.test(n)) || models[0];
+        Object.assign(provider, { kind: 'openai', label: `Ollama (${pref})`, base: `${OLLAMA_URL}/v1`, key: 'ollama',
+          leadModel: pref, agentModel: pref, vision: /vision|llava|gemma3|vl|minicpm-v|llama4/i.test(pref) });
+      }
+    } catch { /* no local Ollama */ }
+  }
+}
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.json': 'application/json' };
 
@@ -76,6 +102,31 @@ function readBody(req, limit = 12 * 1024 * 1024) {
   });
 }
 
+// One call shape for every provider. content: [{type:'text',text}|{type:'image',dataUrl}]
+async function llm({ lead = false, system, content, maxTokens = 1800 }) {
+  const model = lead ? provider.leadModel : provider.agentModel;
+  if (provider.kind === 'anthropic') return claude({ model, system, maxTokens, content: content.map(c => {
+    if (c.type !== 'image') return c;
+    const m = /^data:(image\/[a-z+]+);base64,(.*)$/.exec(c.dataUrl);
+    return { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } };
+  }) });
+  if (provider.kind !== 'openai') throw new Error('No AI provider configured');
+  const call = async (withImages) => {
+    const parts = content.filter(c => withImages || c.type !== 'image').map(c => c.type === 'image' ? { type: 'image_url', image_url: { url: c.dataUrl } } : { type: 'text', text: c.text });
+    const r = await fetch(`${provider.base}/chat/completions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(provider.key ? { Authorization: `Bearer ${provider.key}` } : {}) },
+      body: JSON.stringify({ model, max_tokens: maxTokens, temperature: 0.2, messages: [{ role: 'system', content: system }, { role: 'user', content: parts.length === 1 ? parts[0].text : parts }] }),
+      signal: AbortSignal.timeout(300000),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j?.error?.message || j?.error || `${provider.label} ${r.status}`);
+    return j.choices?.[0]?.message?.content || '';
+  };
+  const hasImage = content.some(c => c.type === 'image');
+  if (hasImage && provider.vision) { try { return await call(true); } catch { /* model can't see images: fall back to text */ } }
+  return call(false);
+}
+
 async function claude({ model, system, content, maxTokens = 1800 }) {
   const r = await fetch(ANTHROPIC_URL, {
     method: 'POST',
@@ -102,26 +153,25 @@ function caseFileText(c) {
 
 // ---------- Routes ----------
 async function handleAgent(req, res) {
-  if (!ANTHROPIC_KEY) return send(res, 400, { error: 'ANTHROPIC_API_KEY not set' });
+  if (provider.kind === 'none') return send(res, 400, { error: 'No AI provider configured' });
   const body = await readBody(req);
   const agent = AGENTS[body.agent];
   if (!agent) return send(res, 400, { error: 'unknown agent' });
   const content = [];
   if (body.agent === 'forensics' && body.case?.imageData) {
-    const m = /^data:(image\/[a-z+]+);base64,(.*)$/.exec(body.case.imageData);
-    if (m) content.push({ type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } });
+    if (/^data:image\/[a-z+]+;base64,/.test(body.case.imageData)) content.push({ type: 'image', dataUrl: body.case.imageData });
   }
   content.push({ type: 'text', text: `CASE FILE\n\n${caseFileText(body.case || {})}\n\nWrite your specialist report: findings with evidence, confidence per finding, and open questions. Under 400 words. Plain text, short headed sections.` });
-  const text = await claude({ model: AGENT_MODEL, system: agent.brief, content, maxTokens: 1400 });
+  const text = await llm({ system: agent.brief, content, maxTokens: 1400 });
   send(res, 200, { agent: body.agent, name: agent.name, report: text });
 }
 
 async function handleLead(req, res) {
-  if (!ANTHROPIC_KEY) return send(res, 400, { error: 'ANTHROPIC_API_KEY not set' });
+  if (provider.kind === 'none') return send(res, 400, { error: 'No AI provider configured' });
   const body = await readBody(req);
   const reports = (body.reports || []).map(r => `=== ${r.name} ===\n${r.report}`).join('\n\n');
-  const raw = await claude({
-    model: LEAD_MODEL, system: LEAD_BRIEF, maxTokens: 2500,
+  const raw = await llm({
+    lead: true, system: LEAD_BRIEF, maxTokens: 2500,
     content: [{ type: 'text', text: `CASE FILE\n\n${caseFileText(body.case || {})}\n\nSPECIALIST REPORTS\n\n${reports}` }],
   });
   let parsed = null;
@@ -146,6 +196,29 @@ async function assertPublicUrl(u) {
   const host = hostname.replace(/^\[|\]$/g, '');
   const addrs = net.isIP(host) ? [{ address: host }] : await dns.lookup(host, { all: true });
   if (!addrs.length || addrs.some(a => isPrivateIp(a.address))) throw new Error('Refusing to fetch a private or local network address');
+}
+
+// Builds a single self-contained prompt that runs the whole agent team inside one chat (claude.ai, or any assistant).
+async function handlePrompt(req, res) {
+  const body = await readBody(req);
+  const roles = Object.values(AGENTS).map((a, i) => `### Specialist ${i + 1}: ${a.name}\n${a.brief}`).join('\n\n');
+  const prompt = `You are running a multi-agent fraud & disinformation investigation called Deduce. Play every role below in turn, then act as the lead investigator.
+
+${roles}
+
+### Lead investigator
+${LEAD_BRIEF.split('Respond with ONLY')[0].trim()}
+
+HOW TO ANSWER
+1. Write each specialist's report under its own heading (under 200 words each). Where a specialist cannot see something (e.g. the image), say so and rely on the extracted data.
+2. Then "## Cross-examination": where specialists disagree, decide who is right and why.
+3. Then "## Verdict": one of Scam / Likely scam / Suspicious / Misleading / Coordinated / AI-generated / Likely legitimate / Insufficient evidence, plus category, risk 0-100, confidence 0-100.
+4. Then "## Observation → Inference" table, "## Hidden information", "## Next pivots", "## What the person should do now".
+${body.hasImage ? '\nIf I attach the image, examine it visually too (hands, text, lighting, shadows, textures, edges).\n' : ''}
+CASE FILE
+
+${caseFileText(body.case || {})}`;
+  send(res, 200, { prompt });
 }
 
 async function handleFetch(req, res) {
@@ -191,9 +264,10 @@ async function handleSearch(req, res) {
 const server = http.createServer(async (req, res) => {
   try {
     const u = new URL(req.url, 'http://x');
-    if (u.pathname === '/api/status') return send(res, 200, { anthropic: !!ANTHROPIC_KEY, firecrawl: !!FIRECRAWL_KEY, leadModel: LEAD_MODEL, agentModel: AGENT_MODEL, agents: Object.entries(AGENTS).map(([id, a]) => ({ id, name: a.name })) });
+    if (u.pathname === '/api/status') return send(res, 200, { ai: provider.kind !== 'none', provider: provider.label, vision: provider.vision, firecrawl: !!FIRECRAWL_KEY, leadModel: provider.leadModel, agentModel: provider.agentModel, agents: Object.entries(AGENTS).map(([id, a]) => ({ id, name: a.name })) });
     if (req.method === 'POST' && u.pathname === '/api/agent') return await handleAgent(req, res);
     if (req.method === 'POST' && u.pathname === '/api/lead') return await handleLead(req, res);
+    if (req.method === 'POST' && u.pathname === '/api/prompt') return await handlePrompt(req, res);
     if (req.method === 'POST' && u.pathname === '/api/fetch') return await handleFetch(req, res);
     if (req.method === 'POST' && u.pathname === '/api/search') return await handleSearch(req, res);
     let p = path.normalize(path.join(PUB, u.pathname === '/' ? 'index.html' : u.pathname));
@@ -208,7 +282,8 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, HOST, () => {
+detectProvider().then(() => server.listen(PORT, HOST, () => {
   console.log(`Deduce running → http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
-  console.log(`  Claude agents: ${ANTHROPIC_KEY ? 'ON' : 'off (set ANTHROPIC_API_KEY)'} · Firecrawl: ${FIRECRAWL_KEY ? 'ON' : 'off (set FIRECRAWL_API_KEY)'}`);
-});
+  console.log(`  Agent team: ${provider.kind === 'none' ? 'off: install Ollama, or set ANTHROPIC_API_KEY / LLM_BASE_URL (claude.ai handoff still works)' : provider.label + (provider.vision ? ' · vision' : '')}`);
+  console.log(`  Firecrawl: ${FIRECRAWL_KEY ? 'ON' : 'off (optional)'}`);
+}));

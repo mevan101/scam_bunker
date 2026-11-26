@@ -19,7 +19,7 @@ Drop in an image, a post, a DM or a link. Deduce dates the image, checks whether
 | **Detects coordination** | Copy-paste comment rings, hashtag stuffing, mass-tagging, "my advisor" testimonial networks |
 | **Dissects links** | Typosquats, punycode homographs, brand-in-subdomain tricks, `@` tricks, shorteners, high-abuse TLDs, redirect chains, tracking parameters |
 | **Extracts entities** | Crypto wallets (with block-explorer links), phone numbers, handles, emails, money amounts |
-| **Agent team** *(optional)* | Image Forensics (vision), Fraud Analyst, OSINT & Platform Analyst and Fact Checker run in parallel. The Lead Investigator then reconciles their reports and returns a structured verdict |
+| **Agent team** | Image Forensics (vision), Fraud Analyst, OSINT & Platform Analyst and Fact Checker run in parallel. The Lead Investigator then reconciles their reports and returns a structured verdict |
 
 Every finding is labelled **proof**, **strong** or **weak**. Missing metadata is never treated as proof of AI.
 
@@ -30,17 +30,20 @@ Requires Node.js 22 or later. There are no dependencies to install.
 ```bash
 git clone https://github.com/<you>/deduce.git
 cd deduce
-cp .env.example .env    # optional: add ANTHROPIC_API_KEY / FIRECRAWL_API_KEY
+cp .env.example .env    # optional — works with no keys at all
 npm start               # → http://localhost:4400
 ```
 
-Without keys, the local engines still run fully: image forensics, pattern detection, link analysis and timelines.
+## Running the agent team: no API key required
 
-| Variable | Enables |
-|---|---|
-| `ANTHROPIC_API_KEY` | The five-agent team, including vision analysis of the image |
-| `FIRECRAWL_API_KEY` | Robust page fetching and web search to corroborate claims |
-| `DEDUCE_LEAD_MODEL` / `DEDUCE_AGENT_MODEL` | Model overrides |
+| Mode | Setup | Cost |
+|---|---|---|
+| **Investigate with Claude** | None. The button packs the case and all five agent roles into one prompt and opens claude.ai | Your existing Claude plan |
+| **Ollama (local)** | Install [Ollama](https://ollama.com), then run `ollama pull gemma3`. Deduce detects it on start | Free, offline, private |
+| **OpenAI-compatible API** | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` (Groq, OpenRouter, LM Studio and others) | Free tiers available |
+| **Anthropic API** | `ANTHROPIC_API_KEY` | Pay per use |
+
+With a vision-capable model (Gemma 3, Llama 3.2 Vision, Qwen-VL, Claude), the Image Forensics agent looks at the image itself as well as the metadata. Text-only models fall back to the metadata automatically. Add `FIRECRAWL_API_KEY` to fetch pages and search the web for corroboration. See `.env.example`.
 
 ## Make it your investigator
 
@@ -48,7 +51,7 @@ Open **Investigator profile** and describe who you are, what you investigate and
 
 ## Privacy
 
-Images are parsed **in your browser**. Nothing leaves your machine unless you enable the agents. Then a downscaled copy and the extracted findings go to the Anthropic API. Case history lives in your browser's localStorage.
+Images are parsed **in your browser**. Nothing leaves your machine unless you choose to. With Ollama, nothing ever leaves it. With a cloud provider or the claude.ai handoff, the extracted findings (and, for vision models, a downscaled copy of the image) go to that provider. Case history lives in your browser's localStorage.
 
 ## Architecture
 
