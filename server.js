@@ -46,7 +46,7 @@ async function detectProvider() {
   }
 }
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.json': 'application/json' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 
 // ---------- Agent roster ----------
 const { AGENTS, LEAD_BRIEF, caseFileText: sharedCaseFileText, buildHandoffPrompt } = require('./public/shared/prompt');
