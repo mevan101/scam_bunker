@@ -1,0 +1,9 @@
+/* "Update available" prompt (public/pwa.js). Mirrors .toast, but persistent and interactive. */
+.pwa-update { position: fixed; bottom: var(--s5); left: 50%; transform: translateX(-50%); max-width: calc(100vw - 32px); display: flex; align-items: center; gap: var(--s3); background: var(--ink); color: var(--on-ink); padding: 6px 6px 6px 14px; border-radius: var(--radius); font-size: var(--fs-md); box-shadow: var(--shadow-overlay); z-index: 51; }
+.pwa-update span { white-space: nowrap; }
+.pwa-update button { height: 28px; border-radius: var(--radius-sm); font-size: var(--fs-md); font-weight: 600; cursor: pointer; border: 1px solid transparent; }
+.pwa-update .pwa-reload { padding: 0 var(--s3); background: var(--on-ink); color: var(--ink); }
+.pwa-update .pwa-dismiss { width: 28px; background: transparent; color: var(--on-ink); font-size: var(--fs-lg); line-height: 1; }
+.pwa-update .pwa-reload:hover { background: color-mix(in srgb, var(--on-ink) 85%, var(--ink)); }
+.pwa-update .pwa-dismiss:hover { border-color: var(--on-ink); }
+.pwa-update button:focus-visible { outline: 2px solid var(--on-ink); outline-offset: 2px; }

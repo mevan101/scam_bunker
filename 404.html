@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scam Bunker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>try { var t = localStorage.getItem('scambunker.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) { }
+document.documentElement.dataset.mode = 'simple'; try { if (localStorage.getItem('scambunker.mode') === 'investigator') document.documentElement.dataset.mode = 'investigator'; } catch (e) { }</script>
+<meta name="description" content="Check a suspicious message, link, number, screenshot, photo or video for free. A plain answer, the evidence, and what to do next. Private: checked on your device.">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="osint.css">
+<link rel="stylesheet" href="events.css">
+<link rel="stylesheet" href="pwa.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%2316181d'/><circle cx='14' cy='14' r='6.5' fill='none' stroke='%23fff' stroke-width='2.6'/><path d='M19 19l6 6' stroke='%23fff' stroke-width='2.8' stroke-linecap='square'/></svg>">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15181c" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-row">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" class="mark" aria-hidden="true"><rect width="32" height="32" rx="6" fill="currentColor"/><circle cx="14" cy="14" r="6.5" fill="none" stroke="var(--on-ink)" stroke-width="2.6"/><path d="M19 19l6 6" stroke="var(--on-ink)" stroke-width="2.8" stroke-linecap="square"/></svg>
+    <div><div class="brand-name">Scam Bunker</div><div class="brand-sub">Free scam &amp; fact checker</div></div>
+  </div>
+    <div class="top-controls">
+      <a class="top-link" href="guide.html">Guide</a>
+      <button type="button" class="top-link" id="btn-tour">Take the tour</button>
+      <div class="mode-switch" role="group" aria-label="Mode" data-tour="mode">
+        <button type="button" data-mode-set="simple" aria-pressed="true">Simple</button>
+        <button type="button" data-mode-set="investigator" aria-pressed="false">Investigator</button>
+      </div>
+      <div class="theme-toggle" role="group" aria-label="Colour theme">
+        <button type="button" data-theme-set="system" aria-pressed="true" title="Match system"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="8.5" rx="1"/><path d="M5.5 13.75h5M8 11.25v2.5"/></svg><span class="sr-only">System theme</span></button>
+        <button type="button" data-theme-set="light" aria-pressed="false" title="Light"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.75M8 12.75v1.75M1.5 8h1.75M12.75 8h1.75M3.4 3.4l1.24 1.24M11.36 11.36l1.24 1.24M3.4 12.6l1.24-1.24M11.36 4.64l1.24-1.24"/></svg><span class="sr-only">Light theme</span></button>
+        <button type="button" data-theme-set="dark" aria-pressed="false" title="Dark"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A5.75 5.75 0 016.4 2.5a5.75 5.75 0 107.1 7.1z"/></svg><span class="sr-only">Dark theme</span></button>
+      </div>
+    </div>
+  </div>
+  <div class="inv-bar">
+    <div class="status" id="status">
+    <span class="pill" id="pill-local"><i></i>Local forensics</span>
+    <span class="pill" id="pill-agents"><i></i>Agents</span>
+    <span class="pill" id="pill-web"><i></i>Web</span>
+  </div>
+  <nav class="actions">
+    <button class="ghost" id="btn-subjects" aria-haspopup="dialog">Subjects</button>
+    <button class="ghost" id="btn-history">Case files</button>
+    <button class="ghost" id="btn-persona">Investigator profile</button>
+  </nav>
+  </div>
+</header>
+<div class="static-notice" role="note" id="static-notice">
+  <p><strong>Hosted version.</strong> Everything runs in your browser: image and video forensics, scam detection, the offender index, grading and the custody log. “Investigate with Claude” runs the agent team in claude.ai. Page fetching, username sweeps, domain and wallet lookups and built-in agents need the local app: <a href="https://github.com/mevan101/scam_bunker#quick-start">run it on your computer</a>.</p>
+</div>
+
+<main class="simple" id="simple">
+  <section class="s-home" aria-labelledby="s-h">
+    <h1 id="s-h">Is this a scam?</h1>
+    <p class="s-lede">Paste a message, link, phone number or email, or add a screenshot, photo, video or QR code. You’ll get a plain answer, the evidence, and what to do next.</p>
+    <form class="s-box" id="s-form" data-tour="input" novalidate>
+      <label for="s-text" class="sr-only">Message, link, phone number or email to check</label>
+      <textarea id="s-text" rows="5" placeholder="Paste it here…" autocomplete="off" spellcheck="false"></textarea>
+      <div class="s-file" id="s-file" hidden>
+        <img id="s-thumb" alt="" hidden>
+        <span id="s-file-name"></span>
+        <button type="button" class="link" id="s-file-remove">Remove<span class="sr-only"> the attached file</span></button>
+      </div>
+      <div class="s-box-bar">
+        <label class="s-attach">
+          <input type="file" id="s-fileinput" class="sr-only" accept="image/*,video/mp4,video/quicktime,video/webm,.mp4,.m4v,.mov,.webm,.mkv,.heic">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></svg>
+          <span>Add a screenshot or photo</span>
+        </label>
+        <button type="submit" class="primary s-go" id="s-go">Check it</button>
+      </div>
+    </form>
+    <p class="s-privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>Free and private. Everything is checked on your device; nothing is uploaded.</p>
+    <div class="s-examples" data-tour="examples">
+      <span id="s-ex-h">Or try an example:</span>
+      <div class="s-chips" role="group" aria-labelledby="s-ex-h">
+        <button type="button" class="s-chip" data-sample="phish">Bank text message</button>
+        <button type="button" class="s-chip" data-sample="job">Job offer</button>
+        <button type="button" class="s-chip" data-sample="crypto">Crypto “mentor”</button>
+        <button type="button" class="s-chip" data-sample="viral">Viral health claim</button>
+        <button type="button" class="s-chip" data-sample="bots">Fake reviews</button>
+      </div>
+    </div>
+  </section>
+  <p class="sr-only" role="status" aria-live="polite" id="s-status"></p>
+  <section class="s-result" id="s-result" aria-label="Result" hidden></section>
+</main>
+
+<main class="layout">
+  <!-- INTAKE -->
+  <section class="intake card" aria-labelledby="intake-h">
+    <div class="eyebrow">New case</div>
+    <h1 id="intake-h">What are we looking at?</h1>
+    <p class="lede">Drop in an image, paste the post or message, add the link. The forensics run on your device. If you've turned the specialist agents on, they review the evidence and the lead investigator gives the verdict.</p>
+
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept="image/*,video/mp4,video/quicktime,video/webm,.mp4,.m4v,.mov,.webm,.mkv" class="sr-only" aria-label="Choose an image or video to investigate">
+      <div class="drop-empty" id="drop-empty">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2l1.6-1.6a2 2 0 012.8 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <strong>Drop an image or video, or click to choose</strong>
+        <span>JPEG, PNG, WebP, HEIC, or MP4, MOV, WebM video. Read on your device; nothing is uploaded unless agents are on.</span>
+      </div>
+      <div class="drop-full" id="drop-full" hidden>
+        <img id="preview" alt="Evidence preview">
+        <div class="drop-meta"><span id="file-name"></span><button type="button" class="link" id="clear-img">Remove</button></div>
+      </div>
+    </label>
+
+    <label class="field"><span>Post, message or claim</span>
+      <textarea id="text" rows="6" placeholder="Paste the caption, DM, email, comment thread or claim you want examined…"></textarea>
+    </label>
+    <div class="row">
+      <label class="field grow"><span>Link (optional)</span><input id="url" type="url" placeholder="https://www.facebook.com/… or any suspicious link"></label>
+      <label class="field"><span>Platform</span>
+        <select id="platform"><option value="">Auto-detect</option><option>Facebook</option><option>Instagram</option><option>X / Twitter</option><option>LinkedIn</option><option>TikTok</option><option>Telegram</option><option>WhatsApp</option><option>Reddit</option><option>YouTube</option><option>Email / SMS</option><option>Forum / other</option></select>
+      </label>
+    </div>
+
+    <button class="primary" id="go"><span>Open investigation</span><kbd>⌘ ↵</kbd></button>
+
+    <div class="samples">
+      <span>Samples</span>
+      <button class="chip" data-sample="crypto">Crypto “mentor” DM</button>
+      <button class="chip" data-sample="job">LinkedIn job offer</button>
+      <button class="chip" data-sample="phish">Bank SMS</button>
+      <button class="chip" data-sample="viral">Viral claim</button>
+      <button class="chip" data-sample="bots">Comment network</button>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="results" id="results" aria-label="Investigation results">
+    <div class="placeholder card" id="placeholder">
+      <h2>No case open</h2>
+      <p>Submit material in the case panel, or load a sample. Every finding is shown with the evidence behind it and graded as proof, strong, moderate or weak.</p>
+      <div class="ph-cols">
+        <div>
+          <h3>What you can submit</h3>
+          <dl class="caps">
+            <dt>Image</dt><dd>Dated from EXIF, XMP, PNG and GPS timestamps. Checked for C2PA, IPTC source type and generator signatures. GPS, device serials and edit history are surfaced.</dd>
+            <dt>Text</dt><dd>A post, DM, email or comment thread. The scheme is classified (phishing, pig-butchering, job, giveaway, impersonation) and coordinated networks are flagged.</dd>
+            <dt>Link</dt><dd>Checked for typosquats, punycode, brand-in-subdomain tricks, shorteners, redirects and tracking.</dd>
+          </dl>
+        </div>
+        <div>
+          <h3>Privacy</h3>
+          <p class="muted">Images and text are analysed in your browser. Nothing is uploaded unless you turn on the agent team or hand the case to Claude. Case files and the offender index stay in this browser's local storage.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="report" hidden>
+      <div class="report-bar">
+        <span class="report-label">Case report</span>
+        <div class="report-actions">
+          <button class="ghost" data-handoff>Investigate with Claude ↗</button>
+          <button class="ghost" id="btn-export">Export case report</button>
+          <button class="ghost" id="btn-copy">Copy summary</button>
+        </div>
+      </div>
+      <div class="verdict card" id="verdict">
+        <div class="v-body">
+          <div class="eyebrow" id="v-source">Preliminary · local engines</div>
+          <h2 id="v-title" aria-live="polite">—</h2>
+          <p class="v-headline" id="v-headline"></p>
+          <div class="v-tags" id="v-tags"></div>
+        </div>
+        <div class="gauge" id="gauge">
+          <div class="g-num"><span class="g-label">Risk score</span><span class="g-val"><b id="g-val">0</b><small>/100</small></span></div>
+          <div class="g-track"><svg viewBox="0 0 314 8" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="4" x2="314" y2="4" class="g-bg"/><line x1="0" y1="4" x2="314" y2="4" class="g-fg" id="g-fg"/></svg></div>
+          <div class="g-scale" aria-hidden="true"><span style="--w:25">Low</span><span style="--w:25">Elevated</span><span style="--w:20">High</span><span style="--w:30">Critical</span></div>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Report sections" id="tabs">
+        <span class="tab-group" role="presentation" aria-hidden="true">Report</span>
+        <button role="tab" aria-selected="true" data-tab="deduction" id="tab-deduction" aria-controls="panel-deduction">Deduction</button>
+        <button role="tab" data-tab="links" id="tab-links" aria-controls="panel-links">Links &amp; entities</button>
+        <button role="tab" data-tab="claims" id="tab-claims" aria-controls="panel-claims">Claims &amp; matches <span class="count" id="claims-count"></span></button>
+        <button role="tab" data-tab="timeline" id="tab-timeline" aria-controls="panel-timeline">Timeline</button>
+        <button role="tab" data-tab="next" id="tab-next" aria-controls="panel-next">Next moves</button>
+        <button role="tab" data-tab="agents" id="tab-agents" aria-controls="panel-agents">Agents <span class="count" id="agents-count"></span></button>
+        <span class="tab-group" role="presentation" aria-hidden="true">Media</span>
+        <button role="tab" data-tab="image" id="tab-image" aria-controls="panel-image">Image lab</button>
+        <button role="tab" data-tab="video" id="tab-video" aria-controls="panel-video" hidden>Video lab</button>
+        <button role="tab" data-tab="provenance" id="tab-provenance" aria-controls="panel-provenance" hidden>Provenance</button>
+        <span class="tab-group" role="presentation" aria-hidden="true">Tools</span>
+        <button role="tab" data-tab="corroborate" id="tab-corroborate" aria-controls="panel-corroborate">Corroborate</button>
+        <button role="tab" data-tab="events" id="tab-events" aria-controls="panel-events">Events <span class="count"></span></button>
+        <button role="tab" data-tab="checklist" id="tab-checklist" aria-controls="panel-checklist">Checklist</button>
+        <button role="tab" data-tab="custody" id="tab-custody" aria-controls="panel-custody">Custody log</button>
+      </div>
+
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-deduction" aria-labelledby="tab-deduction" data-panel="deduction"></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-agents" aria-labelledby="tab-agents" data-panel="agents" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-image" aria-labelledby="tab-image" data-panel="image" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-video" aria-labelledby="tab-video" data-panel="video" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-links" aria-labelledby="tab-links" data-panel="links" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-timeline" aria-labelledby="tab-timeline" data-panel="timeline" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-provenance" aria-labelledby="tab-provenance" data-panel="provenance" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-checklist" aria-labelledby="tab-checklist" data-panel="checklist" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-claims" aria-labelledby="tab-claims" data-panel="claims" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-corroborate" aria-labelledby="tab-corroborate" data-panel="corroborate" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-next" aria-labelledby="tab-next" data-panel="next" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-custody" aria-labelledby="tab-custody" data-panel="custody" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-events" aria-labelledby="tab-events" data-panel="events" hidden></div>
+
+    </div>
+  </section>
+</main>
+
+<!-- Drawers -->
+<dialog id="dlg-persona" class="drawer">
+  <form method="dialog">
+    <header role="none"><h3>Investigator profile</h3><button class="x" value="close" aria-label="Close">×</button></header>
+    <p class="muted">Every agent reads this before it starts. Paste in your Sherlock Holmes bot's instructions from Qbot, along with what you investigate, the patterns you care about, your region and your methods. The lead investigator will work the way you describe.</p>
+    <textarea id="persona" rows="16" aria-label="Investigator profile instructions"></textarea>
+    <footer role="none"><button class="ghost" type="button" id="persona-reset">Restore default</button><button class="primary sm" value="save" id="persona-save">Save profile</button></footer>
+  </form>
+</dialog>
+
+<dialog id="dlg-history" class="drawer">
+  <form method="dialog">
+    <header role="none"><h3>Case files</h3><button class="x" value="close" aria-label="Close">×</button></header>
+    <div id="offender-index"></div>
+    <div id="history-list"></div>
+    <footer role="none"><button class="ghost" type="button" id="history-clear">Clear all</button></footer>
+  </form>
+</dialog>
+
+<dialog id="dlg-subjects" class="drawer osint" aria-labelledby="subjects-h">
+  <div class="os-wrap">
+    <header role="none"><h3 id="subjects-h">Subject investigation</h3><button type="button" class="x" id="subjects-close" aria-label="Close">×</button></header>
+    <p class="os-ethics" id="subjects-ethics"><b>Public sources only.</b> Scam Bunker checks public profiles and public ledgers. It does no people-search, home-address, relatives or phone-owner lookups, and neither should you. A matching username is a lead, not an identification.</p>
+    <div class="tabs os-tabs" role="tablist" aria-label="Subject workspace">
+      <button role="tab" id="os-tab-investigate" aria-controls="os-panel-investigate" aria-selected="true" data-ostab="investigate">Investigate</button>
+      <button role="tab" id="os-tab-dossiers" aria-controls="os-panel-dossiers" aria-selected="false" tabindex="-1" data-ostab="dossiers">Offender dossiers <span class="count" id="os-dossier-count"></span></button>
+    </div>
+    <section role="tabpanel" id="os-panel-investigate" aria-labelledby="os-tab-investigate" data-ospanel="investigate"></section>
+    <section role="tabpanel" id="os-panel-dossiers" aria-labelledby="os-tab-dossiers" data-ospanel="dossiers" hidden></section>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  const btns = document.querySelectorAll('[data-theme-set]');
+  let cur = 'system'; try { cur = localStorage.getItem('scambunker.theme') || 'system'; } catch (e) { }
+  const apply = t => {
+    cur = t;
+    if (t === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+    btns.forEach(b => b.setAttribute('aria-pressed', b.dataset.themeSet === t));
+    try { t === 'system' ? localStorage.removeItem('scambunker.theme') : localStorage.setItem('scambunker.theme', t); } catch (e) { }
+  };
+  btns.forEach(b => b.addEventListener('click', () => apply(b.dataset.themeSet)));
+  apply(cur);
+})();
+</script>
+<script>
+// Report section nav: one ARIA tablist, vertical on wide screens. Arrow keys skip hidden tabs.
+(() => {
+  const list = document.getElementById('tabs');
+  const wide = matchMedia('(min-width: 1280px)');
+  const orient = () => list.setAttribute('aria-orientation', wide.matches ? 'vertical' : 'horizontal');
+  orient(); wide.addEventListener('change', orient);
+  const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+  list.addEventListener('keydown', e => {
+    if (!(e.key in step) && e.key !== 'Home' && e.key !== 'End') return;
+    const tabs = [...list.querySelectorAll('[role=tab]')].filter(t => !t.hidden);
+    const i = tabs.indexOf(document.activeElement); if (i < 0) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const n = e.key === 'Home' ? tabs[0] : e.key === 'End' ? tabs[tabs.length - 1] : tabs[(i + step[e.key] + tabs.length) % tabs.length];
+    n.focus(); n.click();
+  }, true);
+  // In the horizontal (scrolling) layout, keep the selected tab in view.
+  new MutationObserver(() => {
+    const t = list.querySelector('[aria-selected="true"]'); if (!t || wide.matches) return;
+    const l = t.offsetLeft - list.offsetLeft, r = l + t.offsetWidth;
+    if (l < list.scrollLeft || r > list.scrollLeft + list.clientWidth) list.scrollTo({ left: Math.max(0, l - 16) });
+  }).observe(list, { subtree: true, attributeFilter: ['aria-selected'] });
+})();
+</script>
+<script src="forensics.js"></script>
+<script src="scam.js"></script>
+<script src="shared/prompt.js"></script>
+<script src="app.js"></script>
+<script src="simple.js"></script>
+<script src="dossier.js"></script>
+<script src="osint.js"></script>
+<script src="provenance.js"></script>
+<script src="grading.js"></script>
+<script src="custody.js"></script>
+<script src="similar.js"></script>
+<script src="shared/claims.js"></script>
+<script src="factcheck.js"></script>
+<script src="shared/corroborate-core.js"></script>
+<script src="corroborate.js"></script>
+<script src="video.js"></script>
+<script src="events-core.js"></script>
+<script src="events.js"></script>
+<script src="pwa.js"></script>
+</body>
+</html>
