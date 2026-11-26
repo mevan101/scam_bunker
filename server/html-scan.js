@@ -64,7 +64,7 @@ function* tokens(html) {
     const gt = tagEnd(ne);
     if (gt === -1) { yield { type: 'text', text: html.slice(lt) }; return; }
     const name = html.slice(ns, ne).toLowerCase(), raw = html.slice(lt, gt + 1);
-    if (!closing && RAW_TEXT.has(name) && html.charCodeAt(gt - 1) === 47) { yield { type: 'raw', name, raw, content: '', closed: true }; i = gt + 1; continue; } // XHTML <script …/>
+    if (!closing && RAW_TEXT.has(name) && html.charCodeAt(gt - 1) === 47 && (gt - 1 === ne || /[\s"']/.test(html[gt - 2]))) { yield { type: 'raw', name, raw, content: '', closed: true }; i = gt + 1; continue; } // XHTML <script …/>
     if (!closing && RAW_TEXT.has(name)) {
       const at = findClose(name, gt + 1);
       if (at === -1) { yield { type: 'raw', name, raw, content: html.slice(gt + 1), closed: false }; return; }
