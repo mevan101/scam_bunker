@@ -73,6 +73,27 @@ async function t(name, fn) { try { await fn(); results.push(['✓', name]); } ca
     assert.deepStrictEqual(plain(ctx.window.ScamBunkerClaims.extractClaims(VIRAL)), golden.factcheck[0].claims);
     assert.ok(golden.factcheck[0].claims[0].explorerUrl.startsWith('https://toolbox.google.com/factcheck/explorer/search/'));
   });
+  await t('weather keeps capture minutes across fractional offsets; hour-only input unchanged', () => {
+    const om = JSON.parse(fixture('open-meteo-dhaka-2024-07-15.json'));
+    // The fixture is in GMT. 09:45 at UTC+05:30 is 04:15 UTC; truncating to 09:00 first would give 03:30 -> the 03 record.
+    const r = K.weatherResult(K.parseWeatherInput({ lat: 23.81, lon: 90.41, date: '2024-07-15', hour: 9, minute: 45, offsetMin: 330 }), om, false);
+    assert.strictEqual(r.hourly.time.slice(0, 13), '2024-07-15T04'); assert.strictEqual(r.minute, 45);
+    const h = K.weatherResult(K.parseWeatherInput({ lat: 23.81, lon: 90.41, date: '2024-07-15', hour: 9, minute: 0, offsetMin: 330 }), om, false);
+    assert.strictEqual(h.hourly.time.slice(0, 13), '2024-07-15T03'); assert.ok(!('minute' in h));
+    assert.throws(() => K.parseWeatherInput({ lat: 1, lon: 1, date: '2024-07-15', hour: 9, minute: 61 }), e => e.status === 400);
+  });
+  await t('browser Claude handoff includes locally extracted claims, same text as the server', () => {
+    const ctx = { window: {}, URL, URLSearchParams }; vm.createContext(ctx);
+    for (const f of ['public/shared/claims.js', 'public/shared/prompt.js']) vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx);
+    const text = 'Invented post: the Example Valley reservoir was closed in 2019 by the regional council.';
+    const factchecks = { available: false, claims: ctx.window.ScamBunkerClaims.extractClaims(text).map(c => ({ text: c.text, explorerUrl: c.explorerUrl })) };
+    const body = { case: { text, factchecks } };
+    const app = fs.readFileSync(path.join(root, 'public', 'app.js'), 'utf8');
+    assert.ok(app.includes('buildHandoffPrompt(body, window.ScamBunkerClaims?.caseFileSections)'), 'browser handoff passes the formatter');
+    const browser = ctx.window.ScamBunkerPrompt.buildHandoffPrompt(body, ctx.window.ScamBunkerClaims.caseFileSections);
+    assert.ok(/PRIOR FACT-CHECKS \(claims extracted locally, not searched/.test(browser) && browser.includes('reservoir was closed in 2019'));
+    assert.strictEqual(browser, require('../public/shared/prompt.js').buildHandoffPrompt(body, F.caseFileSections));
+  });
   await t('shared corroborate core loads as a plain browser script', () => {
     const ctx = { window: {}, URL, URLSearchParams }; vm.createContext(ctx);
     vm.runInContext(fs.readFileSync(path.join(root, 'public/shared/corroborate-core.js'), 'utf8'), ctx);

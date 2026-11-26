@@ -73,6 +73,7 @@
     const el = SB.panel('claims'); if (!el) return;
     const count = $('#claims-count');
     if (!c) { el.innerHTML = ''; return; }
+    el.dataset.caseId = c.id || '';
     const fc = c.factcheck, sim = window.ScamBunkerSimilar && window.ScamBunkerSimilar.html ? window.ScamBunkerSimilar.html(c) : '';
     if (count) count.textContent = (c.similar || []).length ? String(c.similar.length) : '';
     let claims;
@@ -96,5 +97,12 @@
     if (!e.target.closest('#history-list .hist')) return;
     setTimeout(() => { const c = SB.current; if (!c) return; if (c.factcheck && !c.factcheck.status) { observations(c); SB.renderAll(); render(c); } else lookup(c); }, 0);
   });
+  // Cases opened from elsewhere (e.g. a dossier's Linked cases) do not fire sb:case, so refresh when the tab is shown.
+  const tab = $('#tab-claims');
+  if (tab) new MutationObserver(() => {
+    const c = SB.current, el = SB.panel('claims');
+    if (!c || !el || tab.getAttribute('aria-selected') !== 'true' || el.dataset.caseId === String(c.id || '')) return;
+    if (c.factcheck && !c.factcheck.status) render(c); else lookup(c);
+  }).observe(tab, { attributes: true, attributeFilter: ['aria-selected'] });
   render(SB.current);
 })();

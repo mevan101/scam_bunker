@@ -7,7 +7,7 @@ const { assertPublicUrl } = require('./net-guard');
 
 const KEY = process.env.GOOGLE_FACTCHECK_API_KEY || process.env.FACTCHECK_API_KEY || '';
 const ENDPOINT = 'https://factchecktools.googleapis.com/v1alpha1/claims:search';
-const { EXPLORER, extractClaims, toQuery, sentences } = require('../public/shared/claims');
+const { EXPLORER, extractClaims, toQuery, sentences, caseFileSections } = require('../public/shared/claims');
 const CACHE_MS = 6 * 3600 * 1000;
 const cache = new Map();
 
@@ -71,26 +71,6 @@ async function lookup(body = {}, opts = {}) {
 }
 
 // ---------- Case-file sections for the agent team ----------
-function caseFileSections(c = {}) {
-  const parts = [];
-  const fc = c.factchecks;
-  if (fc && Array.isArray(fc.claims) && fc.claims.length) {
-    const lines = fc.claims.map((cl, i) => {
-      const head = `${i + 1}. CLAIM: "${str(cl.text, 240)}"`;
-      if (!fc.available) return `${head}\n   Not searched automatically (no API key). Investigator can check Google Fact Check Explorer.`;
-      if (cl.error) return `${head}\n   Lookup failed: ${str(cl.error, 160)}`;
-      if (!(cl.matches || []).length) return `${head}\n   No published fact-check found by search. Absence of a fact-check is not evidence either way.`;
-      return `${head}\n` + cl.matches.slice(0, 3).map(m => m.reviews.slice(0, 2).map(r => `   - ${r.publisher} rated "${str(m.text, 160)}" as "${r.rating}"${r.reviewDate ? ` (${r.reviewDate.slice(0, 10)})` : ''} ${r.url}`).join('\n')).join('\n');
-    });
-    parts.push(`PRIOR FACT-CHECKS (${fc.available ? 'Google Fact Check Tools claims:search, ClaimReview' : 'claims extracted locally, not searched'}; search matches may be a different claim, confirm before relying on them):\n${lines.join('\n')}`);
-  }
-  const sim = c.similar;
-  if (Array.isArray(sim) && sim.length) {
-    parts.push(`SIMILAR EARLIER CASES (local template match, word 5-gram Jaccard similarity; links to a reused script, not proof of the same sender; earlier case text stays on the investigator's device):\n${sim.slice(0, 5).map(s => `- ${Math.round(s.similarity * 100)}% similar to a case from ${str(s.at, 10)} judged "${str(s.verdict, 40)}"${s.platform ? ` on ${str(s.platform, 30)}` : ''}`).join('\n')}`);
-  }
-  return parts.join('\n\n');
-}
-
 const routes = { '/api/factcheck': b => lookup(b) };
 
 module.exports = { routes, extractClaims, toQuery, sentences, parseClaimSearch, parseApiError, searchClaim, lookup, caseFileSections, available: () => !!KEY, EXPLORER };

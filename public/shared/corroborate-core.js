@@ -76,11 +76,15 @@ function parseWeatherInput(b) {
   if (Date.parse(date) > Date.now()) throw httpError(400, 'Date is in the future', 'bad_input');
   let hour = b.hour === '' || b.hour == null ? null : Number(b.hour);
   if (hour != null && !(Number.isInteger(hour) && hour >= 0 && hour <= 23)) throw httpError(400, 'Hour must be 0-23', 'bad_input');
+  const minute = b.minute === '' || b.minute == null || hour == null ? 0 : Number(b.minute);
+  if (!(Number.isInteger(minute) && minute >= 0 && minute <= 59)) throw httpError(400, 'Minute must be 0-59', 'bad_input');
   const claim = b.claim ? String(b.claim) : null;
   if (claim && !CLAIMS.includes(claim)) throw httpError(400, 'Unknown weather claim', 'bad_input');
   const offsetMin = b.offsetMin === '' || b.offsetMin == null ? null : Number(b.offsetMin);
   if (offsetMin != null && !(Number.isInteger(offsetMin) && Math.abs(offsetMin) <= 840)) throw httpError(400, 'UTC offset must be -14:00..+14:00', 'bad_input');
-  return { lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100, date, hour, offsetMin, claim };
+  const p = { lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100, date, hour, offsetMin, claim };
+  if (minute) p.minute = minute;
+  return p;
 }
 
 const shiftDay = (date, n) => new Date(Date.parse(date + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
@@ -98,13 +102,13 @@ function weatherUrl(p) {
 // Open-Meteo answers bad input with HTTP 400 and {error:true, reason}.
 function weatherApiError(j) { return j && j.error ? httpError(400, String(j.reason || 'Open-Meteo rejected the request').slice(0, 200), 'bad_input') : null; }
 
-// `hour` is wall-clock time at `offsetMin` (capture offset) or, without an offset, local time at the place.
-// Open-Meteo answers in the place's timezone, so the instant is moved into it before picking the day and hour.
-function summarizeWeather(j, hour = null, date = null, offsetMin = null) {
+// `hour`:`minute` is wall-clock time at `offsetMin` (capture offset) or, without an offset, local time at the place.
+// Open-Meteo answers in the place's timezone, so the full instant is moved into it before picking the day and hour.
+function summarizeWeather(j, hour = null, date = null, offsetMin = null, minute = 0) {
   if (!j || !j.daily || !Array.isArray(j.daily.time)) throw httpError(502, 'Unexpected Open-Meteo response', 'upstream');
   date = date || j.daily.time[0];
   const hourKey = hour == null ? null : offsetMin == null ? `${date}T${String(hour).padStart(2, '0')}`
-    : new Date(Date.parse(`${date}T${String(hour).padStart(2, '0')}:00:00Z`) + ((j.utc_offset_seconds || 0) - offsetMin * 60) * 1000).toISOString().slice(0, 13);
+    : new Date(Date.parse(`${date}T${String(hour).padStart(2, '0')}:${String(minute || 0).padStart(2, '0')}:00Z`) + ((j.utc_offset_seconds || 0) - offsetMin * 60) * 1000).toISOString().slice(0, 13);
   const localDate = hourKey ? hourKey.slice(0, 10) : date;
   const d = j.daily, i = d.time.indexOf(localDate), pick = k => (i >= 0 && d[k] ? d[k][i] ?? null : null), h = j.hourly || {};
   const sameDay = (h.time || []).map((t, k) => (String(t).slice(0, 10) === localDate ? h.snow_depth?.[k] : null)).filter(v => v != null);
@@ -154,7 +158,7 @@ function checkClaim(s, claim) {
   }
 }
 function weatherResult(p, j, cached) {
-  const s = summarizeWeather(j, p.hour, p.date, p.offsetMin);
+  const s = summarizeWeather(j, p.hour, p.date, p.offsetMin, p.minute || 0);
   return {
     ...p, ...s, cached, check: checkClaim(s, p.claim),
     attribution: { text: 'Weather data by Open-Meteo.com', url: 'https://open-meteo.com/', license: 'CC BY 4.0' },

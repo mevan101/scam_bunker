@@ -67,7 +67,29 @@ function extractClaims(text, max = 3) {
     .map(c => ({ text: c.text, query: c.query, why: c.why, explorerUrl: EXPLORER + encodeURIComponent(c.query) }));
 }
 
-const api = { EXPLORER, extractClaims, toQuery, sentences, scoreSentence };
+// Case-file sections for the agents and the Claude handoff (server prompt and browser prompt use the same text).
+const str = (v, n = 300) => (v == null ? '' : String(v).slice(0, n));
+function caseFileSections(c = {}) {
+  const parts = [];
+  const fc = c.factchecks;
+  if (fc && Array.isArray(fc.claims) && fc.claims.length) {
+    const lines = fc.claims.map((cl, i) => {
+      const head = `${i + 1}. CLAIM: "${str(cl.text, 240)}"`;
+      if (!fc.available) return `${head}\n   Not searched automatically (no API key). Investigator can check Google Fact Check Explorer.`;
+      if (cl.error) return `${head}\n   Lookup failed: ${str(cl.error, 160)}`;
+      if (!(cl.matches || []).length) return `${head}\n   No published fact-check found by search. Absence of a fact-check is not evidence either way.`;
+      return `${head}\n` + cl.matches.slice(0, 3).map(m => m.reviews.slice(0, 2).map(r => `   - ${r.publisher} rated "${str(m.text, 160)}" as "${r.rating}"${r.reviewDate ? ` (${r.reviewDate.slice(0, 10)})` : ''} ${r.url}`).join('\n')).join('\n');
+    });
+    parts.push(`PRIOR FACT-CHECKS (${fc.available ? 'Google Fact Check Tools claims:search, ClaimReview' : 'claims extracted locally, not searched'}; search matches may be a different claim, confirm before relying on them):\n${lines.join('\n')}`);
+  }
+  const sim = c.similar;
+  if (Array.isArray(sim) && sim.length) {
+    parts.push(`SIMILAR EARLIER CASES (local template match, word 5-gram Jaccard similarity; links to a reused script, not proof of the same sender; earlier case text stays on the investigator's device):\n${sim.slice(0, 5).map(s => `- ${Math.round(s.similarity * 100)}% similar to a case from ${str(s.at, 10)} judged "${str(s.verdict, 40)}"${s.platform ? ` on ${str(s.platform, 30)}` : ''}`).join('\n')}`);
+  }
+  return parts.join('\n\n');
+}
+
+const api = { EXPLORER, extractClaims, toQuery, sentences, scoreSentence, caseFileSections };
 if (typeof module === 'object' && module.exports) module.exports = api;
 else root.ScamBunkerClaims = api;
 })(typeof window !== 'undefined' ? window : globalThis);

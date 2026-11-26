@@ -322,7 +322,7 @@
     if (pl.err) { st.wxHtml = errBox(pl.err); return render(c); }
     st.wxHtml = '<p class="muted">Looking up Open-Meteo…</p>'; render(c);
     try {
-      const r = await lookup('weather', { lat: pl.lat, lon: pl.lon, date: f.date, hour: f.time ? +f.time.slice(0, 2) : null, offsetMin: f.time && f.offset.trim() ? pl.off : null, claim: f.claim || null });
+      const r = await lookup('weather', { lat: pl.lat, lon: pl.lon, date: f.date, hour: f.time ? +f.time.slice(0, 2) : null, minute: f.time ? +f.time.slice(3, 5) || 0 : null, offsetMin: f.time && f.offset.trim() ? pl.off : null, claim: f.claim || null });
       const dd = r.daily, h = r.hourly, ck = r.check;
       st.wxHtml = `${ck ? `<div class="obs"><div class="ob"><div><span class="k">Claimed: ${esc(ck.claim)}</span><p>${esc(ck.why)}</p></div><div><span class="k">Strength</span><p>${esc(ck.strength)}: gridded model, not a local observation</p></div><span class="w ${ck.result === 'contradicted' ? 'moderate' : ck.result === 'consistent' ? 'ok' : 'weak'}">${esc(ck.result)}</span></div></div>` : ''}
         <div class="kv">
