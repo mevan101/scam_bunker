@@ -344,12 +344,14 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
         if (db) try { await req(db, 'files', 'put', f); return true; } catch { }
         memFiles.set(f.sha256, f); return false;
       },
+      forgetLocal() { mem.clear(); memFiles.clear(); },
       async clear() {
         mem.clear(); memFiles.clear();
         lsIndex().forEach(id => { try { localStorage.removeItem(LS + id); } catch { } });
         try { localStorage.removeItem(LS + 'index'); } catch { }
         const db = await open();
         if (db) for (const s of ['logs', 'files']) try { await req(db, s, 'clear'); } catch { }
+        try { localStorage.setItem(LS + 'cleared', String(Date.now())); } catch { }
       },
       async getFile(sha) {
         const db = await open();
@@ -647,7 +649,8 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
   // ---------- Events ----------
   document.addEventListener('sb:case', e => { const c = e.detail; caseTask(c.id, () => intake(c)).then(() => SB.current === c && render(c)); });
   document.addEventListener('sb:case-complete', e => { const c = e.detail; caseTask(c.id, () => complete(c)).then(() => SB.current === c && render(c)); });
-  window.addEventListener('storage', e => { if (e.key === 'scambunker.cases' && e.newValue === '[]') Store.clear().then(() => render(SB.current)); });
+  // The clearing tab already emptied shared storage; other tabs only drop their tab-local copies.
+  window.addEventListener('storage', e => { if (e.key === LS + 'cleared') { Store.forgetLocal(); render(SB.current); } });
   document.addEventListener('click', e => {
     if (e.target.closest('#history-list .hist')) { setTimeout(() => render(SB.current), 0); return; }
     if (e.target.closest('#btn-history')) { setTimeout(annotateHistory, 0); return; }
