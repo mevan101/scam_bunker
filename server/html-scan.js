@@ -17,12 +17,39 @@ function closeFinder(html) {
   };
 }
 
+// Memoised indexOf for single characters: each search resumes where the last one ended, so the total work stays linear.
+function charFinder(html) {
+  const memo = new Map();
+  return (ch, from) => {
+    const m = memo.get(ch);
+    if (m && m.from <= from && (m.at === -1 || m.at >= from)) return m.at;
+    const at = html.indexOf(ch, from);
+    memo.set(ch, { from, at });
+    return at;
+  };
+}
+
 // Tokens: { type: 'text', text } | { type: 'tag', name, closing, raw, start, end } | { type: 'raw', name, raw, content }
 // Raw-text elements (script, style, noscript, title, textarea) are returned whole, with content up to their close tag
 // (or the end of the input when unclosed, as browsers do).
 function* tokens(html) {
   html = String(html ?? '');
-  const n = html.length, findClose = closeFinder(html);
+  const n = html.length, findClose = closeFinder(html), next = charFinder(html);
+  // End of a tag: the first '>' outside a quoted attribute value (a quote right after '='). An unclosed quote falls back
+  // to the first '>'.
+  const tagEnd = from => {
+    let j = from;
+    for (;;) {
+      const gt = next('>', j), dq = next('"', j), sq = next("'", j);
+      const q = dq === -1 ? sq : sq === -1 ? dq : Math.min(dq, sq);
+      if (q === -1 || gt === -1 || gt < q) return gt;
+      let b = q - 1; while (b > j && (html.charCodeAt(b) === 32 || html.charCodeAt(b) === 9 || html.charCodeAt(b) === 10 || html.charCodeAt(b) === 13)) b--;
+      if (html[b] !== '=') { j = q + 1; continue; } // a quote only opens an attribute value right after '='
+      const close = next(html[q], q + 1);
+      if (close === -1) return next('>', from);
+      j = close + 1;
+    }
+  };
   let i = 0;
   while (i < n) {
     const lt = html.indexOf('<', i);
@@ -34,9 +61,10 @@ function* tokens(html) {
     if (c1 === 33 || c1 === 63) { const e = html.indexOf('>', lt); if (e === -1) return; i = e + 1; continue; } // <!doctype, <?xml
     if (!isNameStart(html.charCodeAt(ns))) { yield { type: 'text', text: '<' }; i = lt + 1; continue; }
     let ne = ns + 1; while (ne < n && isNameChar(html.charCodeAt(ne))) ne++;
-    const gt = html.indexOf('>', ne);
+    const gt = tagEnd(ne);
     if (gt === -1) { yield { type: 'text', text: html.slice(lt) }; return; }
     const name = html.slice(ns, ne).toLowerCase(), raw = html.slice(lt, gt + 1);
+    if (!closing && RAW_TEXT.has(name) && html.charCodeAt(gt - 1) === 47) { yield { type: 'raw', name, raw, content: '', closed: true }; i = gt + 1; continue; } // XHTML <script …/>
     if (!closing && RAW_TEXT.has(name)) {
       const at = findClose(name, gt + 1);
       if (at === -1) { yield { type: 'raw', name, raw, content: html.slice(gt + 1), closed: false }; return; }
