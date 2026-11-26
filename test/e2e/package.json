@@ -1,0 +1,15 @@
+{
+  "name": "scam-bunker-e2e",
+  "private": true,
+  "description": "Dev-only Playwright end-to-end suite. Not part of the app, which stays zero-dependency.",
+  "scripts": {
+    "test": "playwright test",
+    "test:server": "playwright test --project=server",
+    "test:static": "playwright test --project=static"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.1",
+    "@playwright/test": "1.65.1",
+    "axe-core": "4.14.1"
+  }
+}

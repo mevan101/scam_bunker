@@ -113,6 +113,25 @@ test/provenance.test.js  npm test (hashing, verdict, Wayback parser, SSRF guard)
 - Username sweeps show that a profile with that exact name exists, not who runs it. Many big platforms (Instagram, Facebook, X, LinkedIn, TikTok) block anonymous checks, so they are reported as unknown with a link to check by hand.
 - This is an aid to judgement and does not replace it. Verify before you accuse anyone publicly.
 
+## Testing
+
+```bash
+npm test                     # unit tests, zero dependencies
+```
+
+The browser suite in `test/e2e/` uses Playwright. Playwright is a dev-only tool with its own `package.json`; the app stays zero-dependency and `npm start` never needs it.
+
+```bash
+cd test/e2e
+npm ci                                            # pinned @playwright/test + axe-core
+npx playwright@1.65.1 install --with-deps chromium
+npx playwright test                               # both modes
+npx playwright test --project=server              # npm start, with /api
+npx playwright test --project=static              # npm run build:pages, served under /scam_bunker/, no /api
+```
+
+Every test runs in both modes. The suite covers the five samples, an AI-generated PNG and a geotagged JPEG (both generated at test time), every report section, keyboard navigation, the claude.ai handoff, repeat-offender linking, light and dark themes, a 390px layout and axe-core (WCAG 2.2 AA) in both themes. Report tests run in Investigator mode. A Simple-mode block checks every sample, the 390px layout and axe-core, and it skips itself until `ScamBunker.mode()` exists. The browser can reach only the local app. All fixtures are invented. The `E2E` GitHub Actions workflow runs the suite on every push and pull request and uploads the HTML report.
+
 ## Contributing
 
 Read [docs/MISSION.md](docs/MISSION.md) and [docs/PRODUCT.md](docs/PRODUCT.md) first, then [AGENTS.md](AGENTS.md) for the working rules (they apply to humans and AI agents alike). Scam Bunker is built in the open by people working alongside AI agents: Claude Code coordinates, reviews and does final QA, and Devin sessions build features in parallel. Every change goes through review and is tested in both the local app and the hosted site.

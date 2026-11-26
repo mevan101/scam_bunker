@@ -1,0 +1,23 @@
+name: E2E
+on: [push, pull_request]
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: test/e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      # Dev-only tooling, pinned in test/e2e/package-lock.json. The app itself stays zero-dependency.
+      - run: npm ci
+      - run: npx playwright@1.65.1 install --with-deps chromium
+      - run: npx playwright test
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: test/e2e/playwright-report/
+          retention-days: 14
