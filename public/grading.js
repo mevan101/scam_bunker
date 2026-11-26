@@ -111,7 +111,7 @@
   function noun(verdict, category) {
     if (SCAM_VERDICTS.has(verdict) || verdict === 'Suspicious') {
       const cat = String(category || '').trim();
-      if (!SCHEMES.test(cat)) return verdict === 'Suspicious' && /\b(ai|synthetic|generat\w*)\b/i.test(cat) ? 'AI-generated' : verdict === 'Suspicious' && /image|metadata|edit/i.test(cat) ? 'manipulated' : 'a scam';
+      if (!SCHEMES.test(cat)) return verdict === 'Suspicious' && /\b(ai|synthetic|generat\w*)\b/i.test(cat) ? 'AI-generated' : verdict === 'Suspicious' && /\b(image|metadata|edit\w*)\b/i.test(cat) ? 'manipulated' : 'a scam';
       const t = cat.toLowerCase().replace(/\s+scam$/, '');
       return `${/^[aeiou]/.test(t) ? 'an' : 'a'} ${t} scam`;
     }

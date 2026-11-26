@@ -212,6 +212,8 @@ test('a suspicious image-only case is worded about AI or manipulation, not scams
   assert.match(G.apply(mkCase({ verdict: 'Suspicious', category: 'Possible AI image' })).estimate.label, /^Roughly even chance that this is AI-generated/);
   assert.strictEqual(G.noun('Suspicious', 'Metadata anomaly'), 'manipulated');
   assert.strictEqual(G.noun('Suspicious', 'Linked to earlier scam cases'), 'a scam');
+  assert.strictEqual(G.noun('Suspicious', 'Credit card fraud'), 'a scam');
+  assert.strictEqual(G.noun('Suspicious', 'Edited screenshot'), 'manipulated');
 });
 
 // ---------- Wiring ----------
