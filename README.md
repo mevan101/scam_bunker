@@ -19,6 +19,8 @@ Drop in an image, a post, a DM or a link. Scam Bunker dates the image, checks wh
 | **Detects coordination** | Copy-paste comment rings, hashtag stuffing, mass-tagging, "my advisor" testimonial networks |
 | **Dissects links** | Typosquats, punycode homographs, brand-in-subdomain tricks, `@` tricks, shorteners, high-abuse TLDs, redirect chains, tracking parameters |
 | **Profiles repeat offenders** | Every case adds the scammer's wallets, handles, phone numbers, emails, domains, image hashes and camera serials to a local offender index. New cases are matched against it automatically, and reuse is flagged as strong evidence |
+| **Investigates a subject** | **Subjects** opens a workspace for one suspected actor. It checks an exact username on about 60 public platforms (found / not found / unknown / blocked, never guessed), reads domain age and registrar from RDAP, and summarises wallets from public ledgers (BTC via mempool.space, TRON via TronGrid, ETH with an Etherscan key). It does no people-search, address or relatives lookups |
+| **Builds offender dossiers** | Union-find entity resolution links every saved case that shares a wallet, handle, phone, email, domain, image or camera serial into one actor profile with aliases, identifiers (first and last seen), platforms, linked cases and a timeline. Exports a printable report with a SHA-256 for chain of custody |
 | **Extracts entities** | Crypto wallets (with block-explorer links), phone numbers, handles, emails, money amounts |
 | **Agent team** | Image Forensics (vision), Fraud Analyst, OSINT & Platform Analyst and Fact Checker run in parallel. The Lead Investigator then reconciles their reports and returns a structured verdict |
 
@@ -60,6 +62,11 @@ Images are parsed **in your browser**. Nothing leaves your machine unless you ch
 public/forensics.js   image container parsers (JPEG/PNG/WebP/HEIC), EXIF/XMP/IPTC/C2PA, ELA, AI signatures
 public/scam.js        rule engine: scam patterns, link analysis, entity extraction, coordination signals
 public/app.js         case orchestration, local reasoning, UI
+public/osint.js       subject workspace, username sweep UI, dossiers, export, domain-age observations
+public/dossier.js     pure entity-resolution (union-find), risk scoring, SHA-256
+server/osint.js       /api/osint/username · /api/osint/domain (RDAP) · /api/osint/wallet
+server/net-guard.js   SSRF guard shared by every server-side fetch
+data/sites.json       username-check definitions (CC BY-SA 4.0, see data/README.md)
 server.js             zero-dependency Node server: static files + /api/agent, /api/lead, /api/fetch, /api/search
 test/run.js           npm test
 ```
@@ -69,6 +76,7 @@ test/run.js           npm test
 - Metadata can be forged or stripped. Scam Bunker reports what the file says and how far to trust it.
 - Statistical AI detection is unreliable on its own. Scam Bunker treats it as a weak signal by design.
 - Facebook, Instagram and LinkedIn block anonymous page fetches. Paste the post text instead.
+- Username sweeps show that a profile with that exact name exists, not who runs it. Many big platforms (Instagram, Facebook, X, LinkedIn, TikTok) block anonymous checks, so they are reported as unknown with a link to check by hand.
 - This is an aid to judgement and does not replace it. Verify before you accuse anyone publicly.
 
 ## Contributing
@@ -77,4 +85,4 @@ New scam patterns, generator signatures and platform fingerprints are the most v
 
 ## License
 
-[MIT](LICENSE)
+Code: [MIT](LICENSE). `data/sites.json` is CC BY-SA 4.0. Its format is modelled on [WhatsMyName](https://github.com/WebBreacher/WhatsMyName) (CC BY-SA 4.0, archived November 2026). See [data/README.md](data/README.md).

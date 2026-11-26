@@ -1,0 +1,39 @@
+{
+  "objectClassName": "domain",
+  "handle": "D000000000-CNIC",
+  "ldhName": "COINBASE-PRO-WALLET.XYZ",
+  "status": ["client transfer prohibited", "server hold"],
+  "events": [
+    { "eventAction": "registration", "eventDate": "2026-11-12T08:15:30.0Z" },
+    { "eventAction": "expiration", "eventDate": "2027-11-12T23:59:59.0Z" },
+    { "eventAction": "last changed", "eventDate": "2026-11-13T10:02:11.0Z" },
+    { "eventAction": "last update of RDAP database", "eventDate": "2026-11-26T09:00:00.0Z" }
+  ],
+  "entities": [
+    {
+      "objectClassName": "entity",
+      "handle": "1068",
+      "roles": ["registrar"],
+      "publicIds": [{ "type": "IANA Registrar ID", "identifier": "1068" }],
+      "vcardArray": ["vcard", [["version", {}, "text", "4.0"], ["fn", {}, "text", "Example Registrar, LLC"]]],
+      "entities": [
+        {
+          "objectClassName": "entity",
+          "roles": ["abuse"],
+          "vcardArray": ["vcard", [["version", {}, "text", "4.0"], ["fn", {}, "text", "Abuse Contact"], ["tel", { "type": "voice" }, "uri", "tel:+1.5555550100"], ["email", {}, "text", "abuse@registrar.example"]]]
+        }
+      ]
+    },
+    {
+      "objectClassName": "entity",
+      "roles": ["registrant"],
+      "vcardArray": ["vcard", [["version", {}, "text", "4.0"], ["fn", {}, "text", "REDACTED FOR PRIVACY"]]]
+    }
+  ],
+  "nameservers": [
+    { "objectClassName": "nameserver", "ldhName": "ADA.NS.CLOUDFLARE.COM" },
+    { "objectClassName": "nameserver", "ldhName": "BOB.NS.CLOUDFLARE.COM" }
+  ],
+  "secureDNS": { "delegationSigned": false },
+  "rdapConformance": ["rdap_level_0", "icann_rdap_response_profile_0"]
+}

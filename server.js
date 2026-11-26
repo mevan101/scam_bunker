@@ -1,12 +1,12 @@
 // Scam Bunker — investigation server. Zero dependencies: `node server.js`
 // AI provider (first match wins): ANTHROPIC_API_KEY · LLM_BASE_URL (+LLM_API_KEY, LLM_MODEL) for any OpenAI-compatible API
 // (Groq, OpenRouter, LM Studio…) · a local Ollama, detected automatically. With none, the claude.ai handoff still works.
-// Optional: FIRECRAWL_API_KEY (web fetch + corroboration search)
+// Optional: FIRECRAWL_API_KEY (web fetch + corroboration search) · ETHERSCAN_API_KEY · TRONGRID_API_KEY / TRONSCAN_API_KEY (optional, wallet lookups in server/osint.js)
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const net = require('net');
-const dns = require('dns').promises;
+const { assertPublicUrl } = require('./server/net-guard');
+const osint = require('./server/osint');
 
 const PORT = process.env.PORT || 4400;
 const HOST = process.env.HOST || '127.0.0.1'; // localhost only by default, so others on your network can't spend your API key
@@ -179,25 +179,6 @@ async function handleLead(req, res) {
   send(res, 200, parsed ? { verdict: parsed } : { raw });
 }
 
-// SSRF guard: only fetch public internet hosts, never localhost / LAN / cloud metadata.
-function isPrivateIp(ip) {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split('.').map(Number);
-    return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19)) || a >= 224;
-  }
-  const v = ip.toLowerCase();
-  if (v.startsWith('::ffff:')) return isPrivateIp(v.slice(7));
-  return v === '::' || v === '::1' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80');
-}
-async function assertPublicUrl(u) {
-  const { protocol, hostname } = new URL(u);
-  if (!/^https?:$/.test(protocol)) throw new Error('Only http(s) URLs can be fetched');
-  const host = hostname.replace(/^\[|\]$/g, '');
-  const addrs = net.isIP(host) ? [{ address: host }] : await dns.lookup(host, { all: true });
-  if (!addrs.length || addrs.some(a => isPrivateIp(a.address))) throw new Error('Refusing to fetch a private or local network address');
-}
-
 // Builds a single self-contained prompt that runs the whole agent team inside one chat (claude.ai, or any assistant).
 async function handlePrompt(req, res) {
   const body = await readBody(req);
@@ -270,6 +251,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && u.pathname === '/api/prompt') return await handlePrompt(req, res);
     if (req.method === 'POST' && u.pathname === '/api/fetch') return await handleFetch(req, res);
     if (req.method === 'POST' && u.pathname === '/api/search') return await handleSearch(req, res);
+    if (req.method === 'POST' && osint.routes[u.pathname]) return await osint.routes[u.pathname](await readBody(req, 64 * 1024), res, send);
     let p = path.normalize(path.join(PUB, u.pathname === '/' ? 'index.html' : u.pathname));
     if (p !== PUB && !p.startsWith(PUB + path.sep)) return send(res, 403, 'forbidden', 'text/plain');
     fs.readFile(p, (err, data) => {
@@ -278,7 +260,7 @@ const server = http.createServer(async (req, res) => {
       res.end(data);
     });
   } catch (e) {
-    send(res, 502, { error: e.cause?.code ? `${e.message} (${e.cause.code})` : e.message });
+    send(res, e.status || 502, { error: e.cause?.code ? `${e.message} (${e.cause.code})` : e.message });
   }
 });
 

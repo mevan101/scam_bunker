@@ -1,0 +1,14 @@
+{
+  "address": "TJYeasTPa6gpEEfYqCP9sMBc7NJqKPDJvT",
+  "activated": true,
+  "balance": 12500000,
+  "date_created": 1729000000000,
+  "latest_operation_time": 1732500000000,
+  "totalTransactionCount": 214,
+  "transactions_in": 190,
+  "transactions_out": 24,
+  "withPriceTokens": [
+    { "tokenId": "_", "tokenAbbr": "trx", "tokenName": "trx", "tokenDecimal": 6, "balance": "12500000" },
+    { "tokenId": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", "tokenAbbr": "USDT", "tokenName": "Tether USD", "tokenDecimal": 6, "balance": "48210500000" }
+  ]
+}

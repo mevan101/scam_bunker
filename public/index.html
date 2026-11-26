@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="osint.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='13' cy='13' r='8' fill='none' stroke='%23e8a33d' stroke-width='3'/><path d='M19 19l8 8' stroke='%23e8a33d' stroke-width='3.5' stroke-linecap='round'/></svg>">
 </head>
 <body>
@@ -22,6 +23,7 @@
     <span class="pill" id="pill-web"><i></i>Web</span>
   </div>
   <nav class="actions">
+    <button class="ghost" id="btn-subjects" aria-haspopup="dialog">Subjects</button>
     <button class="ghost" id="btn-history">Case files</button>
     <button class="ghost" id="btn-persona">Investigator profile</button>
   </nav>
@@ -142,10 +144,25 @@
   </form>
 </dialog>
 
+<dialog id="dlg-subjects" class="drawer osint" aria-labelledby="subjects-h">
+  <div class="os-wrap">
+    <header><h3 id="subjects-h">Subject investigation</h3><button type="button" class="x" id="subjects-close" aria-label="Close">×</button></header>
+    <p class="os-ethics" id="subjects-ethics"><b>Public sources only.</b> Scam Bunker checks public profiles and public ledgers. It does no people-search, home-address, relatives or phone-owner lookups, and neither should you. A matching username is a lead, not an identification.</p>
+    <div class="tabs os-tabs" role="tablist" aria-label="Subject workspace">
+      <button role="tab" id="os-tab-investigate" aria-controls="os-panel-investigate" aria-selected="true" data-ostab="investigate">Investigate</button>
+      <button role="tab" id="os-tab-dossiers" aria-controls="os-panel-dossiers" aria-selected="false" tabindex="-1" data-ostab="dossiers">Offender dossiers <span class="count" id="os-dossier-count"></span></button>
+    </div>
+    <section role="tabpanel" id="os-panel-investigate" aria-labelledby="os-tab-investigate" data-ospanel="investigate"></section>
+    <section role="tabpanel" id="os-panel-dossiers" aria-labelledby="os-tab-dossiers" data-ospanel="dossiers" hidden></section>
+  </div>
+</dialog>
+
 <div class="toast" id="toast" role="status"></div>
 
 <script src="forensics.js"></script>
 <script src="scam.js"></script>
 <script src="app.js"></script>
+<script src="dossier.js"></script>
+<script src="osint.js"></script>
 </body>
 </html>
