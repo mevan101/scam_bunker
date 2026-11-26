@@ -514,7 +514,7 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
         <p class="muted" id="cust-recheck-out" role="status" aria-live="polite">${verifyHtml.startsWith('local:') ? verifyHtml.slice(6) : ''}</p>
       </section>
       <section aria-labelledby="cust-ev-h"><h3 id="cust-ev-h">Evidence locker</h3>
-        <div class="cust-scroll" role="region" aria-labelledby="cust-ev-h" tabindex="0"><table class="cust-table"><thead><tr><th scope="col">Item</th><th scope="col">SHA-256</th><th scope="col">Size</th><th scope="col">Acquired (UTC)</th><th scope="col">Source</th><th scope="col">Original</th></tr></thead><tbody>
+        <div class="cust-scroll" role="region" aria-label="Evidence locker table" tabindex="0"><table class="cust-table"><thead><tr><th scope="col">Item</th><th scope="col">SHA-256</th><th scope="col">Size</th><th scope="col">Acquired (UTC)</th><th scope="col">Source</th><th scope="col">Original</th></tr></thead><tbody>
         ${evidence.map(e => { const x = e.input; const notes = log.filter(n => n.action === 'evidence-note' && n.input.sha256 === x.sha256).map(n => n.input.note); return `<tr><td><b>${escH(x.kind)}</b> ${escH(x.name)}${x.note ? `<br><span class="muted">${escH(x.note)}</span>` : ''}${notes.map(n => `<br><span class="muted">Where I got this: ${escH(n)}</span>`).join('')}</td><td><code>${escH(x.sha256)}</code></td><td class="cust-nw">${escH(kb(x.size))}</td><td>${escH(x.acquiredAt)}</td><td>${linkOrDash(x.sourceUrl)}</td><td class="cust-nw">${escH(x.original)}</td></tr>`; }).join('') || '<tr><td colspan="6">No evidence recorded.</td></tr>'}
         </tbody></table></div>
         ${evidence.length ? `<div class="row" style="margin-top:12px"><label class="field grow"><span>Where I got this (recorded as a new log entry)</span><input id="cust-note" type="text" placeholder="e.g. Screenshot sent to me in a WhatsApp group on 2 May"></label>
@@ -548,7 +548,7 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
         <div class="cust-result" id="cust-verify-out" role="status" aria-live="polite">${verifyHtml.startsWith('pkg:') ? verifyHtml.slice(4) : ''}</div>
       </section>
       <section aria-labelledby="cust-log-h"><h3 id="cust-log-h">Case log</h3>
-        <div class="cust-scroll" role="region" aria-labelledby="cust-log-h" tabindex="0"><table class="cust-table"><thead><tr><th scope="col">#</th><th scope="col">When (UTC)</th><th scope="col">Action</th><th scope="col">Detail</th><th scope="col">Entry hash</th></tr></thead><tbody>
+        <div class="cust-scroll" role="region" aria-label="Case log table" tabindex="0"><table class="cust-table"><thead><tr><th scope="col">#</th><th scope="col">When (UTC)</th><th scope="col">Action</th><th scope="col">Detail</th><th scope="col">Entry hash</th></tr></thead><tbody>
         ${log.map(e => `<tr><td>${e.seq}</td><td>${escH(e.ts)}</td><td class="cust-nw">${escH(ACTION_LABEL[e.action] || e.action)}</td><td>${escH(summarizeEntry(e))}</td><td><code title="${escH(e.hash)}">${escH(short(e.hash))}</code></td></tr>`).join('')}
         </tbody></table></div>
       </section>`;

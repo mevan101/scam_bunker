@@ -6,16 +6,17 @@
 <title>Scam Bunker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>try { var t = localStorage.getItem('scambunker.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) { }</script>
 <link rel="stylesheet" href="app.css">
 <link rel="stylesheet" href="osint.css">
 <link rel="stylesheet" href="events.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='13' cy='13' r='8' fill='none' stroke='%23e8a33d' stroke-width='3'/><path d='M19 19l8 8' stroke='%23e8a33d' stroke-width='3.5' stroke-linecap='round'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%2316181d'/><circle cx='14' cy='14' r='6.5' fill='none' stroke='%23fff' stroke-width='2.6'/><path d='M19 19l6 6' stroke='%23fff' stroke-width='2.8' stroke-linecap='square'/></svg>">
 </head>
 <body>
 <header class="topbar">
   <div class="brand">
-    <svg viewBox="0 0 32 32" class="mark" aria-hidden="true"><circle cx="13" cy="13" r="8.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M19.5 19.5l7.5 7.5" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/><circle cx="13" cy="13" r="2.4" fill="currentColor"/></svg>
+    <svg viewBox="0 0 32 32" class="mark" aria-hidden="true"><rect width="32" height="32" rx="6" fill="currentColor"/><circle cx="14" cy="14" r="6.5" fill="none" stroke="var(--on-ink)" stroke-width="2.6"/><path d="M19 19l6 6" stroke="var(--on-ink)" stroke-width="2.8" stroke-linecap="square"/></svg>
     <div><div class="brand-name">Scam Bunker</div><div class="brand-sub">Scam investigation lab</div></div>
   </div>
   <div class="status" id="status">
@@ -27,6 +28,11 @@
     <button class="ghost" id="btn-subjects" aria-haspopup="dialog">Subjects</button>
     <button class="ghost" id="btn-history">Case files</button>
     <button class="ghost" id="btn-persona">Investigator profile</button>
+    <div class="theme-toggle" role="group" aria-label="Colour theme">
+      <button type="button" data-theme-set="system" aria-pressed="true" title="Match system"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="8.5" rx="1"/><path d="M5.5 13.75h5M8 11.25v2.5"/></svg><span class="sr-only">System theme</span></button>
+      <button type="button" data-theme-set="light" aria-pressed="false" title="Light"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.75M8 12.75v1.75M1.5 8h1.75M12.75 8h1.75M3.4 3.4l1.24 1.24M11.36 11.36l1.24 1.24M3.4 12.6l1.24-1.24M11.36 4.64l1.24-1.24"/></svg><span class="sr-only">Light theme</span></button>
+      <button type="button" data-theme-set="dark" aria-pressed="false" title="Dark"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A5.75 5.75 0 016.4 2.5a5.75 5.75 0 107.1 7.1z"/></svg><span class="sr-only">Dark theme</span></button>
+    </div>
   </nav>
 </header>
 
@@ -63,7 +69,7 @@
     <button class="primary" id="go"><span>Open investigation</span><kbd>⌘ ↵</kbd></button>
 
     <div class="samples">
-      <span>Try a sample:</span>
+      <span>Samples</span>
       <button class="chip" data-sample="crypto">Crypto “mentor” DM</button>
       <button class="chip" data-sample="job">LinkedIn job offer</button>
       <button class="chip" data-sample="phish">Bank SMS</button>
@@ -75,46 +81,64 @@
   <!-- RESULTS -->
   <section class="results" id="results" aria-label="Investigation results">
     <div class="placeholder card" id="placeholder">
-      <div class="ph-art" aria-hidden="true">
-        <svg viewBox="0 0 220 140"><g fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"><rect x="18" y="22" width="70" height="52" rx="4"/><rect x="132" y="14" width="70" height="44" rx="4"/><rect x="120" y="86" width="82" height="40" rx="4"/><rect x="26" y="92" width="58" height="34" rx="4"/></g><g stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="3 4"><path d="M88 48L132 36M88 56l32 44M84 108h36M160 58v28"/></g><g fill="var(--accent)"><circle cx="88" cy="48" r="3"/><circle cx="132" cy="36" r="3"/><circle cx="120" cy="100" r="3"/><circle cx="84" cy="108" r="3"/><circle cx="160" cy="86" r="3"/></g></svg>
+      <h2>No case open</h2>
+      <p>Submit material in the case panel, or load a sample. Every finding is shown with the evidence behind it and graded as proof, strong, moderate or weak.</p>
+      <div class="ph-cols">
+        <div>
+          <h3>What you can submit</h3>
+          <dl class="caps">
+            <dt>Image</dt><dd>Dated from EXIF, XMP, PNG and GPS timestamps. Checked for C2PA, IPTC source type and generator signatures. GPS, device serials and edit history are surfaced.</dd>
+            <dt>Text</dt><dd>A post, DM, email or comment thread. The scheme is classified (phishing, pig-butchering, job, giveaway, impersonation) and coordinated networks are flagged.</dd>
+            <dt>Link</dt><dd>Checked for typosquats, punycode, brand-in-subdomain tricks, shorteners, redirects and tracking.</dd>
+          </dl>
+        </div>
+        <div>
+          <h3>Privacy</h3>
+          <p class="muted">Images and text are analysed in your browser. Nothing is uploaded unless you turn on the agent team or hand the case to Claude. Case files and the offender index stay in this browser's local storage.</p>
+        </div>
       </div>
-      <h2>The board is empty</h2>
-      <p>Start a case on the left. Every finding comes with the evidence behind it, and each one is labelled as proof, a strong signal or a weak one.</p>
-      <ul class="caps">
-        <li><b>Dates an image</b> from EXIF, XMP, PNG and GPS timestamps</li>
-        <li><b>Detects AI</b> through C2PA, IPTC source type, generator prompts and pixel statistics</li>
-        <li><b>Surfaces hidden data</b> such as GPS, device serials, authors, edit history and embedded prompts</li>
-        <li><b>Classifies the scheme:</b> phishing, pig-butchering, job, giveaway, impersonation, coordinated networks</li>
-        <li><b>Dissects links</b> for typosquats, punycode, redirects, shorteners and tracking</li>
-        <li><b>Cross-examines</b> with agents for forensics, fraud, OSINT and fact-checking</li>
-      </ul>
     </div>
 
     <div id="report" hidden>
+      <div class="report-bar">
+        <span class="report-label">Case report</span>
+        <div class="report-actions">
+          <button class="ghost" data-handoff>Investigate with Claude ↗</button>
+          <button class="ghost" id="btn-export">Export case report</button>
+          <button class="ghost" id="btn-copy">Copy summary</button>
+        </div>
+      </div>
       <div class="verdict card" id="verdict">
-        <div class="gauge" id="gauge"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" class="g-bg"/><circle cx="60" cy="60" r="50" class="g-fg" id="g-fg"/></svg><div class="g-num"><b id="g-val">0</b><span>risk</span></div></div>
         <div class="v-body">
           <div class="eyebrow" id="v-source">Preliminary · local engines</div>
           <h2 id="v-title" aria-live="polite">—</h2>
-          <div class="v-tags" id="v-tags"></div>
           <p class="v-headline" id="v-headline"></p>
+          <div class="v-tags" id="v-tags"></div>
+        </div>
+        <div class="gauge" id="gauge">
+          <div class="g-num"><span class="g-label">Risk score</span><span class="g-val"><b id="g-val">0</b><small>/100</small></span></div>
+          <div class="g-track"><svg viewBox="0 0 314 8" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="4" x2="314" y2="4" class="g-bg"/><line x1="0" y1="4" x2="314" y2="4" class="g-fg" id="g-fg"/></svg></div>
+          <div class="g-scale" aria-hidden="true"><span style="--w:25">Low</span><span style="--w:25">Elevated</span><span style="--w:20">High</span><span style="--w:30">Critical</span></div>
         </div>
       </div>
 
       <div class="tabs" role="tablist" aria-label="Report sections" id="tabs">
+        <span class="tab-group" role="presentation" aria-hidden="true">Report</span>
         <button role="tab" aria-selected="true" data-tab="deduction" id="tab-deduction" aria-controls="panel-deduction">Deduction</button>
+        <button role="tab" data-tab="links" id="tab-links" aria-controls="panel-links">Links &amp; entities</button>
+        <button role="tab" data-tab="claims" id="tab-claims" aria-controls="panel-claims">Claims &amp; matches <span class="count" id="claims-count"></span></button>
+        <button role="tab" data-tab="timeline" id="tab-timeline" aria-controls="panel-timeline">Timeline</button>
+        <button role="tab" data-tab="next" id="tab-next" aria-controls="panel-next">Next moves</button>
         <button role="tab" data-tab="agents" id="tab-agents" aria-controls="panel-agents">Agents <span class="count" id="agents-count"></span></button>
+        <span class="tab-group" role="presentation" aria-hidden="true">Media</span>
         <button role="tab" data-tab="image" id="tab-image" aria-controls="panel-image">Image lab</button>
         <button role="tab" data-tab="video" id="tab-video" aria-controls="panel-video" hidden>Video lab</button>
-        <button role="tab" data-tab="links" id="tab-links" aria-controls="panel-links">Links &amp; entities</button>
-        <button role="tab" data-tab="timeline" id="tab-timeline" aria-controls="panel-timeline">Timeline</button>
         <button role="tab" data-tab="provenance" id="tab-provenance" aria-controls="panel-provenance" hidden>Provenance</button>
-        <button role="tab" data-tab="checklist" id="tab-checklist" aria-controls="panel-checklist">Checklist</button>
-        <button role="tab" data-tab="claims" id="tab-claims" aria-controls="panel-claims">Claims &amp; matches <span class="count" id="claims-count"></span></button>
+        <span class="tab-group" role="presentation" aria-hidden="true">Tools</span>
         <button role="tab" data-tab="corroborate" id="tab-corroborate" aria-controls="panel-corroborate">Corroborate</button>
-        <button role="tab" data-tab="next" id="tab-next" aria-controls="panel-next">Next moves</button>
-        <button role="tab" data-tab="custody" id="tab-custody" aria-controls="panel-custody">Custody log</button>
         <button role="tab" data-tab="events" id="tab-events" aria-controls="panel-events">Events <span class="count"></span></button>
+        <button role="tab" data-tab="checklist" id="tab-checklist" aria-controls="panel-checklist">Checklist</button>
+        <button role="tab" data-tab="custody" id="tab-custody" aria-controls="panel-custody">Custody log</button>
       </div>
 
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-deduction" aria-labelledby="tab-deduction" data-panel="deduction"></div>
@@ -131,11 +155,6 @@
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-custody" aria-labelledby="tab-custody" data-panel="custody" hidden></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-events" aria-labelledby="tab-events" data-panel="events" hidden></div>
 
-      <div class="report-actions">
-        <button class="ghost" data-handoff>Investigate with Claude ↗</button>
-        <button class="ghost" id="btn-export">Export case report</button>
-        <button class="ghost" id="btn-copy">Copy summary</button>
-      </div>
     </div>
   </section>
 </main>
@@ -143,25 +162,25 @@
 <!-- Drawers -->
 <dialog id="dlg-persona" class="drawer">
   <form method="dialog">
-    <header><h3>Investigator profile</h3><button class="x" value="close" aria-label="Close">×</button></header>
+    <header role="none"><h3>Investigator profile</h3><button class="x" value="close" aria-label="Close">×</button></header>
     <p class="muted">Every agent reads this before it starts. Paste in your Sherlock Holmes bot's instructions from Qbot, along with what you investigate, the patterns you care about, your region and your methods. The lead investigator will work the way you describe.</p>
-    <textarea id="persona" rows="16"></textarea>
-    <footer><button class="ghost" type="button" id="persona-reset">Restore default</button><button class="primary sm" value="save" id="persona-save">Save profile</button></footer>
+    <textarea id="persona" rows="16" aria-label="Investigator profile instructions"></textarea>
+    <footer role="none"><button class="ghost" type="button" id="persona-reset">Restore default</button><button class="primary sm" value="save" id="persona-save">Save profile</button></footer>
   </form>
 </dialog>
 
 <dialog id="dlg-history" class="drawer">
   <form method="dialog">
-    <header><h3>Case files</h3><button class="x" value="close" aria-label="Close">×</button></header>
+    <header role="none"><h3>Case files</h3><button class="x" value="close" aria-label="Close">×</button></header>
     <div id="offender-index"></div>
     <div id="history-list"></div>
-    <footer><button class="ghost" type="button" id="history-clear">Clear all</button></footer>
+    <footer role="none"><button class="ghost" type="button" id="history-clear">Clear all</button></footer>
   </form>
 </dialog>
 
 <dialog id="dlg-subjects" class="drawer osint" aria-labelledby="subjects-h">
   <div class="os-wrap">
-    <header><h3 id="subjects-h">Subject investigation</h3><button type="button" class="x" id="subjects-close" aria-label="Close">×</button></header>
+    <header role="none"><h3 id="subjects-h">Subject investigation</h3><button type="button" class="x" id="subjects-close" aria-label="Close">×</button></header>
     <p class="os-ethics" id="subjects-ethics"><b>Public sources only.</b> Scam Bunker checks public profiles and public ledgers. It does no people-search, home-address, relatives or phone-owner lookups, and neither should you. A matching username is a lead, not an identification.</p>
     <div class="tabs os-tabs" role="tablist" aria-label="Subject workspace">
       <button role="tab" id="os-tab-investigate" aria-controls="os-panel-investigate" aria-selected="true" data-ostab="investigate">Investigate</button>
@@ -174,6 +193,44 @@
 
 <div class="toast" id="toast" role="status"></div>
 
+<script>
+(() => {
+  const btns = document.querySelectorAll('[data-theme-set]');
+  let cur = 'system'; try { cur = localStorage.getItem('scambunker.theme') || 'system'; } catch (e) { }
+  const apply = t => {
+    cur = t;
+    if (t === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+    btns.forEach(b => b.setAttribute('aria-pressed', b.dataset.themeSet === t));
+    try { t === 'system' ? localStorage.removeItem('scambunker.theme') : localStorage.setItem('scambunker.theme', t); } catch (e) { }
+  };
+  btns.forEach(b => b.addEventListener('click', () => apply(b.dataset.themeSet)));
+  apply(cur);
+})();
+</script>
+<script>
+// Report section nav: one ARIA tablist, vertical on wide screens. Arrow keys skip hidden tabs.
+(() => {
+  const list = document.getElementById('tabs');
+  const wide = matchMedia('(min-width: 1280px)');
+  const orient = () => list.setAttribute('aria-orientation', wide.matches ? 'vertical' : 'horizontal');
+  orient(); wide.addEventListener('change', orient);
+  const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+  list.addEventListener('keydown', e => {
+    if (!(e.key in step) && e.key !== 'Home' && e.key !== 'End') return;
+    const tabs = [...list.querySelectorAll('[role=tab]')].filter(t => !t.hidden);
+    const i = tabs.indexOf(document.activeElement); if (i < 0) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const n = e.key === 'Home' ? tabs[0] : e.key === 'End' ? tabs[tabs.length - 1] : tabs[(i + step[e.key] + tabs.length) % tabs.length];
+    n.focus(); n.click();
+  }, true);
+  // In the horizontal (scrolling) layout, keep the selected tab in view.
+  new MutationObserver(() => {
+    const t = list.querySelector('[aria-selected="true"]'); if (!t || wide.matches) return;
+    const l = t.offsetLeft - list.offsetLeft, r = l + t.offsetWidth;
+    if (l < list.scrollLeft || r > list.scrollLeft + list.clientWidth) list.scrollTo({ left: Math.max(0, l - 16) });
+  }).observe(list, { subtree: true, attributeFilter: ['aria-selected'] });
+})();
+</script>
 <script src="forensics.js"></script>
 <script src="scam.js"></script>
 <script src="app.js"></script>
