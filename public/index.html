@@ -35,11 +35,11 @@
     <p class="lede">Drop in an image, paste the post or message, add the link. The forensics run on your device. If you've turned the specialist agents on, they review the evidence and the lead investigator gives the verdict.</p>
 
     <label class="drop" id="drop">
-      <input type="file" id="file" accept="image/*" class="sr-only" aria-label="Choose an image to investigate">
+      <input type="file" id="file" accept="image/*,video/mp4,video/quicktime,video/webm,.mp4,.m4v,.mov,.webm,.mkv" class="sr-only" aria-label="Choose an image or video to investigate">
       <div class="drop-empty" id="drop-empty">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2l1.6-1.6a2 2 0 012.8 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <strong>Drop an image or click to choose</strong>
-        <span>JPEG, PNG, WebP, HEIC. Read on your device; nothing is uploaded unless agents are on.</span>
+        <strong>Drop an image or video, or click to choose</strong>
+        <span>JPEG, PNG, WebP, HEIC, or MP4, MOV, WebM video. Read on your device; nothing is uploaded unless agents are on.</span>
       </div>
       <div class="drop-full" id="drop-full" hidden>
         <img id="preview" alt="Evidence preview">
@@ -102,6 +102,7 @@
         <button role="tab" aria-selected="true" data-tab="deduction" id="tab-deduction" aria-controls="panel-deduction">Deduction</button>
         <button role="tab" data-tab="agents" id="tab-agents" aria-controls="panel-agents">Agents <span class="count" id="agents-count"></span></button>
         <button role="tab" data-tab="image" id="tab-image" aria-controls="panel-image">Image lab</button>
+        <button role="tab" data-tab="video" id="tab-video" aria-controls="panel-video" hidden>Video lab</button>
         <button role="tab" data-tab="links" id="tab-links" aria-controls="panel-links">Links &amp; entities</button>
         <button role="tab" data-tab="timeline" id="tab-timeline" aria-controls="panel-timeline">Timeline</button>
         <button role="tab" data-tab="provenance" id="tab-provenance" aria-controls="panel-provenance" hidden>Provenance</button>
@@ -111,6 +112,7 @@
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-deduction" aria-labelledby="tab-deduction" data-panel="deduction"></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-agents" aria-labelledby="tab-agents" data-panel="agents" hidden></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-image" aria-labelledby="tab-image" data-panel="image" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-video" aria-labelledby="tab-video" data-panel="video" hidden></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-links" aria-labelledby="tab-links" data-panel="links" hidden></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-timeline" aria-labelledby="tab-timeline" data-panel="timeline" hidden></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-provenance" aria-labelledby="tab-provenance" data-panel="provenance" hidden></div>
@@ -150,5 +152,6 @@
 <script src="scam.js"></script>
 <script src="app.js"></script>
 <script src="provenance.js"></script>
+<script src="video.js"></script>
 </body>
 </html>

@@ -60,12 +60,14 @@ How I want you to work:
   const drop = $('#drop');
   ['dragenter', 'dragover'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('over'); }));
   ['dragleave', 'drop'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('over'); }));
-  drop.addEventListener('drop', ev => { const f = ev.dataTransfer.files[0]; if (f && f.type.startsWith('image/') || f && /\.(heic|avif|webp)$/i.test(f.name)) setImage(f); });
-  $('#file').addEventListener('change', e => e.target.files[0] && setImage(e.target.files[0]));
+  const VID = () => window.ScamBunkerVideo; // public/video.js handles MP4/MOV/WebM
+  drop.addEventListener('drop', ev => { const f = ev.dataTransfer.files[0]; if (VID()?.isVideo(f)) setVideo(f); else if (f && f.type.startsWith('image/') || f && /\.(heic|avif|webp)$/i.test(f.name)) setImage(f); });
+  $('#file').addEventListener('change', e => { const f = e.target.files[0]; if (f) VID()?.isVideo(f) ? setVideo(f) : setImage(f); });
+  function setVideo(f) { imageFile = null; VID().setFile(f); }
   document.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) setImage(it.getAsFile()); });
   $('#clear-img').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); imageFile = null; $('#file').value = ''; $('#drop-full').hidden = true; $('#drop-empty').hidden = false; });
   function setImage(f) {
-    imageFile = f; $('#preview').src = URL.createObjectURL(f); $('#file-name').textContent = `${f.name} · ${(f.size / 1024).toFixed(0)} KB`;
+    VID()?.setFile(null); imageFile = f; $('#preview').src = URL.createObjectURL(f); $('#file-name').textContent = `${f.name} · ${(f.size / 1024).toFixed(0)} KB`;
     $('#drop-full').hidden = false; $('#drop-empty').hidden = true;
   }
   $$('[data-sample]').forEach(b => b.addEventListener('click', () => { const s = SAMPLES[b.dataset.sample]; $('#text').value = s.text; $('#url').value = s.url; $('#platform').value = s.platform; investigate(); }));
@@ -85,7 +87,7 @@ How I want you to work:
   // ---------- Investigation ----------
   async function investigate() {
     const text = $('#text').value.trim(), url = $('#url').value.trim();
-    if (!text && !url && !imageFile) { toast('Add an image, some text or a link first'); return; }
+    if (!text && !url && !imageFile && !VID()?.file) { toast('Add an image, a video, some text or a link first'); return; }
     const go = $('#go'); go.disabled = true; go.firstElementChild.textContent = 'Investigating…';
     $('#placeholder').hidden = true; $('#report').hidden = false; showTab('deduction');
     if (innerWidth < 1020) $('#results').scrollIntoView({ behavior: 'smooth' });
@@ -100,6 +102,10 @@ How I want you to work:
         c.agents.metadata = { status: 'run' }; renderAll(c);
         c.forensics = await DeduceForensics.analyze(imageFile);
         c.agents.metadata = { status: 'done', report: metadataReport(c.forensics) };
+      } else if (VID()?.file) {
+        c.agents.metadata = { status: 'run' }; renderAll(c);
+        c.video = await VID().analyze(VID().file);
+        c.agents.metadata = { status: 'done', report: VID().report(c.video) };
       }
       c.offenders = matchOffenders(c);
       c.local = localVerdict(c);
@@ -119,7 +125,7 @@ How I want you to work:
 
       // 3. Agent team
       if (server.ai) {
-        const caseData = { persona: c.persona, platform: c.platform, url, text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown ? `${c.page.title || ''}\n${JSON.stringify(c.page.redirects || '')}\n${c.page.markdown}` : null, corroboration: c.corroboration, imageData: c.forensics?.visionData };
+        const caseData = { persona: c.persona, platform: c.platform, url, text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown ? `${c.page.title || ''}\n${JSON.stringify(c.page.redirects || '')}\n${c.page.markdown}` : null, corroboration: c.corroboration, imageData: c.forensics?.visionData, video: c.video ? VID().summarize(c.video) : null };
         const roster = ['scam', 'osint', 'factcheck']; if (c.forensics) roster.unshift('forensics');
         roster.forEach(a => c.agents[a] = { status: 'run' }); c.agents.lead = { status: 'wait' };
         renderAgents(c); $('#agents-count').textContent = '…';
@@ -384,10 +390,10 @@ How I want you to work:
 
   function renderTimeline(c) {
     const f = c.forensics;
-    const items = (f?.timeline || []).map(t => ({ ...t }));
+    const items = [...(f?.timeline || []), ...(c.video?.timeline || [])].map(t => ({ ...t }));
     items.push({ when: c.at.slice(0, 19), what: 'Case opened in Scam Bunker', src: 'This investigation', trust: 'low' });
     items.sort((a, b) => a.when.localeCompare(b.when));
-    panel('timeline').innerHTML = `${!f ? '<p class="empty">Add an image to rebuild its timeline from embedded timestamps.</p>' : !f.earliest ? '<div class="callout">The file has no surviving embedded timestamps, which is typical after social-media upload. To date it, run a reverse image search and use the earliest indexed copy (TinEye: sort by Oldest).</div>' : ''}
+    panel('timeline').innerHTML = `${!f && c.video ? (c.video.earliest ? '' : '<div class="callout">The video has no surviving embedded timestamps, which is typical after platform re-encoding. Reverse-search its keyframes (Video lab) and use the earliest indexed copy.</div>') : !f ? '<p class="empty">Add an image to rebuild its timeline from embedded timestamps.</p>' : !f.earliest ? '<div class="callout">The file has no surviving embedded timestamps, which is typical after social-media upload. To date it, run a reverse image search and use the earliest indexed copy (TinEye: sort by Oldest).</div>' : ''}
       <div class="tl">${items.map(t => `<div class="tl-item ${t.trust === 'low' ? 'low' : ''}"><time>${esc(t.when.replace('T', ' · '))}</time><p>${esc(t.what)}</p><small>${esc(t.src)} · trust ${esc(t.trust)}</small></div>`).join('')}</div>`;
   }
 
@@ -401,7 +407,7 @@ How I want you to work:
     const c = current; if (!c) return;
     let prompt;
     try {
-      ({ prompt } = await post('/api/prompt', { hasImage: !!c.forensics, case: { persona: c.persona, platform: c.platform, url: c.url, text: c.text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown || null, corroboration: c.corroboration } }));
+      ({ prompt } = await post('/api/prompt', { hasImage: !!c.forensics, case: { persona: c.persona, platform: c.platform, url: c.url, text: c.text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown || null, corroboration: c.corroboration, video: c.video ? VID().summarize(c.video) : null } }));
     } catch (e) { toast('Could not build the prompt: ' + e.message); return; }
     let copied = false; try { await navigator.clipboard.writeText(prompt); copied = true; } catch { }
     const short = prompt.length < 7000;
