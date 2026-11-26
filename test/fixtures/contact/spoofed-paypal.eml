@@ -1,0 +1,21 @@
+Delivered-To: reader@example.org
+Received: by 2002:a05:6000:1a8:b0:33a:1111:2222 with SMTP id x8csp1234567;
+        Mon, 2 Nov 2026 09:15:04 -0800 (PST)
+Authentication-Results: mx.example.org;
+       spf=fail (example.org: domain of billing@paypa1-billing.example does not designate 203.0.113.45 as permitted sender) smtp.mailfrom=billing@paypa1-billing.example;
+       dkim=fail header.d=paypa1-billing.example;
+       dmarc=fail (p=REJECT sp=REJECT dis=NONE) header.from=paypa1-billing.example
+Return-Path: <bounce-77@mailer.invalid-sender.example>
+Received: from mail.paypa1-billing.example (unknown [203.0.113.45])
+        by mx.example.org with ESMTP id abc123
+        for <reader@example.org>; Mon, 2 Nov 2026 09:15:02 -0800 (PST)
+From: "PayPal Service" <billing@paypa1-billing.example>
+Reply-To: paypal.refund.desk.invented@gmail.com
+To: reader@example.org
+Subject: =?UTF-8?B?WW91ciBhY2NvdW50IGlzIGxpbWl0ZWQ=?=
+Date: Mon, 2 Nov 2026 17:14:58 +0000
+Message-ID: <20261102171458.4242@bulk-sender.example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+
+Your account is limited. Confirm your details within 24 hours.

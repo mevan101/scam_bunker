@@ -1,0 +1,15 @@
+Received: from mail-out.shop.example (mail-out.shop.example [198.51.100.7])
+        by mx.example.org with ESMTPS id q1;
+        Tue, 3 Nov 2026 08:00:02 +0000
+Authentication-Results: mx.example.org;
+       spf=pass smtp.mailfrom=news@shop.example;
+       dkim=pass header.d=shop.example;
+       dmarc=pass header.from=shop.example
+Return-Path: <news@shop.example>
+From: Shop Example <news@shop.example>
+To: reader@example.org
+Subject: Your November newsletter
+Date: Tue, 3 Nov 2026 08:00:00 +0000
+Message-ID: <n-2026-11@shop.example>
+
+Hello, here is what is new this month.
