@@ -295,6 +295,7 @@
   function runSun(c) {
     const f = readForm(c), pl = place(f, true), st = c.corroborate;
     if (pl.err) { st.sunHtml = errBox(pl.err); return render(c); }
+    st.sun = { date: f.date, time: f.time, offset: f.offset, lat: pl.lat, lon: pl.lon }; // read by timeline.js
     let html = '';
     if (f.time) {
       const sun = sunPosition(localToUtc(f.date, f.time, pl.off), pl.lat, pl.lon), sh = shadow(sun);
@@ -324,6 +325,7 @@
     try {
       const r = await lookup('weather', { lat: pl.lat, lon: pl.lon, date: f.date, hour: f.time ? +f.time.slice(0, 2) : null, minute: f.time ? +f.time.slice(3, 5) || 0 : null, offsetMin: f.time && f.offset.trim() ? pl.off : null, claim: f.claim || null });
       const dd = r.daily, h = r.hourly, ck = r.check;
+      st.wx = { date: f.date, time: f.time, offsetMin: f.time && f.offset.trim() ? pl.off : (r.utcOffsetSeconds ?? 0) / 60, timezone: r.timezone, text: dd.text, claim: ck ? ck.claim : null, result: ck ? ck.result : null, url: r.attribution && r.attribution.url }; // read by timeline.js
       st.wxHtml = `${ck ? `<div class="obs"><div class="ob"><div><span class="k">Claimed: ${esc(ck.claim)}</span><p>${esc(ck.why)}</p></div><div><span class="k">Strength</span><p>${esc(ck.strength)}: gridded model, not a local observation</p></div><span class="w ${ck.result === 'contradicted' ? 'moderate' : ck.result === 'consistent' ? 'ok' : 'weak'}">${esc(ck.result)}</span></div></div>` : ''}
         <div class="kv">
           <div>Day (${esc(r.timezone)})</div><div>${esc(dd.text)} · ${fmt(dd.tmin)}–${fmt(dd.tmax)} °C · precipitation ${fmt(dd.precip)} mm · snow ${fmt(dd.snow)} cm · cloud ${fmt(dd.cloud, 0)}%</div>
@@ -347,6 +349,7 @@
     st.domHtml = '<p class="muted">Querying crt.sh (can take up to 20 s)…</p>'; render(c);
     try {
       const r = await lookup('crtsh', { domain: f.domain });
+      st.crt = { domain: r.domain, firstSeen: r.firstSeen || null, url: r.source && r.source.url }; // read by timeline.js
       const days = r.firstSeen ? Math.floor((Date.now() - Date.parse(r.firstSeen)) / 864e5) : null;
       st.domHtml = `<div class="linkcard"><div class="top"><code>${esc(r.domain)}</code><span class="w ${days != null && days < 90 ? 'moderate' : 'weak'}">${r.firstSeen ? `first certificate ${esc(r.firstSeen.slice(0, 10))}` : 'no certificates logged'}</span></div>
         ${r.firstSeen ? `<div class="kv"><div>First seen</div><div>${esc(r.firstSeen)} (${days} days ago)</div><div>Latest</div><div>${esc(r.lastSeen)}</div><div>Certificates</div><div>${r.count}</div>
