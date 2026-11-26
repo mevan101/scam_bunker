@@ -43,8 +43,10 @@ t('tour: steps with a missing target are skipped in both directions', () => {
   assert.strictEqual(Tour.nextIndex(Tour.STEPS, -1, 1, () => false), -1);
 });
 t('index: Take the tour and Guide in the top bar, tour script and stylesheet loaded', () => {
-  assert.match(index, /<button class="ghost" type="button" data-tour-start>Take the tour<\/button>/);
-  assert.match(index, /<a class="ghost" href="guide.html">Guide<\/a>/);
+  assert.match(index, /id="btn-tour">Take the tour<\/button>/);
+  assert.match(index, /href="guide.html">Guide<\/a>/);
+  for (const k of ['input', 'examples', 'mode']) assert.match(index, new RegExp(`data-tour="${k}"`));
+  assert.match(fs.readFileSync(path.join(PUB, 'tour.js'), 'utf8'), /addEventListener\('sb:tour'/);
   assert.match(index, /<script src="tour.js"><\/script>/);
   assert.match(index, /<link rel="stylesheet" href="guide.css">/);
 });
