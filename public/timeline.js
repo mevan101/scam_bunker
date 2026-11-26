@@ -158,7 +158,7 @@
     }
 
     // Event listings (events.js comparison), if any
-    const norm = u => { const h = safeHref(u); if (!h) return null; const x = new URL(h), q = new URLSearchParams([...x.searchParams].filter(([k]) => !/^(utm_|fbclid$|gclid$)/.test(k))); q.sort(); return `${x.origin}${x.pathname.replace(/\/+$/, '')}${q.size ? '?' + q : ''}`; };
+    const norm = u => { const h = safeHref(u); if (!h) return null; const x = new URL(h), q = new URLSearchParams([...x.searchParams].filter(([k]) => !/^(utm_|fbclid$|gclid$)/.test(k))); q.sort(); const qs = String(q); return `${x.origin}${x.pathname.replace(/\/+$/, '')}${qs ? '?' + qs : ''}`; };
     const caseLinks = new Set([c.url, ...((c.page && c.page.redirects) || []).map(r => r.url), ...((c.heuristics && c.heuristics.links) || []).map(x => x.url || x)].map(norm).filter(Boolean));
     const linked = l => [l.url, l.finalUrl].map(norm).some(u => u && caseLinks.has(u));
     for (const l of opts.listings || []) {
