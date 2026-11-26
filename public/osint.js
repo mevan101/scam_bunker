@@ -27,6 +27,11 @@
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
   async function postJson(path, body) { return SB.post(path, body); }
+  // Static mode (GitHub Pages): RDAP, mempool.space and TronGrid straight from the browser, same code as the server.
+  const direct = window.ScamBunkerDirect;
+  const canLookup = () => SB.server().online || (SB.isStatic() && !!direct);
+  const lookupDomain = body => SB.isStatic() ? direct.domain(body) : postJson('/api/osint/domain', body);
+  const lookupWallet = body => SB.isStatic() ? direct.wallet(body) : postJson('/api/osint/wallet', body);
 
   // ---------- Dialog & tabs ----------
   const dlg = $('#dlg-subjects');
@@ -80,7 +85,7 @@
         ${(s?.caseIds || []).length ? `<div class="muted">${plural(s.caseIds.length, 'case')} linked by hand.</div>` : ''}
         <div class="os-bar">
           <button type="submit" class="primary sm">Save subject</button>
-          <button type="button" class="ghost" id="os-run" ${SB.server().online ? '' : 'disabled title="The Scam Bunker server is not reachable"'}>Save &amp; run public checks</button>
+          <button type="button" class="ghost" id="os-run" ${canLookup() ? '' : 'disabled title="The Scam Bunker server is not reachable"'}>Save &amp; run public checks</button>
           ${s ? `<button type="button" class="ghost" id="os-dossier">View dossier</button><button type="button" class="ghost" id="os-delete">Delete subject</button>` : ''}
         </div>
       </form>
@@ -137,8 +142,8 @@
     try {
       await Promise.all([
         (async () => { for (const u of handles.slice(0, MAX_USERNAMES)) await sweep(id, u, out); })(),
-        ...domains.map(d => lookup(id, 'domains', d, () => postJson('/api/osint/domain', { domain: d }))),
-        ...wallets.map(w => lookup(id, 'wallets', w.key.slice(7), () => postJson('/api/osint/wallet', { chain: w.chain || D.walletChain(w.key.slice(7)), address: w.key.slice(7) }))),
+        ...domains.map(d => lookup(id, 'domains', d, () => lookupDomain({ domain: d }))),
+        ...wallets.map(w => lookup(id, 'wallets', w.key.slice(7), () => lookupWallet({ chain: w.chain || D.walletChain(w.key.slice(7)), address: w.key.slice(7) }))),
       ]);
       if (handles.length > MAX_USERNAMES) toast(`Checked the first ${MAX_USERNAMES} usernames only, to stay polite to the platforms`);
     } finally {
@@ -182,6 +187,7 @@
   async function sweep(id, username, out) {
     let sec = $(`section[data-user="${CSS.escape(username)}"]`, out);
     if (!sec) { sec = document.createElement('section'); sec.className = 'os-section'; sec.dataset.user = username; out.prepend(sec); }
+    if (SB.isStatic()) { sec.innerHTML = `<h4>Username <code>${esc(username)}</code></h4>${localSweepHtml()}`; return; }
     sec.innerHTML = `<h4>Username <code>${esc(username)}</code></h4><p class="os-sum" role="status">Starting…</p>`;
     const results = [];
     try {
@@ -214,6 +220,9 @@
     }
   }
 
+  // Platforms send no CORS headers, so a browser page cannot read their answers: the sweep needs the local server.
+  const localSweepHtml = () => direct ? direct.localAppHtml(esc, 'Username sweep', 'Checking a username across ~60 platforms needs the Scam Bunker server, because the platforms do not let other websites read their pages. Domain and wallet checks still run here.')
+    : '<p class="os-sum">The username sweep needs the local app.</p>';
   const summaryLine = (sum, total) => `${total} platforms · ${sum.found || 0} found · ${sum.not_found || 0} not found · ${sum.unknown || 0} unknown · ${sum.blocked || 0} blocked`;
   function usernameSectionHtml(username, results, at, live) {
     const sum = results.reduce((a, x) => (a[x.status] = (a[x.status] || 0) + 1, a), {});
@@ -273,6 +282,8 @@
   function findingsHtml(s) {
     const f = s.findings || {}; const parts = [];
     Object.entries(f.usernames || {}).forEach(([u, x]) => parts.push(`<section class="os-section" data-user="${esc(u)}">${usernameSectionHtml(u, x.results || [], x.at, false)}</section>`));
+    if (SB.isStatic()) (s.indicators || []).filter(i => i.type === 'handle').map(i => i.key.slice(7)).filter(u => !(f.usernames || {})[u]).slice(0, MAX_USERNAMES)
+      .forEach(u => parts.push(`<section class="os-section" data-user="${esc(u)}"><h4>Username <code>${esc(u)}</code></h4>${localSweepHtml()}</section>`));
     const ds = Object.values(f.domains || {}), ws = Object.values(f.wallets || {});
     if (ds.length) parts.push(`<section class="os-section" id="os-domains"><h4>Domains (RDAP)</h4>${ds.map(domainCard).join('')}</section>`);
     if (ws.length) parts.push(`<section class="os-section" id="os-wallets"><h4>Wallets (public ledgers)</h4>${ws.map(walletCard).join('')}</section>`);
@@ -408,12 +419,12 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
   const domainObs = (d, r) => ({ fact: `${d} was registered ${plural(r.ageDays, 'day')} ago (${fmtDate(r.registeredAt)}${r.registrar ? ', ' + r.registrar : ''})`, inference: 'Newly registered domain. Phishing and fake-investment sites are usually days or weeks old when they are used; established businesses rarely are.', weight: r.ageDays < 30 ? 'strong' : 'moderate', source: 'rdap' });
   function addObs(v, ob) { if (v && Array.isArray(v.observations) && !v.observations.some(o => o.fact === ob.fact)) v.observations.unshift(ob); }
   async function checkCaseDomains(c) {
-    if (!c || c._osintDomains || !SB.server().online) return;
+    if (!c || c._osintDomains || !canLookup()) return;
     c._osintDomains = true;
     const risk = new Map((c.heuristics?.links || []).filter(l => l.host).map(l => [l.host.replace(/^www\./, ''), l.risk || 0]));
     const doms = (c.indicators || []).filter(i => i.type === 'domain').map(i => i.key.slice(7)).sort((a, b) => (risk.get(b) || 0) - (risk.get(a) || 0)).slice(0, 3);
     if (!doms.length) return;
-    const results = await Promise.all(doms.map(d => postJson('/api/osint/domain', { domain: d }).then(r => [d, r]).catch(e => [d, { error: e.message }])));
+    const results = await Promise.all(doms.map(d => lookupDomain({ domain: d }).then(r => [d, r]).catch(e => [d, { error: e.message }])));
     c.domainAges = Object.fromEntries(results.map(([d, r]) => [d, r.error ? { error: r.error } : { registeredAt: r.registeredAt || null, ageDays: r.ageDays ?? null, registrar: r.registrar || null, young: !!r.young, registered: r.registered !== false }]));
     const obs = results.filter(([, r]) => r.young && r.ageDays != null).map(([d, r]) => domainObs(d, r));
     if (!obs.length) return;

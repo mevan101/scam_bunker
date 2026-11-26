@@ -298,7 +298,7 @@
     if (v.dates.length) L.push('Dated evidence:', ...v.dates.map(d => `- ${fmtDate(d.date)} · ${d.source} · ${d.item} · trust ${d.trust}${d.note ? ' · ' + d.note : ''}`));
     if (v.contradictions.length) L.push('Contradictions:', ...v.contradictions.map(c => `- [${c.weight}] ${c.text}`));
     const cands = (p.items || []).filter(i => !i.isCase);
-    if (cands.length) L.push('Copies compared:', ...cands.map(i => `- ${i.label}: ${i.error ? 'error: ' + i.error : `${i.compare.label} (${i.compare.matchPct} % match, dHash ${i.compare.d}/64, pHash ${i.compare.p}/64), ${i.width}×${i.height}`} <${i.imageUrl}>${i.pageUrl ? ' on <' + i.pageUrl + '>' : ''}`));
+    if (cands.length) L.push('Copies compared:', ...cands.map(i => `- ${i.label}: ${i.error ? 'error: ' + i.error : i.localOnly ? 'not compared (needs the local app): ' + i.localOnly : `${i.compare.label} (${i.compare.matchPct} % match, dHash ${i.compare.d}/64, pHash ${i.compare.p}/64), ${i.width}×${i.height}`} <${i.imageUrl}>${i.pageUrl ? ' on <' + i.pageUrl + '>' : ''}`));
     return L;
   }
 
@@ -346,7 +346,24 @@
     return j;
   }
   const waybackCache = new Map();
-  const wayback = url => { if (!url) return Promise.resolve(null); if (!waybackCache.has(url)) waybackCache.set(url, postJson('/api/provenance/wayback', { url }).catch(e => ({ ok: false, url, error: e.message }))); return waybackCache.get(url); };
+  // Static mode (GitHub Pages, no /api): Wayback via the CORS-enabled Availability API, candidate images straight
+  // from hosts that allow it. Page fetching and SerpApi need the local app (public/shared/direct.js).
+  const direct = window.ScamBunkerDirect;
+  const isStatic = () => !!(SB.isStatic && SB.isStatic());
+  const localAppHtml = (what, detail) => direct ? direct.localAppHtml(esc, what, detail) : `<p class="muted">${esc(what)}: available in the local app.</p>`;
+  const waybackLookup = url => isStatic() ? (direct ? direct.wayback(url) : Promise.resolve({ ok: false, url, error: 'Needs the local app' })) : postJson('/api/provenance/wayback', { url }).catch(e => ({ ok: false, url, error: e.message }));
+  const wayback = url => { if (!url) return Promise.resolve(null); if (!waybackCache.has(url)) waybackCache.set(url, waybackLookup(url)); return waybackCache.get(url); };
+  async function fetchCandidate(it, entry) {
+    if (!isStatic()) return null;
+    try { return await direct.image(entry.url); }
+    catch (e) {
+      // The page/host cannot be read from a browser page. Keep the URL, date it through the archive, explain.
+      it.localOnly = e.message;
+      const [wi, wp] = await Promise.all([wayback(it.imageUrl), wayback(it.pageUrl)]);
+      it.wayback = { image: wi, page: wp };
+      return 'local';
+    }
+  }
 
   function tab() { return $('#tab-provenance'); }
   function sync(c) {
@@ -383,8 +400,10 @@
   async function processCandidate(c, entry, n) {
     const it = { id: 'c' + Date.now().toString(36) + n, label: `Copy ${n}`, imageUrl: entry.url, pageUrl: entry.pageUrl, from: entry.from || 'manual' };
     try {
-      let img;
-      try { img = await postJson('/api/provenance/fetch-image', { url: entry.url }); }
+      let img = await fetchCandidate(it, entry);
+      if (img === 'local') return it;
+      if (img) { /* fetched directly by the browser */ }
+      else try { img = await postJson('/api/provenance/fetch-image', { url: entry.url }); }
       catch (e) {
         if (e.code !== 'bad_type' || !/html|xml/.test(e.contentType || '')) throw e;
         // A page, not an image: take its preview image (og:image) and the page's publish date
@@ -395,14 +414,14 @@
       }
       it.label = `Copy ${n} · ${host(it.pageUrl || it.imageUrl)}`;
       it.finalUrl = img.finalUrl; it.contentType = img.contentType; it.lastModified = img.lastModified; it.archiveOrigLastModified = img.archiveOrigLastModified;
-      const bytes = b64ToBytes(img.dataBase64);
+      const bytes = img.blob || b64ToBytes(img.dataBase64);
       const file = new File([bytes], (new URL(img.finalUrl).pathname.split('/').pop() || 'candidate').slice(0, 80), { type: img.contentType, lastModified: 0 });
       const [f, h] = await Promise.all([DeduceForensics.analyze(file), hashBlob(file)]);
       Object.assign(it, itemFromForensics(f), { width: h.width || f.width, height: h.height || f.height, size: img.size });
       h.sha256 = f.sha256; thumbs.set(it.id, h.thumb);
       it.hash = { d: h.hash.d, p: h.hash.p };
       it.compare = compareImages(caseImg, h);
-      const [wi, wp, pd] = await Promise.all([wayback(it.imageUrl), wayback(it.pageUrl), it.pageUrl && !it.pageDate ? postJson('/api/provenance/page-date', { url: it.pageUrl }).catch(e => ({ error: e.message })) : null]);
+      const [wi, wp, pd] = await Promise.all([wayback(it.imageUrl), wayback(it.pageUrl), it.pageUrl && !it.pageDate && !isStatic() ? postJson('/api/provenance/page-date', { url: it.pageUrl }).catch(e => ({ error: e.message })) : null]);
       it.wayback = { image: wi, page: wp }; if (pd) it.pageDate = pd;
     } catch (e) { it.error = e.message; }
     return it;
@@ -431,8 +450,8 @@
         }
       };
       await Promise.all([worker(), worker(), worker()]);
-      const ok = p.items.filter(i => !i.isCase && !i.error), m = ok.filter(i => MATCHING.includes(i.compare.relation)).length;
-      setStatus(`Done. ${ok.length} cop${ok.length === 1 ? 'y' : 'ies'} analysed, ${m} matching.`);
+      const ok = p.items.filter(i => !i.isCase && !i.error && !i.localOnly), local = p.items.filter(i => i.localOnly).length, m = ok.filter(i => MATCHING.includes(i.compare.relation)).length;
+      setStatus(`Done. ${ok.length} cop${ok.length === 1 ? 'y' : 'ies'} analysed, ${m} matching.${local ? ` ${local} need${local === 1 ? 's' : ''} the local app.` : ''}`);
     } catch (e) { setStatus('Could not run the trace: ' + e.message); SB.toast(e.message); }
     finally { busy = false; $('#prov-run').disabled = false; finish(c); }
   }
@@ -447,7 +466,7 @@
   // Recompute the verdict, store it on the case, feed it into the main report, re-render.
   function finish(c, partial) {
     const p = c.provenance; if (!p) return;
-    const items = [caseItem(c), ...p.items.filter(i => !i.isCase && !i.error)];
+    const items = [caseItem(c), ...p.items.filter(i => !i.isCase && !i.error && !i.localOnly)];
     p.verdict = synthesize(items, p.claimed);
     // keep scores on stored items
     p.items.forEach(i => { const s = items.find(x => x.id === i.id); if (s) { i.score = s.score; i.scoreWhy = s.scoreWhy; } });
@@ -498,11 +517,19 @@
   function wbLine(label, w) {
     if (!w) return '';
     if (!w.ok) return `<div>${label}</div><div>Unavailable: ${esc(w.error || 'error')}</div>`;
+    if (w.approximate) return `<div>${label}</div><div><a href="${safeHref(w.firstSnapshot)}" target="_blank" rel="noopener">${esc(fmtDate(w.firstSeen))} ↗</a> · first capture, last <a href="${safeHref(w.lastSnapshot)}" target="_blank" rel="noopener">${esc(fmtDate(w.lastSeen))} ↗</a> <span class="muted">(capture count in the local app)</span></div>`;
     if (!w.captures) return `<div>${label}</div><div>Not archived. <a href="${safeHref(w.saveUrl)}" target="_blank" rel="noopener">Save it now ↗</a></div>`;
     return `<div>${label}</div><div><a href="${safeHref(w.firstSnapshot)}" target="_blank" rel="noopener">${esc(fmtDate(w.firstSeen))} ↗</a> · ${w.captures}${w.capturesCapped ? '+' : ''} capture${w.captures === 1 ? '' : 's'}, last ${esc(fmtDate(w.lastSeen))}${w.distinctDigests > 1 ? ` · ${w.distinctDigests} different file versions` : ''}</div>`;
   }
 
   function card(it, p) {
+    if (it.localOnly) {
+      const wb = wbLine('Wayback: URL', it.wayback && it.wayback.image) + (it.pageUrl ? wbLine('Wayback: page', it.wayback && it.wayback.page) : '');
+      return `<article class="linkcard prov-card" data-id="${esc(it.id)}" aria-label="${esc(it.label)}"><div class="top"><code>${esc(it.imageUrl)}</code><span class="tag">not compared</span><button type="button" class="link" data-prov-remove="${esc(it.id)}" aria-label="Remove ${esc(it.label)}">Remove</button></div>
+        ${localAppHtml('Comparing this copy', `${it.localOnly}. Fetching copies from any website, with their preview image and publish date, needs the Scam Bunker server.`)}
+        ${wb ? `<div class="kv">${wb}</div>` : ''}
+        <p class="prov-links"><a href="${safeHref(it.imageUrl)}" target="_blank" rel="noopener">Open ↗</a> · Search this copy: ${manualSearchLinks(it.imageUrl).map(([n, u]) => `<a href="${safeHref(u)}" target="_blank" rel="noopener">${n} ↗</a>`).join(' ')}</p></article>`;
+    }
     if (it.error) return `<article class="linkcard prov-card" data-id="${esc(it.id)}"><div class="top"><code>${esc(it.imageUrl)}</code>${B('strong', 'failed')}<button type="button" class="link" data-prov-remove="${esc(it.id)}" aria-label="Remove ${esc(it.label)}">Remove</button></div><ul><li>${esc(it.error)}</li></ul></article>`;
     const c = it.compare, th = thumbs.get(it.id);
     const best = p.verdict && p.verdict.original && p.verdict.original.itemId === it.id;
@@ -569,6 +596,7 @@
       </section>
       <section aria-labelledby="prov-find-h"><h3 id="prov-find-h">1 · Find copies</h3>
         ${srv.reverseSearch ? `<div class="callout"><label class="field" style="margin:0 0 8px"><span>Public URL of this image, if it is published somewhere (automatic Google Lens search via SerpApi)</span><input type="url" id="prov-rev-url" placeholder="https://…/image.jpg"></label><button type="button" class="primary sm" id="prov-rev-run">Search automatically</button> <span class="muted" id="prov-rev-status" role="status"></span><div id="prov-rev-results"></div></div>`
+          : isStatic() ? `${localAppHtml('Automatic reverse search', 'Google Lens search through SerpApi needs a secret API key, which only the local server can hold.')}<p class="muted">Search by hand:</p>`
           : `<p class="muted">Automatic reverse search is off (set <code>SERPAPI_API_KEY</code> on the server to enable it). Search by hand:</p>`}
         <ol class="prov-steps"><li>Open each engine below and upload the case image (drag the file in).</li><li>Look for the <b>largest</b> and <b>oldest</b> copies: TinEye → sort by “Oldest”; Google Lens → “Exact matches”; Bing → “Pages with this image”.</li><li>Right-click each promising result's picture → “Copy image address”, and paste it below. Add the page it appeared on after a space; a page URL on its own also works.</li></ol>
         <div class="rev">${manualSearchLinks(null).map(([n, u, how]) => `<a href="${safeHref(u)}" target="_blank" rel="noopener"><b>${n} ↗</b><span>${esc(how)}</span></a>`).join('')}</div>
@@ -612,6 +640,7 @@
   async function reverseSearch(c) {
     const u = $('#prov-rev-url').value.trim(), st = $('#prov-rev-status'), out = $('#prov-rev-results');
     if (!/^https?:\/\//i.test(u)) { st.textContent = 'Enter the public URL of the image first.'; return; }
+    if (isStatic()) { st.textContent = 'Automatic search needs the local app.'; return; }
     st.textContent = 'Searching…';
     try {
       const r = await postJson('/api/provenance/reverse', { imageUrl: u });
