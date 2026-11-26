@@ -81,7 +81,10 @@
       if (sharedOnly && !caseKeys[ci].some(k => keptKeys.has(k))) return;
       const ref = 'C' + (ci + 1);
       caseNode.set(ci, nodes.length);
-      nodes.push({ id: 'c:' + c.id, kind: 'case', caseId: String(c.id), ref, verdict: c.verdict || null, family: verdictFamily(c.verdict), risk: Number.isFinite(+c.risk) && c.risk !== null && c.risk !== '' ? +c.risk : null, at: c.at || null, platform: c.platform || null, excerpt: String(c.text || c.url || (c.forensics ? 'Image case' : '')).slice(0, 160), label: `${ref} · ${c.verdict || 'No verdict'}`, cluster: null });
+      // A correction recorded in the custody log supersedes the original verdict and risk.
+      const fix = c.correction && typeof c.correction === 'object' ? c.correction : {};
+      const verdict = fix.verdict || c.verdict || null, risk = fix.risk ?? c.risk;
+      nodes.push({ id: 'c:' + c.id, kind: 'case', caseId: String(c.id), ref, verdict, family: verdictFamily(verdict), risk: Number.isFinite(+risk) && risk !== null && risk !== '' ? +risk : null, at: c.at || null, platform: c.platform || null, excerpt: String(c.text || c.url || (c.forensics ? 'Image case' : '')).slice(0, 160), label: `${ref} · ${verdict || 'No verdict'}`, cluster: null });
     });
     const edges = [];
     for (const e of keptInds) {

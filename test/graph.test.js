@@ -47,6 +47,12 @@ test('verdict families drive case shape; unknown verdicts are not guessed', () =
   for (const f of Object.values(G.FAMILIES)) assert.match(G.shapePath(f.shape, 10), /^M.*Z$/);
 });
 
+test('a recorded correction (custody log) supersedes the original verdict and risk', () => {
+  const s = sample(); s[0].correction = { verdict: 'No strong red flags', category: null, risk: 10, reason: 'invented', at: '2026-04-01T00:00:00Z' };
+  const n = plain(G.buildGraph(s)).nodes.find(x => x.caseId === 'a');
+  assert.deepStrictEqual([n.verdict, n.family, n.risk, n.label], ['No strong red flags', 'benign', 10, 'C1 · No strong red flags']);
+});
+
 test('all mode keeps single-case identifiers and unlinked cases; handles are weak', () => {
   const g = plain(G.buildGraph(sample(), { sharedOnly: false }));
   assert.strictEqual(g.counts.cases, 6);
