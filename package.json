@@ -1,0 +1,13 @@
+{
+  "name": "deduce",
+  "version": "0.1.0",
+  "description": "Open-source investigation lab: date images, detect AI generation, expose hidden metadata, and classify scams and disinformation with a team of AI agents.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "test": "node test/run.js"
+  },
+  "engines": { "node": ">=22" },
+  "keywords": ["osint", "fact-checking", "scam-detection", "image-forensics", "exif", "c2pa", "ai-detection", "misinformation", "claude", "agents"],
+  "license": "MIT"
+}
