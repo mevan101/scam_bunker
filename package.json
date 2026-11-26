@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node --env-file-if-exists=.env server.js",
-    "test": "node test/run.js"
+    "test": "node test/run.js && node --test \"test/*.test.js\""
   },
   "engines": { "node": ">=22" },
   "keywords": ["osint", "fact-checking", "scam-detection", "image-forensics", "exif", "c2pa", "ai-detection", "misinformation", "claude", "agents"],
