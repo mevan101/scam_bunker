@@ -146,12 +146,17 @@
       const d = haversineM(a.geo, b.geo);
       if (d <= 100) return { score: 0.95, basis: `coordinates ${Math.round(d)} m apart` };
       if (d <= 300) return { score: 0.7, basis: `coordinates ${Math.round(d)} m apart` };
+      if (d > 1000) return { score: 0, basis: `coordinates ${(d / 1000).toFixed(1)} km apart` };
     }
     const na = norm(a.venueAddress), nb = norm(b.venueAddress);
     if (na && na === nb) return { score: 1, basis: 'identical address' };
     const ta = tokens(`${a.venueName || ''} ${a.venueAddress || ''}`), tb = tokens(`${b.venueName || ''} ${b.venueAddress || ''}`);
     const nameA = norm(a.venueName), nameB = norm(b.venueName);
-    if (nameA && nameA === nameB && nameA.length > 3) return { score: 0.85, basis: 'identical venue name' };
+    if (nameA && nameA === nameB && nameA.length > 3) {
+      const aa = tokens(a.venueAddress), ab = tokens(b.venueAddress);
+      if (aa.length && ab.length && !jaccard(aa, ab)) return { score: 0.5, basis: 'same venue name, different addresses' };
+      return { score: 0.85, basis: 'identical venue name' };
+    }
     const s = Math.max(jaccard(ta, tb), 0.85 * containment(tokens(a.venueName), tokens(b.venueName)) * (tokens(a.venueName).length >= 2 && tokens(b.venueName).length >= 2 ? 1 : 0));
     return { score: Math.round(s * 100) / 100, basis: s ? `venue text ${Math.round(s * 100)}% similar` : 'no venue match' };
   }
