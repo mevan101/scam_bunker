@@ -173,6 +173,35 @@ test('limitations and would-change-if are always populated, merge agent items an
   for (const h of ['ESTIMATIVE ASSESSMENT', 'VERIFICATION CHECKLIST', 'LIMITATIONS', 'WHAT WOULD CHANGE THIS VERDICT', 'Likely an investment / crypto scam']) assert.ok(txt.includes(h), h);
 });
 
+// ---------- Review regressions ----------
+test('duplicate observations get distinct keys, so an override or attachment touches only one', () => {
+  const dup = () => ({ fact: 'examplebank-secure.top', inference: 'Look-alike domain', weight: 'strong' });
+  const c = mkCase({ verdict: 'Likely scam', category: 'Phishing', extra: [dup(), dup()] });
+  const g = G.apply(c);
+  assert.notStrictEqual(g.items[0].key, g.items[1].key);
+  const o = G.apply(c, { overrides: { [g.items[1].key]: 'E5' }, pillars: { source: { attached: [g.items[1].key] } } });
+  assert.strictEqual(o.items[0].by, 'default'); assert.strictEqual(o.items[1].grade, 'E5');
+  assert.strictEqual(o.checklist.find(p => p.id === 'source').attached[0], o.items[1]);
+});
+test('AI involvement is only confirmed by AI-related items, not by unrelated well-graded evidence', () => {
+  const c = mkCase({ verdict: 'Scam', category: 'Phishing', extra: [agentObs('Generator tag in XMP', 'image file', 'B2'), agentObs('Domain registered 2 days ago', 'domain registry', 'A2')] });
+  c.local.ai_involvement = { assessment: 'confirmed', basis: 'XMP tag' };
+  G.apply(c);
+  assert.strictEqual(c.local.ai_involvement.assessment, 'likely');
+});
+test('an AI declaration in the image is not scheme-specific scam evidence', () => {
+  const f = { exif: {}, xmpFields: {}, ai: { signals: [{ label: 'Generator named in metadata', strength: 'proof' }], weak: [] }, editors: [], notes: [] };
+  const h = [hit('Phishing', 'Credential request', 'enter your password', 24)];
+  const c = mkCase({ hits: h, verdict: 'Likely scam', category: 'Phishing', forensics: f, extra: [{ fact: 'Image metadata', inference: 'Generator named in metadata', weight: 'strong' }] });
+  assert.strictEqual(G.apply(c).estimate.likelihood, 'Likely');
+  assert.strictEqual(G.apply(c, { overrides: { [G.keyOf(c.local.observations[0])]: 'D5' } }).estimate.likelihood, 'Roughly even chance');
+});
+test('a suspicious image-only case is worded about AI or manipulation, not scams', () => {
+  assert.match(G.apply(mkCase({ verdict: 'Suspicious', category: 'Possible AI image' })).estimate.label, /^Roughly even chance that this is AI-generated/);
+  assert.strictEqual(G.noun('Suspicious', 'Metadata anomaly'), 'manipulated');
+  assert.strictEqual(G.noun('Suspicious', 'Linked to earlier scam cases'), 'a scam');
+});
+
 // ---------- Wiring ----------
 test('app.js, index.html and server.js carry the hooks', () => {
   const app = fs.readFileSync(path.join(__dirname, '../public/app.js'), 'utf8');

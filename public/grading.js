@@ -49,7 +49,7 @@
     if (o.fact === 'Text pattern') return { kind: 'coordination', root: 'coordination', source: 'message', scheme: false, weight: w };
     if (o.fact === 'Image metadata') {
       const proof = f && f.ai && (f.ai.signals || []).some(s => s.label === o.inference && s.strength === 'proof');
-      return { kind: 'image-meta', root: 'file:ai-declaration', source: 'image file', scheme: true, weight: proof ? 'proof' : w };
+      return { kind: 'image-meta', root: 'file:ai-declaration', source: 'image file', scheme: false, weight: proof ? 'proof' : w };
     }
     if (o.fact === 'Image pixels / dimensions') return { kind: 'detector', root: 'file:statistics', source: 'image file', scheme: false, detector: true, weight: w };
     if (/^Software: /.test(o.fact || '')) return { kind: 'image-editor', root: 'file:editor', source: 'image file', scheme: false, weight: w };
@@ -65,13 +65,16 @@
   // Grade every observation. Order of precedence: analyst override > agent-supplied grade > default for the engine label.
   // Statistical detectors used alone are capped at C3 (METHODOLOGY 3.4), whoever graded them.
   function gradeItems(obs, c, overrides = {}) {
+    const seen = new Map();
     const items = (obs || []).map(o => {
+      const base = keyOf(o), n = seen.get(base) || 0; seen.set(base, n + 1);
+      const key = n ? `${base}#${n}` : base;
       const m = classify(o, c);
       const agent = parseGrade(o.agentGrade) || (o.gradeBy === undefined ? parseGrade(o.grade) || (o.sourceGrade && o.credibility ? parseGrade(o.sourceGrade + o.credibility) : null) : null);
       if (agent && o.agentGrade === undefined) o.agentGrade = fmt(agent);
-      const ov = parseGrade(overrides[keyOf(o)]);
+      const ov = parseGrade(overrides[key]);
       const g = ov || agent || (m.kind === 'none' ? { sourceGrade: 'F', credibility: 6 } : parseGrade(DEFAULTS[m.weight]));
-      return { o, key: keyOf(o), ...m, ...g, by: ov ? 'analyst' : agent ? 'agent' : 'default', capped: false };
+      return { o, key, ...m, ...g, by: ov ? 'analyst' : agent ? 'agent' : 'default', capped: false };
     });
     const corroborated = i => items.some(j => j !== i && !j.detector && j.kind !== 'none' && j.root !== i.root && j.credibility <= 3);
     items.forEach(i => {
@@ -82,8 +85,8 @@
   }
 
   // "Confirmed" needs two or more independent items graded 1 or 2, from different sources (METHODOLOGY 3.4, BACKLOG P1-2).
-  function isConfirmed(items) {
-    const good = counted(items).filter(i => i.credibility <= 2);
+  function isConfirmed(items, about = () => true) {
+    const good = counted(items).filter(i => i.credibility <= 2 && about(i));
     for (const a of good) for (const b of good) if (a.source !== b.source && a.root !== b.root) return true;
     return false;
   }
@@ -107,7 +110,7 @@
   function noun(verdict, category) {
     if (SCAM_VERDICTS.has(verdict) || verdict === 'Suspicious') {
       const cat = String(category || '').trim();
-      if (!SCHEMES.test(cat)) return 'a scam';
+      if (!SCHEMES.test(cat)) return verdict === 'Suspicious' && /\b(ai|synthetic|generat\w*)\b/i.test(cat) ? 'AI-generated' : verdict === 'Suspicious' && /image|metadata|edit/i.test(cat) ? 'manipulated' : 'a scam';
       const t = cat.toLowerCase().replace(/\s+scam$/, '');
       return `${/^[aeiou]/.test(t) ? 'an' : 'a'} ${t} scam`;
     }
@@ -123,7 +126,8 @@
   function estimate(v, items) {
     const it = counted(items), notes = [];
     // A strong label only counts while its credibility is at least "possibly true" (an analyst can grade it down).
-    const strong = it.filter(i => isStrong(i) && i.credibility <= 3);
+    const IMAGE = new Set(['image-meta', 'detector', 'image-editor']);
+    const strong = it.filter(i => isStrong(i) && i.credibility <= 3 && !(SCAM_VERDICTS.has(v.verdict) && IMAGE.has(i.kind)));
     const strongRoots = roots(strong).size;
     const schemeStrong = strong.some(i => i.scheme);
     const confirmed = isConfirmed(items);
@@ -153,6 +157,9 @@
         : `No known scam pattern matched. This is not a statement that it is safe (${conf} confidence)`;
     return { likelihood: term, range: term ? RANGES[term] : null, analytic_confidence: conf, label, confirmed, notes };
   }
+
+  // Items that bear on AI involvement: only these can confirm it.
+  const aboutAI = i => i.kind === 'image-meta' || i.kind === 'detector' || (i.kind === 'agent' && /\b(ai|a\.i\.|generat\w*|synthetic|c2pa|content credentials|diffusion|midjourney|dall-?e|deepfake)\b/i.test(`${i.o.fact} ${i.o.inference}`));
 
   // Nothing may be labelled "confirmed" without passing isConfirmed (BACKLOG P1-2). Reversible: the raw value is kept.
   function enforceConfirmed(v, confirmed) {
@@ -244,7 +251,7 @@
     items.forEach(i => Object.assign(i.o, { grade: i.grade, sourceGrade: i.sourceGrade, credibility: i.credibility, gradeBy: i.by, gradeMeaning: `${SOURCE[i.sourceGrade]}; ${CREDIBILITY[i.credibility].toLowerCase()}`, source: i.source }));
     const est = estimate(v, items);
     estimateCache.set(v, est);
-    enforceConfirmed(v, est.confirmed);
+    enforceConfirmed(v, isConfirmed(items, aboutAI));
     Object.assign(v, { likelihood: est.likelihood, analytic_confidence: est.analytic_confidence, estimative: est.label });
     v.limitations = limitations(c, v, items);
     v.would_change_if = wouldChange(c, v, items);
