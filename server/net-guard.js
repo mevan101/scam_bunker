@@ -68,7 +68,7 @@ function guardedRequest(url, opts = {}) {
       redirects.push({ url: cur, status });
       const loc = res.headers.location;
       if (status >= 300 && status < 400 && loc && followRedirects) {
-        res.resume(); clearTimeout(timer);
+        res.destroy(); clearTimeout(timer); // never drain a redirect body: it has no cap or deadline
         if (n >= maxRedirects) return reject(Object.assign(httpError(502, 'Too many redirects', 'redirects'), { finalUrl: cur, redirects }));
         let next; try { next = new URL(loc, cur).href; } catch { return reject(httpError(502, 'Invalid redirect location', 'redirects')); }
         return resolve(hop(next, n + 1)); // re-checked by lookup / IP check on the next hop
@@ -77,8 +77,8 @@ function guardedRequest(url, opts = {}) {
       const done = (err, val) => { if (settled) return; settled = true; clearTimeout(timer); err ? reject(err) : resolve(val); };
       const result = buffer => ({ status, finalUrl: cur, redirects, headers: res.headers, contentType: type, location: loc || null, buffer });
       const type = String(res.headers['content-type'] || '').toLowerCase();
-      if (status >= 300 && status < 400 && loc) { res.resume(); return done(null, result(Buffer.alloc(0))); }
-      if (!anyStatus && (status < 200 || status >= 300)) { res.resume(); return done(httpError(502, `Remote server answered HTTP ${status}`, 'http_status')); }
+      if (status >= 300 && status < 400 && loc) { res.destroy(); return done(null, result(Buffer.alloc(0))); }
+      if (!anyStatus && (status < 200 || status >= 300)) { res.destroy(); return done(httpError(502, `Remote server answered HTTP ${status}`, 'http_status')); }
       if (accept && !accept.test(type)) { res.destroy(); return done(Object.assign(httpError(415, `Not an accepted content type (${type || 'none'})`, 'bad_type'), { contentType: type, finalUrl: cur })); }
       const enc = String(res.headers['content-encoding'] || '').toLowerCase().trim();
       const makeDecoder = decompress ? DECODERS.get(enc) : null;
