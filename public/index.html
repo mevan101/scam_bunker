@@ -7,7 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script>try { var t = localStorage.getItem('scambunker.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) { }</script>
+<script>try { var t = localStorage.getItem('scambunker.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) { }
+document.documentElement.dataset.mode = 'simple'; try { if (localStorage.getItem('scambunker.mode') === 'investigator') document.documentElement.dataset.mode = 'investigator'; } catch (e) { }</script>
+<meta name="description" content="Check a suspicious message, link, number, screenshot, photo or video for free. A plain answer, the evidence, and what to do next. Private: checked on your device.">
 <link rel="stylesheet" href="app.css">
 <link rel="stylesheet" href="osint.css">
 <link rel="stylesheet" href="events.css">
@@ -15,11 +17,27 @@
 </head>
 <body>
 <header class="topbar">
+  <div class="topbar-row">
   <div class="brand">
     <svg viewBox="0 0 32 32" class="mark" aria-hidden="true"><rect width="32" height="32" rx="6" fill="currentColor"/><circle cx="14" cy="14" r="6.5" fill="none" stroke="var(--on-ink)" stroke-width="2.6"/><path d="M19 19l6 6" stroke="var(--on-ink)" stroke-width="2.8" stroke-linecap="square"/></svg>
-    <div><div class="brand-name">Scam Bunker</div><div class="brand-sub">Scam investigation lab</div></div>
+    <div><div class="brand-name">Scam Bunker</div><div class="brand-sub">Free scam &amp; fact checker</div></div>
   </div>
-  <div class="status" id="status">
+    <div class="top-controls">
+      <a class="top-link" href="guide.html">Guide</a>
+      <button type="button" class="top-link" id="btn-tour">Take the tour</button>
+      <div class="mode-switch" role="group" aria-label="Mode" data-tour="mode">
+        <button type="button" data-mode-set="simple" aria-pressed="true">Simple</button>
+        <button type="button" data-mode-set="investigator" aria-pressed="false">Investigator</button>
+      </div>
+      <div class="theme-toggle" role="group" aria-label="Colour theme">
+        <button type="button" data-theme-set="system" aria-pressed="true" title="Match system"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="8.5" rx="1"/><path d="M5.5 13.75h5M8 11.25v2.5"/></svg><span class="sr-only">System theme</span></button>
+        <button type="button" data-theme-set="light" aria-pressed="false" title="Light"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.75M8 12.75v1.75M1.5 8h1.75M12.75 8h1.75M3.4 3.4l1.24 1.24M11.36 11.36l1.24 1.24M3.4 12.6l1.24-1.24M11.36 4.64l1.24-1.24"/></svg><span class="sr-only">Light theme</span></button>
+        <button type="button" data-theme-set="dark" aria-pressed="false" title="Dark"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A5.75 5.75 0 016.4 2.5a5.75 5.75 0 107.1 7.1z"/></svg><span class="sr-only">Dark theme</span></button>
+      </div>
+    </div>
+  </div>
+  <div class="inv-bar">
+    <div class="status" id="status">
     <span class="pill" id="pill-local"><i></i>Local forensics</span>
     <span class="pill" id="pill-agents"><i></i>Agents</span>
     <span class="pill" id="pill-web"><i></i>Web</span>
@@ -28,16 +46,49 @@
     <button class="ghost" id="btn-subjects" aria-haspopup="dialog">Subjects</button>
     <button class="ghost" id="btn-history">Case files</button>
     <button class="ghost" id="btn-persona">Investigator profile</button>
-    <div class="theme-toggle" role="group" aria-label="Colour theme">
-      <button type="button" data-theme-set="system" aria-pressed="true" title="Match system"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="8.5" rx="1"/><path d="M5.5 13.75h5M8 11.25v2.5"/></svg><span class="sr-only">System theme</span></button>
-      <button type="button" data-theme-set="light" aria-pressed="false" title="Light"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.75M8 12.75v1.75M1.5 8h1.75M12.75 8h1.75M3.4 3.4l1.24 1.24M11.36 11.36l1.24 1.24M3.4 12.6l1.24-1.24M11.36 4.64l1.24-1.24"/></svg><span class="sr-only">Light theme</span></button>
-      <button type="button" data-theme-set="dark" aria-pressed="false" title="Dark"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A5.75 5.75 0 016.4 2.5a5.75 5.75 0 107.1 7.1z"/></svg><span class="sr-only">Dark theme</span></button>
-    </div>
   </nav>
+  </div>
 </header>
 <div class="static-notice" role="note" id="static-notice">
   <p><strong>Hosted version.</strong> Everything runs in your browser: image and video forensics, scam detection, the offender index, grading and the custody log. “Investigate with Claude” runs the agent team in claude.ai. Page fetching, username sweeps, domain and wallet lookups and built-in agents need the local app: <a href="https://github.com/mevan101/scam_bunker#quick-start">run it on your computer</a>.</p>
 </div>
+
+<main class="simple" id="simple">
+  <section class="s-home" aria-labelledby="s-h">
+    <h1 id="s-h">Is this a scam?</h1>
+    <p class="s-lede">Paste a message, link, phone number or email, or add a screenshot, photo, video or QR code. You’ll get a plain answer, the evidence, and what to do next.</p>
+    <form class="s-box" id="s-form" data-tour="input" novalidate>
+      <label for="s-text" class="sr-only">Message, link, phone number or email to check</label>
+      <textarea id="s-text" rows="5" placeholder="Paste it here…" autocomplete="off" spellcheck="false"></textarea>
+      <div class="s-file" id="s-file" hidden>
+        <img id="s-thumb" alt="" hidden>
+        <span id="s-file-name"></span>
+        <button type="button" class="link" id="s-file-remove">Remove<span class="sr-only"> the attached file</span></button>
+      </div>
+      <div class="s-box-bar">
+        <label class="s-attach">
+          <input type="file" id="s-fileinput" class="sr-only" accept="image/*,video/mp4,video/quicktime,video/webm,.mp4,.m4v,.mov,.webm,.mkv,.heic">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/></svg>
+          <span>Add a screenshot or photo</span>
+        </label>
+        <button type="submit" class="primary s-go" id="s-go">Check it</button>
+      </div>
+    </form>
+    <p class="s-privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>Free and private. Everything is checked on your device; nothing is uploaded.</p>
+    <div class="s-examples" data-tour="examples">
+      <span id="s-ex-h">Or try an example:</span>
+      <div class="s-chips" role="group" aria-labelledby="s-ex-h">
+        <button type="button" class="s-chip" data-sample="phish">Bank text message</button>
+        <button type="button" class="s-chip" data-sample="job">Job offer</button>
+        <button type="button" class="s-chip" data-sample="crypto">Crypto “mentor”</button>
+        <button type="button" class="s-chip" data-sample="viral">Viral health claim</button>
+        <button type="button" class="s-chip" data-sample="bots">Fake reviews</button>
+      </div>
+    </div>
+  </section>
+  <p class="sr-only" role="status" aria-live="polite" id="s-status"></p>
+  <section class="s-result" id="s-result" aria-label="Result" hidden></section>
+</main>
 
 <main class="layout">
   <!-- INTAKE -->
@@ -238,6 +289,7 @@
 <script src="scam.js"></script>
 <script src="shared/prompt.js"></script>
 <script src="app.js"></script>
+<script src="simple.js"></script>
 <script src="dossier.js"></script>
 <script src="osint.js"></script>
 <script src="provenance.js"></script>

@@ -21,7 +21,7 @@ Light is the primary theme. Dark is defined twice: under `@media (prefers-color-
 | Legacy aliases | `--bg-2`, `--surface-2` (= `--subtle`), `--serif` (= `--sans`) |
 | Type | `--sans` IBM Plex Sans · `--mono` IBM Plex Mono |
 | Space | `--s1` 4 · `--s2` 8 · `--s3` 12 · `--s4` 16 · `--s5` 24 · `--s6` 32 · `--s7` 48 |
-| Shape | `--radius` 6px · `--radius-sm` 4px · `--shadow` (none in dark) · `--shadow-overlay` (dialogs, toast) |
+| Shape | `--radius` 6px · `--radius-sm` 4px · `--radius-lg` 12px (Simple) · `--shadow-raise` (Simple input card) · `--shadow` (none in dark) · `--shadow-overlay` (dialogs, toast) |
 
 Verdict colour is passed to `#verdict` as `--v` (see `VERDICT_COLOR` in `app.js`). It drives the verdict marker and the risk meter fill.
 
@@ -29,9 +29,29 @@ Verdict colour is passed to `#verdict` as `--v` (see `VERDICT_COLOR` in `app.js`
 
 `--fs-xs` 11 · `--fs-sm` 12 · `--fs-md` 13 · `--fs-base` 14 (body) · `--fs-lg` 16 · `--fs-xl` 20 · `--fs-2xl` 24 (verdict) · `--fs-3xl` 28 (risk number). Weights are 400, 500 and 600. Small uppercase labels (11px, 600, +0.06em) are reserved for section labels such as "New case", "Samples" and "Case report".
 
+## Modes
+
+`<html data-mode="simple|investigator">` is set before first paint from `localStorage['scambunker.mode']` (default **simple**). `ScamBunker.mode()` reads it, `ScamBunker.setMode(m)` changes it, and `sb:mode` fires on change. The switch lives in the top bar (`[data-mode-set]`, `[data-tour=mode]`).
+
+- **Simple** (`#simple`, `public/simple.js`): one smart input, then one plain answer. Expert surfaces stay in the DOM so modules keep working, but are hidden by CSS: the investigator layout, the tools bar, the static notice, grading codes and the risk number. Use plain words only: no codes or acronyms.
+- **Investigator**: the full report (`#report`) with every section and tool. The top bar gains a second row (`.inv-bar`) with the status line and the tools (Event overlap, Subjects, Case files, Investigator profile). `--topbar-h` becomes 102px.
+
+**Rule for modules:** investigator-only UI goes inside `.layout` or `.inv-bar`, or carries `html[data-mode="simple"] … { display: none }`. Simple-mode content goes into the result through `addReasons` and `addActions`, never by editing `#s-result` directly.
+
+### Simple-mode contracts (`public/simple.js`)
+
+| API | Use |
+|---|---|
+| `ScamBunker.registerIntake({ id, label, detect(input) → 0..1, async extract(input) → { text?, url?, notes?, attachments? } })` | Input adapters. `input` is `{ text, file }`. The adapter with the highest confidence above 0.5 runs. Newer registrations win ties. Its text, url and first attachment become the case, and `notes` appear in the result footer. The built-in adapters are `video` (1.0), `url` (0.95, a single link), `image` (0.9) and `text` (0.6). |
+| `ScamBunker.addReasons(case, [{ text, weight, source, quote? }])` | Adds plain reasons. `weight` is one of `proof`, `strong`, `moderate`, `weak`, `info` or `ok`. Reasons are sorted strongest first and capped at 5. |
+| `ScamBunker.addActions(case, [{ text, href?, label? }])` | Adds to-do items. `href` must be https. |
+| Rule hits `{ plain, advice }` | A hit's own `plain` sentence is preferred over the shell's per-rule map. `advice` is looked up in `DeduceHeuristics.ADVICE` when that map exists. |
+| `window.ScamBunkerSimple` | The pure copy helpers (`verdictCopy`, `plainReasons`, `plainActions`, `selfChecks`, `plainHidden`, `riskWord`), tested in `test/simple.test.js`. |
+| `sb:tour` | Dispatched by "Take the tour" (`#btn-tour`). Tour anchors: `[data-tour=input]`, `examples`, `verdict`, `reasons`, `actions` and `mode`. |
+
 ## Layout
 
-- **Top bar** (52px, sticky on desktop): brand, connection status (dot + text), actions, theme toggle.
+- **Top bar** (sticky on desktop): the main row (56px) holds the brand, Guide, Take the tour, the mode switch and the theme toggle. In Investigator mode the tools row (`.inv-bar`, 45px) adds the status line and the tools. On phones the main row wraps: the brand and links on the first line, then a full-width mode switch and the theme toggle.
 - **Shell:** a 384px intake sidebar on the left and the report sheet on the right (max 1160px). Below 1020px they stack. Below 640px every multi-column component collapses to one column, with 16px gutters.
 - **Report sheet (`#report`):** a toolbar (`.report-bar`), then the verdict summary (`.verdict`: source line, verdict, one-line finding, category · confidence · platform, risk meter), then tabs, then the panel.
 - **Report sections (`#tabs`):** one ARIA tablist, grouped by presentational `.tab-group` labels (`aria-hidden`):
@@ -84,6 +104,24 @@ Feature modules may ship their own stylesheet, but only if it is scoped to the m
 Styles injected by `custody.js` and `video.js` are normalised from `app.css` under "Module consistency".
 
 The risk meter (`#gauge`) is a segmented scale. Its bands (Low 0–24, Elevated 25–49, High 50–69, Critical 70–100) match the rule engine's verdict thresholds. `app.js` fills it by setting `stroke-dashoffset` on `#g-fg`, a 314-unit line.
+
+
+### Simple-mode components
+
+Simple mode uses the same tokens with bigger type (17px input, 28px verdict), `--radius-lg` (12px) cards and touch targets of 44px or more. The column is 720px wide, and a single column at 390px.
+
+| Class | Use |
+|---|---|
+| `.s-box` | The smart input card: textarea, attached-file row (`.s-file`) and a bar with `.s-attach` (file picker) and `.s-go` (Check it). Accepts drag and drop and paste. Its `:focus-within` ring marks the whole card. |
+| `.s-chip` | Example buttons (`[data-sample]`), 44px tall. |
+| `.s-card` | A result card. |
+| `.s-verdict.tone-{danger,warn,ok,info}` | The verdict: icon, tone word (Danger, Warning, Looks OK, Not sure), a plain sentence, a one-line next step, and `.s-risk`, which shows scam risk as 4 bars plus Low, Medium, High or Very high. The number appears only in the tooltip. Colour is never the only cue. |
+| `.s-reasons` | "Why we think so": a `.w` weight badge with words (Strong sign, Warning sign, Weak hint), the quoted words in `<q>`, then one plain sentence. Left rule in the weight colour. |
+| `.s-actions` | "What to do now": a numbered checklist with optional report links. |
+| `.s-tools` / `.s-tool` | "Check it yourself": link buttons to free tools (reverse image search, domain age, Safe Browsing, number search, block explorer, Fact Check Explorer). |
+| `.s-hidden` | "Hidden in this file", in plain words. Shown only when relevant. |
+| `.s-foot` | Open full investigation (switches mode, same case), Copy a summary to share, Ask Claude about this (`[data-handoff]`), and a quiet line saying where it was checked. |
+| `.s-error` | Empty or failed input: says what happened and what to do. The shell never leaves a spinner running. |
 
 ## Accessibility
 
