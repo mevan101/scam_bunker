@@ -431,8 +431,14 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
     const results = await Promise.all(doms.map(d => lookupDomain({ domain: d }).then(r => [d, r]).catch(e => [d, { error: e.message }])));
     c.domainAges = Object.fromEntries(results.map(([d, r]) => [d, r.error ? { error: r.error } : { registeredAt: r.registeredAt || null, ageDays: r.ageDays ?? null, registrar: r.registrar || null, young: !!r.young, registered: r.registered !== false }]));
     const young = results.filter(([, r]) => r.young && r.ageDays != null);
-    addReasons(c, young.map(([d, r]) => ({ text: `The website ${d} was created only ${plural(r.ageDays, 'day')} ago (${fmtDate(r.registeredAt)}). Scam websites are usually brand new. Real banks, shops and employers have had theirs for years.`, weight: r.ageDays < 30 ? 'strong' : 'moderate', quote: d, source: 'Public domain registration records (RDAP)' })));
-    addActions(c, young.map(([d]) => ({ text: `Check for yourself when ${d} was created`, href: `https://lookup.icann.org/en/lookup?name=${encodeURIComponent(d)}` })));
+    const reg = ([d, r]) => r.queried || d;
+    const plain = {
+      reasons: young.map(([d, r]) => ({ text: `The website ${reg([d, r])} was created only ${plural(r.ageDays, 'day')} ago (${fmtDate(r.registeredAt)}). Scam websites are usually brand new. Real banks, shops and employers have had theirs for years.`, weight: r.ageDays < 30 ? 'strong' : 'moderate', quote: d, source: 'Public domain registration records (RDAP)' })),
+      actions: young.map(e => ({ text: `Check for yourself when ${reg(e)} was created`, href: `https://lookup.icann.org/en/lookup?name=${encodeURIComponent(reg(e))}` }))
+    };
+    c._osintPlain = plain;
+    addReasons(c, plain.reasons);
+    addActions(c, plain.actions);
     const obs = young.map(([d, r]) => domainObs(d, r));
     if (!obs.length) return;
     c._osintObs = obs;
@@ -444,6 +450,9 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
     const list = store.get('scambunker.cases', []); const x = list.find(i => i.id === c.id); if (!x) return;
     (c._osintObs || []).forEach(ob => { addObs(x.local, ob); addObs(x.final, ob); });
     x.domainAges = c.domainAges;
+    // Saved cases keep the plain-language findings, whether the lookup finished before or after the save.
+    const keep = (have, add) => [...(have || []), ...add.filter(a => !(have || []).some(h => h.text === a.text))];
+    if (c._osintPlain) { x.simpleReasons = keep(x.simpleReasons, c._osintPlain.reasons); x.simpleActions = keep(x.simpleActions, c._osintPlain.actions); }
     store.set('scambunker.cases', list);
   }
   function syncMode() {
