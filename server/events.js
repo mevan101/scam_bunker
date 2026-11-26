@@ -1,7 +1,11 @@
 // Event-listing extraction: fetch a listing page through the SSRF guard and pull out scheduling facts.
 // Preference order per field: schema.org Event JSON-LD > OpenGraph/meta > .ics / Google Calendar link > visible text.
 // Every field carries its source so the UI and the claims ledger can show provenance.
-const { assertPublicUrl, httpError } = require('./net-guard');
+const http = require('http');
+const https = require('https');
+const dns = require('dns');
+const { Readable } = require('stream');
+const { assertPublicUrl, isPrivateIp, httpError } = require('./net-guard');
 const core = require('../public/events-core');
 
 const UA = 'Mozilla/5.0 (compatible; ScamBunkerEventCheck/1.0; +https://github.com/mevan101/scam_bunker)';
@@ -18,14 +22,35 @@ async function readCapped(res, maxBytes) {
   }
   return Buffer.concat(chunks.map(c => Buffer.from(c))).subarray(0, maxBytes).toString('utf8');
 }
-async function fetchFollow(url, { maxBytes = 1500000, fetchImpl = fetch, guard = assertPublicUrl } = {}) {
+// Single GET without following redirects. The address is checked again at connect time (pinned DNS lookup), so a
+// rebinding resolver cannot pass assertPublicUrl with one answer and connect to another.
+function pinnedLookup(hostname, options, cb) {
+  dns.lookup(hostname, { ...options, all: true }, (err, addrs) => {
+    if (err) return cb(err);
+    if (!addrs.length || addrs.some(a => isPrivateIp(a.address))) return cb(httpError(403, 'Refusing to fetch a private or local network address', 'ssrf_blocked'));
+    if (options && options.all) return cb(null, addrs);
+    cb(null, addrs[0].address, addrs[0].family);
+  });
+}
+function guardedHop(url, { headers = {}, timeoutMs = 12000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = (u.protocol === 'https:' ? https : http).get(u, { lookup: pinnedLookup, headers: { ...headers, 'Accept-Encoding': 'identity' } }, res => {
+      res.on('close', () => clearTimeout(timer));
+      resolve({ status: res.statusCode, headers: { get: k => { const v = res.headers[k.toLowerCase()]; return Array.isArray(v) ? v.join(', ') : v ?? null; } }, body: Readable.toWeb(res) });
+    });
+    const timer = setTimeout(() => req.destroy(httpError(504, 'Timed out', 'timeout')), timeoutMs);
+    req.on('error', e => { clearTimeout(timer); reject(e.status ? e : httpError(502, `Could not fetch: ${e.code || e.message}`, 'network')); });
+  });
+}
+async function fetchFollow(url, { maxBytes = 1500000, fetchImpl = guardedHop, guard = assertPublicUrl } = {}) {
   const chain = []; let cur = url, metaRefreshUsed = false;
   for (let i = 0; i < MAX_HOPS; i++) {
     await guard(cur);
     const r = await fetchImpl(cur, { redirect: 'manual', headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,text/calendar;q=0.9,*/*;q=0.5' }, signal: AbortSignal.timeout(12000) });
     const loc = r.headers.get('location');
     chain.push({ url: cur, status: r.status });
-    if (r.status >= 300 && r.status < 400 && loc) { cur = new URL(loc, cur).href; continue; }
+    if (r.status >= 300 && r.status < 400 && loc) { await r.body?.cancel?.().catch(() => {}); cur = new URL(loc, cur).href; continue; }
     const contentType = r.headers.get('content-type') || '';
     const body = await readCapped(r, maxBytes);
     const refresh = !metaRefreshUsed && /html/i.test(contentType) && /<meta[^>]+http-equiv=["']?refresh["']?[^>]*content=["']?\s*\d+\s*;\s*url=([^"'>\s]+)/i.exec(body);
@@ -295,7 +320,11 @@ function merge(cands) {
 
 function extractFromHtml(html, { baseUrl = '', fetchedYear = new Date().getUTCFullYear(), icsText = null, icsVia = '' } = {}) {
   const cands = [];
-  for (const j of parseJsonLd(html).slice(0, 1)) cands.push({ source: 'jsonld', data: j });
+  const lds = parseJsonLd(html), here = core.eventIdFromUrl(baseUrl), strip = u => String(u).replace(/[?#].*$/, '').replace(/\/$/, '');
+  const resolved = u => { try { return strip(new URL(u, baseUrl).href); } catch { return ''; } };
+  const sameId = u => { const x = core.eventIdFromUrl(resolved(u)); return here && x && x.platform === here.platform && x.id === here.id; };
+  const ld = (baseUrl && lds.find(e => e.url && (resolved(e.url) === strip(baseUrl) || sameId(e.url)))) || lds[0];
+  if (ld) cands.push({ source: 'jsonld', data: ld });
   const meta = parseMeta(html);
   cands.push({ source: 'meta', via: meta.timeZoneVia || undefined, data: meta });
   const inline = findIcsLinks(html, baseUrl).find(l => l.inline);

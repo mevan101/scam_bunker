@@ -12,6 +12,8 @@ function isPrivateIp(ip) {
       (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19)) || a >= 224;
   }
   const v = ip.toLowerCase();
+  const mapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(v); // ::ffff:7f00:1 is how URL() normalises ::ffff:127.0.0.1
+  if (mapped) { const hi = parseInt(mapped[1], 16), lo = parseInt(mapped[2], 16); return isPrivateIp(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`); }
   if (v.startsWith('::ffff:')) return isPrivateIp(v.slice(7));
   return v === '::' || v === '::1' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80');
 }

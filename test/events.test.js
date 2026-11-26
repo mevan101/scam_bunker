@@ -244,3 +244,32 @@ test('SHA-256 fallback matches node crypto; ledger hash covers the content', asy
 test('front-end sources parse', () => {
   for (const f of ['public/events-core.js', 'public/events.js', 'server/events.js', 'server/net-guard.js']) new vm.Script(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'));
 });
+
+test('SSRF: IPv4-mapped IPv6 in hex form and connect-time DNS check', async () => {
+  const { isPrivateIp, assertPublicUrl } = require('../server/net-guard');
+  assert.equal(isPrivateIp('::ffff:7f00:1'), true);
+  assert.equal(isPrivateIp('::ffff:a9fe:a9fe'), true);
+  assert.equal(isPrivateIp('::ffff:5db8:d822'), false);
+  await assert.rejects(assertPublicUrl('http://[::ffff:127.0.0.1]/'), /private or local/);
+  // Even if the pre-check is bypassed (as with a DNS-rebinding answer), the default hop refuses at connect time.
+  const srv = require('http').createServer((q, s) => s.end('<h1>internal</h1>'));
+  await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  try {
+    await assert.rejects(ev.fetchFollow(`http://localhost:${srv.address().port}/`, { guard: async () => {} }), /private or local/);
+  } finally { srv.close(); }
+});
+
+test('JSON-LD: the event matching the page URL wins over a related event listed first', () => {
+  const html = `<script type="application/ld+json">[{"@type":"Event","name":"Related Talk","url":"https://www.meetup.com/g/events/301000001/","startDate":"2025-11-01T10:00:00+06:00"},{"@type":"Event","name":"Requested Talk","url":"https://www.meetup.com/g/events/302000002/","startDate":"2025-11-02T10:00:00+06:00"}]</script>`;
+  const r = ev.extractFromHtml(html, { baseUrl: 'https://www.meetup.com/g/events/302000002/?ref=x' });
+  assert.equal(r.fields.title.value, 'Requested Talk');
+  assert.equal(r.fields.start.value, '2025-11-02T10:00:00+06:00');
+  assert.equal(ev.extractFromHtml(html, { baseUrl: 'https://example.org/other' }).fields.title.value, 'Related Talk');
+});
+
+test('venue match: same name but far-apart coordinates or unrelated addresses is not a strong match', () => {
+  const a = { venueName: 'Community Hall', geo: { lat: 23.78, lon: 90.40 } }, b = { venueName: 'Community Hall', geo: { lat: 22.35, lon: 91.78 } };
+  assert.equal(core.venueMatch(a, b).score, 0);
+  const c = core.venueMatch({ venueName: 'Community Hall', venueAddress: '12 Lakeview Road' }, { venueName: 'Community Hall', venueAddress: '7 Quay Street' });
+  assert.ok(c.score < 0.85);
+});
