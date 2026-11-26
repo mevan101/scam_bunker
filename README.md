@@ -1,8 +1,14 @@
 # Scam Bunker
 
-**An open-source lab for identifying scams, profiling repeat offenders, and debunking disinformation and manipulated images.**
+**Got a suspicious message, link, QR code, photo or claim? Check it here, free, in under a minute.**
 
-Drop in an image, a post, a DM or a link. Scam Bunker dates the image, checks whether AI generated it, pulls out the information hidden in the file, takes the links apart, and classifies the scheme. With an API key it also hands the evidence to a team of AI specialists. A lead investigator, modelled on Sherlock Holmes's method, cross-examines their reports and delivers the verdict.
+**Try it now: https://mevan101.github.io/scam_bunker/** (works on any phone, nothing to install, checked on your device)
+
+Scam Bunker is a free, open-source debunker for everyday people and the people who protect them. Paste a message or link, or drop a screenshot, photo or video. You get a plain answer ("this is very likely a scam", "this photo is older than the post claims"), the evidence behind it, what to do now, and how to check it yourself. Fact-checkers, journalists and community moderators can switch to **Investigator mode** for the deeper tools: image provenance and dating, timelines, repeat-offender dossiers, event-listing overlap checks, evidence grading and a tamper-evident case log.
+
+It covers the deception people actually meet: phishing and smishing, QR-code scams, investment and crypto fraud, fake jobs and task scams, mobile-money fraud (bKash, Nagad, Rocket), impersonation, fake shops and giveaways, sextortion, spam and comment rings, recycled or AI-generated images, and false claims. English, Bangla and Banglish.
+
+**Why we built it and the principles we hold to:** [docs/MISSION.md](docs/MISSION.md). **What we are building next:** [docs/PRODUCT.md](docs/PRODUCT.md). **How verification works here:** [docs/METHODOLOGY.md](docs/METHODOLOGY.md).
 
 ![Scam Bunker case report: a crypto "mentor" scam on the Deduction tab, with verdict, segmented risk scale and graded evidence chain](docs/screenshot.png)
 
@@ -107,6 +113,8 @@ test/provenance.test.js  npm test (hashing, verdict, Wayback parser, SSRF guard)
 - This is an aid to judgement and does not replace it. Verify before you accuse anyone publicly.
 
 ## Contributing
+
+Read [docs/MISSION.md](docs/MISSION.md) and [docs/PRODUCT.md](docs/PRODUCT.md) first, then [AGENTS.md](AGENTS.md) for the working rules (they apply to humans and AI agents alike). Scam Bunker is built in the open by people working alongside AI agents: Claude Code coordinates, reviews and does final QA, and Devin sessions build features in parallel. Every change goes through review and is tested in both the local app and the hosted site.
 
 New scam patterns, generator signatures and platform fingerprints are the most valuable contributions. See [CONTRIBUTING.md](CONTRIBUTING.md).
 

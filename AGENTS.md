@@ -2,6 +2,8 @@
 
 Several agents (Claude Code, Devin) and humans work on this repo in parallel. These rules keep that safe.
 
+**Start here:** read [docs/MISSION.md](docs/MISSION.md) (why this exists and who it serves) and [docs/PRODUCT.md](docs/PRODUCT.md) (Simple vs Investigator mode, the tour, input types, module contracts, definition of done). Every change should make Scam Bunker simpler and more useful for an ordinary person checking something suspicious, without losing depth for investigators.
+
 ## Ground rules
 - **Zero npm dependencies.** Node >= 22, vanilla JS frontend. `npm start` must work on a fresh clone.
 - **One branch + one pull request per task.** Branch names: `<agent>/<short-topic>` (e.g. `devin/event-overlap`). Never push to `main` directly.
