@@ -197,6 +197,7 @@
     const h = c.heuristics || { hits: [], links: [], entities: {} }, cat = v.category || h.category || '', where = !c.platform ? 'in the app it came from' : /Email|SMS/i.test(c.platform) ? 'as spam or phishing (in your email app, or by forwarding a scam text to your mobile operator)' : `on ${c.platform}`;
     const acts = [], add = (text, href, label) => { if (!acts.some(a => a.text === text)) acts.push({ text, href, label }); };
     const ADV = root.DeduceHeuristics?.ADVICE;
+    if (['Scam', 'Likely scam', 'Suspicious'].includes(v.verdict)) add('Don’t send money, gift cards or crypto, and never share codes, PINs or passwords.');
     if (ADV) (h.hits || []).forEach(x => { const a = x.advice && ADV[x.advice]; if (a) typeof a === 'string' ? add(a) : add(a.text, a.href, a.label); });
     const scammy = ['Scam', 'Likely scam', 'Suspicious'].includes(v.verdict);
     if (scammy) {

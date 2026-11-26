@@ -9,7 +9,7 @@ for (const r of H.RULES) {
   check(typeof r.plain === 'string' && /^[A-Z"]/.test(r.plain) && /[.!?]$/.test(r.plain) && r.plain.length >= 30 && r.plain.length <= 220, `${r.id}: plain is a short sentence (${r.plain})`);
   check(!!H.ADVICE[r.advice], `${r.id}: advice key "${r.advice}" exists in ADVICE`);
 }
-for (const [k, a] of Object.entries(H.ADVICE)) check(typeof a.action === 'string' && a.action.length > 20 && typeof a.report === 'boolean', `ADVICE.${k} has action text and report flag`);
+for (const [k, a] of Object.entries(H.ADVICE)) check(typeof a.text === 'string' && a.text.length > 20 && typeof a.report === 'boolean', `ADVICE.${k} has text and report flag`);
 const used = new Set(H.RULES.map(r => r.advice));
 check(Object.keys(H.ADVICE).every(k => used.has(k) || ['block_report', 'contact_bank'].includes(k)), 'every ADVICE key is used by a rule (or is a general fallback)');
 for (const cc of ['US', 'UK', 'IN', 'BD', 'EU']) {

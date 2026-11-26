@@ -442,19 +442,19 @@
   // ---------- Plain-language actions and reporting routes (Simple mode) ----------
   // Every rule carries `advice` (a key below) and `plain` (a one-sentence reason). Reporting links were checked against the official sites.
   const ADVICE = {
-    dont_pay: { action: 'Do not send money, gift cards or crypto. If you already paid, contact your bank or payment app right away.', report: true },
-    dont_click: { action: 'Do not tap the link. Open the company\'s official app or type its address yourself.', report: true },
-    dont_share_code: { action: 'Never share a code, PIN, password or recovery phrase. If you already did, change your password and call your bank or provider now.', report: true },
-    verify_official_channel: { action: 'Check with the company or agency using a phone number or website you find yourself, not one in the message.', report: true },
-    verify_person: { action: 'Call the person on the number you already have, or ask a question only they would know, before doing anything.', report: true },
-    block_report: { action: 'Stop replying, block the sender and report the account on the platform.', report: true },
-    contact_bank: { action: 'Call your bank or card provider using the number on your card and ask them to stop or reverse the payment.', report: true },
-    keep_evidence: { action: 'Do not delete anything. Take screenshots of messages, numbers and payment receipts and report them.', report: true },
-    dont_install: { action: 'Do not install apps or give anyone remote access to your device. If you did, disconnect from the internet and get help from someone you trust.', report: true },
-    no_recovery_fees: { action: 'Nobody can get lost money back for a fee. Report the original loss to the police and your bank only.', report: true },
-    get_support: { action: 'Do not pay and do not reply. Save the messages, block the sender and talk to someone you trust or a support service.', report: true },
-    take_your_time: { action: 'Slow down. A real company or person will still be there tomorrow; talk to someone you trust first.', report: false },
-    check_before_sharing: { action: 'Check the claim with a trusted news source or fact-checker before sharing it.', report: false },
+    dont_pay: { text: 'Do not pay any fee, deposit or charge they ask for. If you already paid, contact your bank or payment app right away.', report: true },
+    dont_click: { text: 'Do not tap the link. Open the company\'s official app or type its address yourself.', report: true },
+    dont_share_code: { text: 'Never share a code, PIN, password or recovery phrase. If you already did, change your password and call your bank or provider now.', report: true },
+    verify_official_channel: { text: 'Check with the company or agency using a phone number or website you find yourself, not one in the message.', report: true },
+    verify_person: { text: 'Call the person on the number you already have, or ask a question only they would know, before doing anything.', report: true },
+    block_report: { text: 'Stop replying, block the sender and report the account on the platform.', report: true },
+    contact_bank: { text: 'Call your bank or card provider using the number on your card and ask them to stop or reverse the payment.', report: true },
+    keep_evidence: { text: 'Do not delete anything. Take screenshots of messages, numbers and payment receipts and report them.', report: true },
+    dont_install: { text: 'Do not install apps or give anyone remote access to your device. If you did, disconnect from the internet and get help from someone you trust.', report: true },
+    no_recovery_fees: { text: 'Nobody can get lost money back for a fee. Report the original loss to the police and your bank only.', report: true },
+    get_support: { text: 'Do not pay and do not reply. Save the messages, block the sender and talk to someone you trust or a support service.', report: true },
+    take_your_time: { text: 'Slow down. A real company or person will still be there tomorrow; talk to someone you trust first.', report: false },
+    check_before_sharing: { text: 'Check the claim with a trusted news source or fact-checker before sharing it.', report: false },
   };
   // Official reporting routes per country. `links` are https only; `phones` are numbers to show as text or tel: links.
   const REPORTING = {
@@ -469,7 +469,7 @@
     const hits = [...(result?.hits || [])].filter(h => h.plain).sort((a, b) => b.weight - a.weight);
     const reasons = [...new Map(hits.map(h => [h.plain, { id: h.id, plain: h.plain, advice: h.advice }])).values()];
     const keys = [...new Set(hits.map(h => h.advice).filter(k => ADVICE[k]))];
-    const actions = keys.map(key => ({ key, text: ADVICE[key].action }));
+    const actions = keys.map(key => ({ key, text: ADVICE[key].text }));
     const report = keys.some(k => ADVICE[k].report) && REPORTING[country] ? REPORTING[country] : null;
     return { reasons, actions, report };
   }
