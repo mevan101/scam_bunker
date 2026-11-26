@@ -140,4 +140,23 @@ ok('official QR on a checkout that names several brands is not a mismatch', () =
   assert(!a.quishing, JSON.stringify(a.reasons));
   assert(!a.reasons.some(r => /not .*real one/.test(r.text)), JSON.stringify(a.reasons));
 });
+ok('the image text and QR link never become the shell input (they would be sent to the server)', () => {
+  const file = { name: 'Screenshot_x.png', size: 10 };
+  const r = { qr: ['https://paypa1-parking.top/pay?zone=42', 'WIFI:T:WPA;S:CafeExample;P:invented;;'], ocr: { text: 'Your parking fine is overdue. Pay now at the link.' }, notes: ['Found a QR code.'], screenshot: { isScreenshot: true, score: 0.9 } };
+  const x = M.extractionOf(r, file);
+  assert.strictEqual(x.text, undefined); assert.strictEqual(x.url, undefined);
+  assert.strictEqual(x.attachments[0], file);
+  const s = JSON.stringify(x);
+  assert(!/paypa1|parking fine|CafeExample|invented/.test(s), s);
+  assert.strictEqual(x.attachments[1].qrCodes, 2); assert.strictEqual(x.attachments[1].ocrWords, 10);
+});
+ok('lookups say what they send, and where', () => {
+  assert.strictEqual(M.sendsNote([{ what: 'domain', values: ['paypa1-parking.top'], to: 'rdap.org' }]), 'Sends the domain paypa1-parking.top to rdap.org.');
+  assert.strictEqual(M.sendsNote([]), '');
+});
+ok('the browser module never fetches a decoded QR link, and only looks up domain age from a click', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../public/intake-media.js'), 'utf8');
+  assert(!/\/api\/fetch|\/api\/search|caseExtras\s*=/.test(src));
+  assert.strictEqual((src.match(/domainAgeFor\(/g) || []).length, 2, 'defined once, called once (from the button)');
+});
 console.log(`✓ ${n} intake-media tests passed`);

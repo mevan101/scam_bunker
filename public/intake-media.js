@@ -252,7 +252,20 @@
     return t ? { registeredAt: new Date(t).toISOString(), ageDays: Math.max(0, Math.floor((now - t) / 864e5)) } : null;
   }
 
-  const API = { CDN, pixelFeatures, screenshotScore, exifCamera, formatOf, cleanOcr, classifyPayload, parseEmv, analyzeQr, registrable, rdapAge };
+  // What an adapter hands to the shell. The OCR text and the QR payloads stay out of `text` and `url` on purpose:
+  // the shell sends those to the local server (page fetch, web search, AI agents). They are analysed here, on the device.
+  function extractionOf(r, file) {
+    const meta = { type: 'intake-media', qrCodes: r.qr.length, ocrWords: r.ocr && r.ocr.text ? (r.ocr.text.match(/[\p{L}\p{N}]+/gu) || []).length : 0, screenshot: r.screenshot ? { isScreenshot: r.screenshot.isScreenshot, score: r.screenshot.score } : null };
+    return { notes: r.notes.slice(), attachments: [file, meta] };
+  }
+  // Same wording as PR #10's ScamBunkerDirect.sendsNote: "Sends the domain example.top to rdap.org."
+  function sendsNote(parts) {
+    const list = xs => xs.length < 2 ? (xs[0] || '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+    const bits = (parts || []).filter(x => x && x.values && x.values.length).map(x => `the ${x.what}${x.values.length > 1 ? 's' : ''} ${list(x.values)} to ${x.to}`);
+    return bits.length ? `Sends ${list(bits)}.` : '';
+  }
+
+  const API = { CDN, pixelFeatures, screenshotScore, exifCamera, formatOf, cleanOcr, classifyPayload, parseEmv, analyzeQr, registrable, rdapAge, extractionOf, sendsNote };
   root.ScamBunkerIntakeMedia = API;
   if (typeof document === 'undefined' || !document.createElement) return;
 
@@ -405,7 +418,7 @@
     box.className = 'im-status'; box.id = 'im-status'; box.hidden = true;
     box.innerHTML = `<div class="im-row"><span class="im-msg" id="im-msg" role="status" aria-live="polite"></span><button type="button" class="link im-cancel" id="im-cancel" hidden>Cancel</button></div>
       <progress id="im-progress" max="100" value="0" aria-labelledby="im-msg" hidden></progress>
-      <p class="im-note" id="im-note" hidden>Your image never leaves this device. The text reader and its English and Bangla language data (about 8 MB) are downloaded once from cdn.jsdelivr.net, then kept in this browser.</p>
+      <p class="im-note" id="im-note" hidden>Your image, and the text and QR link read from it, never leave this device. The text reader and its English and Bangla language data (about 8 MB) are downloaded once from cdn.jsdelivr.net, then kept in this browser.</p>
       <div class="im-found" id="im-found"></div>`;
     placeBox();
     return box;
@@ -483,45 +496,80 @@
     else if (r.cancelled) bits.push('Reading the text was cancelled.');
     else if (r.screenshot && r.screenshot.isScreenshot && !r.ocr) bits.push('Could not read the text in the screenshot. You can paste it instead.');
     if (!bits.length) return '';
-    return bits.join(' ') + ' It will be checked together with the image.';
+    return bits.join(' ') + ' Checked on this device only.';
   }
   function foundHtml(r) {
     const items = r.qr.map(q => { const a = classifyPayload(q); const shown = a.kind === 'url' ? (safeHost(a.url) || q) : q; return `<li><span class="im-tag">QR code</span> ${a.kind === 'url' ? 'opens' : 'contains'} <code>${esc(short(shown, 90))}</code></li>`; });
-    return items.length ? `<ul class="im-list">${items.join('')}</ul>` : '';
+    const doms = [...new Set(qrDomains(r).filter(Boolean))];
+    const age = doms.map(d => `<div class="im-age"><button type="button" class="ghost im-age-btn" data-im-age="${esc(d)}">Check how old ${esc(d)} is</button><p class="im-note">${esc(ageNote(d))} Nothing is sent unless you press the button.</p><p class="im-note" data-im-age-out="${esc(d)}" role="status" aria-live="polite"></p></div>`);
+    const text = r.ocr && r.ocr.text ? `<details class="im-text"><summary>Text read from the screenshot</summary><pre>${esc(r.ocr.text)}</pre><p class="im-note">This text stays on this device. To have it searched or sent to AI agents, paste it into the text box yourself.</p></details>` : '';
+    return (items.length ? `<ul class="im-list">${items.join('')}</ul>` : '') + age.join('') + text;
   }
+  const qrDomains = r => r.qr.map(q => { const p = classifyPayload(q); const h = p.kind === 'url' ? safeHost(p.url).replace(/^www\./, '') : ''; return h && !/^\d+(\.\d+){3}$/.test(h) ? registrable(h) : null; });
+  const viaLocalApp = () => { const sb = SB(); return !(sb.isStatic && sb.isStatic()) && !!(sb.server && sb.server().online); };
+  const ageNote = d => sendsNote([{ what: 'domain', values: [d], to: viaLocalApp() ? 'the public domain registry (RDAP) through your Scam Bunker app' : 'rdap.org (and on to the registry for that domain)' }]);
   const safeHost = u => { try { return new URL(u).hostname; } catch { return ''; } };
 
   // The shell picks one adapter per input, so either adapter returns both the QR and the OCR findings. The image itself
   // stays in `attachments`, so the normal image forensics still run on it.
   function toExtraction(r, file) {
-    const text = [r.ocr && r.ocr.text, ...r.qr.map(q => analyzeQr(q).caseText)].filter(Boolean).join('\n\n');
-    const urls = r.qr.map(classifyPayload).filter(p => p.kind === 'url').map(p => p.url);
     r.via = 'adapter';
-    return { text, url: urls[0], notes: r.notes.slice(), attachments: [file, { type: 'intake-media', qr: r.qr.slice(), ocrText: r.ocr ? r.ocr.text : '', screenshot: r.screenshot }] };
+    return extractionOf(r, file);
   }
 
   // ---------- Contributing reasons to the case ----------
   const WEIGHTS = { strong: 'strong', moderate: 'moderate', weak: 'weak' };
+  // Only ever called from the "Check how old … is" button.
   function domainAgeFor(domain, signal) {
     const sb = SB();
     if (!domain || /^\d+(\.\d+){3}$/.test(domain)) return Promise.resolve(null);
     const t = new Promise(res => setTimeout(() => res(null), 9000));
-    const q = (sb.isStatic && sb.isStatic()) || !(sb.server && sb.server().online)
-      ? fetch(`https://rdap.org/domain/${encodeURIComponent(domain)}`, { headers: { Accept: 'application/rdap+json, application/json' }, signal }).then(r => r.ok ? r.json() : null).then(j => j && rdapAge(j))
+    const q = !viaLocalApp()
+      ? fetch(`https://rdap.org/domain/${encodeURIComponent(domain)}`, { headers: { Accept: 'application/rdap+json, application/json' }, signal, credentials: 'omit', referrerPolicy: 'no-referrer' }).then(r => r.ok ? r.json() : null).then(j => j && rdapAge(j))
       : sb.post('/api/osint/domain', { domain }).then(j => j && j.ageDays != null ? { ageDays: j.ageDays, registeredAt: j.registeredAt } : null);
     return Promise.race([q.catch(() => null), t]);
   }
   function addObs(v, ob) { if (v && Array.isArray(v.observations) && !v.observations.some(o => o.fact === ob.fact)) v.observations.unshift(ob); }
+  // The screenshot text is run through the same rule engine as a pasted message, here in the browser.
+  function ocrFindings(r) {
+    const H = window.DeduceHeuristics, S = window.ScamBunkerSimple || {};
+    if (!(r.ocr && r.ocr.text) || !H || !H.analyze) return null;
+    const h = H.analyze({ text: r.ocr.text }), level = w => w >= 20 ? 'strong' : w >= 14 ? 'moderate' : 'weak';
+    const hits = h.hits.slice().sort((a, b) => b.weight - a.weight).slice(0, 6);
+    const obs = [], reasons = [], actions = [];
+    hits.forEach(x => {
+      obs.push({ fact: `Screenshot text: “${short(x.match, 60)}”`, inference: x.label, weight: level(x.weight), source: 'ocr', intakeMedia: true });
+      reasons.push({ text: S.plainFor ? S.plainFor(x) : `${x.label}.`, weight: level(x.weight), quote: short(x.match, 60), source: 'ocr', intakeMedia: true });
+      const a = x.advice && H.ADVICE && H.ADVICE[x.advice];
+      if (a) actions.push(typeof a === 'string' ? { text: a, intakeMedia: true } : { text: a.text, href: a.href, label: a.label, intakeMedia: true });
+    });
+    h.links.filter(l => l.risk >= 15 && l.flags && l.flags.length).slice(0, 3).forEach(l => {
+      const w = l.risk >= 35 ? 'strong' : 'moderate';
+      obs.push({ fact: `Link in the screenshot: ${l.host || l.url}`, inference: l.flags[0], weight: w, source: 'ocr', intakeMedia: true });
+      reasons.push({ text: S.plainLinkFlag ? S.plainLinkFlag(l.flags[0]) : `${l.flags[0]}.`, weight: w, quote: l.host || l.url, source: 'ocr', intakeMedia: true });
+    });
+    (h.entities.wallets || []).forEach(x => {
+      obs.push({ fact: `Screenshot text: ${x.chain} wallet ${x.addr.slice(0, 10)}…`, inference: 'Payment demanded to an irreversible crypto address', weight: 'strong', source: 'ocr', intakeMedia: true });
+      reasons.push({ text: `It asks you to send cryptocurrency to a wallet (${x.chain}). Crypto payments can’t be reversed or refunded.`, weight: 'strong', quote: `${x.addr.slice(0, 10)}…`, source: 'ocr', intakeMedia: true });
+    });
+    return { h, obs, reasons, actions };
+  }
   function applyToCase(c, r) {
     const context = [c.text, r.ocr && r.ocr.text].filter(Boolean).join('\n');
-    const H = window.DeduceHeuristics;
+    const H = window.DeduceHeuristics, ocr = ocrFindings(r);
     const analyse = age => r.qr.map((q, i) => analyzeQr(q, { context, analyzeUrl: H && H.analyzeUrl, domainAge: age[i] }));
     const commit = list => {
       const obs = [];
-      if (r.ocr && r.ocr.text) obs.push({ fact: `Text read from the screenshot (${wordCount(r.ocr.text)} words, English + Bangla, read on this device)`, inference: 'The screenshot text was checked like a pasted message. OCR can misread words, so check the text box and correct it if needed.', weight: 'weak', source: 'ocr', intakeMedia: true });
+      if (r.ocr && r.ocr.text) obs.push({ fact: `Text read from the screenshot (${wordCount(r.ocr.text)} words, English + Bangla, read on this device)`, inference: 'The screenshot text was checked on this device with the same rules as a pasted message, and was not sent anywhere. OCR can misread words.', weight: 'weak', source: 'ocr', intakeMedia: true });
+      if (ocr) obs.push(...ocr.obs);
       list.forEach(a => a.reasons.forEach(x => obs.push({ fact: x.text, inference: x.weight === 'strong' ? 'QR codes hide where they lead, which is why scammers stick them on parking meters, posters, letters and emails.' : 'Decoded on this device from the QR code in the image.', weight: WEIGHTS[x.weight] || 'weak', source: 'qr', intakeMedia: true })));
       c._intakeMediaObs = obs;
       [c.local, c.final].forEach(v => { if (!v) return; v.observations = (v.observations || []).filter(o => !o.intakeMedia); obs.slice().reverse().forEach(ob => addObs(v, ob)); });
+      if (ocr && c.local && ocr.h.score > (+c.local.risk || 0)) {
+        const v = c.local;
+        v.risk = ocr.h.score;
+        if (['No strong red flags', 'Insufficient evidence', 'Edited image'].includes(v.verdict) || ['Scam', 'Likely scam'].includes(ocr.h.verdict)) { v.verdict = ocr.h.verdict; v.category = ocr.h.category; }
+      }
       const q = list.find(a => a.quishing === 'strong') || list.find(a => a.quishing);
       if (q && c.local) {
         const v = c.local, low = ['No strong red flags', 'Insufficient evidence', 'Suspicious', 'Edited image'];
@@ -531,30 +579,41 @@
       }
       const sb = SB();
       const reasons = list.flatMap(a => a.reasons.map(x => ({ text: x.text, weight: WEIGHTS[x.weight] || 'weak', quote: a.host || '', source: 'qr', intakeMedia: true })));
-      if (r.ocr && r.ocr.text) reasons.push({ text: `We read the text in the screenshot on your device and checked it like a pasted message (${wordCount(r.ocr.text)} words). Reading can miss or change words.`, weight: 'info', quote: '', source: 'ocr', intakeMedia: true });
-      const actions = list.flatMap(a => a.actions.map(x => ({ ...x, intakeMedia: true })));
+      if (ocr) reasons.push(...ocr.reasons);
+      if (r.ocr && r.ocr.text) reasons.push({ text: `We read the text in the screenshot on your device and checked it there (${wordCount(r.ocr.text)} words). It was not sent anywhere. Reading can miss or change words.`, weight: 'info', quote: '', source: 'ocr', intakeMedia: true });
+      const actions = list.flatMap(a => a.actions.map(x => ({ ...x, intakeMedia: true }))).concat(ocr ? ocr.actions : []);
       // This runs again when the domain age arrives: replace what we added before instead of adding it twice.
       if (Array.isArray(c.simpleReasons)) c.simpleReasons = c.simpleReasons.filter(x => !x.intakeMedia);
       if (Array.isArray(c.simpleActions)) c.simpleActions = c.simpleActions.filter(x => !x.intakeMedia);
       if (typeof sb.addReasons === 'function' && reasons.length) { try { sb.addReasons(c, reasons); } catch (e) { console.debug('addReasons failed', e); } }
       if (typeof sb.addActions === 'function' && actions.length) { try { sb.addActions(c, actions); } catch (e) { console.debug('addActions failed', e); } }
-      c.caseExtras = { ...(c.caseExtras || {}), media_intake: { qr: list.map(a => ({ payload: a.payload, kind: a.kind, host: a.host || null, quishing: a.quishing, reasons: a.reasons.map(x => x.text) })), screenshot: r.screenshot ? { score: r.screenshot.score, reasons: r.screenshot.reasons } : null, ocr: r.ocr ? { words: wordCount(r.ocr.text), confidence: r.ocr.confidence } : null } };
+      // Kept on the case (and in local history) but not in caseExtras, which is sent to the AI agents.
+      c.mediaIntake = { qr: list.map(a => ({ payload: a.payload, kind: a.kind, host: a.host || null, quishing: a.quishing, reasons: a.reasons.map(x => x.text) })), screenshot: r.screenshot ? { score: r.screenshot.score, reasons: r.screenshot.reasons } : null, ocr: r.ocr ? { words: wordCount(r.ocr.text), confidence: r.ocr.confidence } : null };
       persist(c);
       if (sb.current === c && sb.renderAll) sb.renderAll();
     };
     commit(analyse([]));
-    const doms = r.qr.map(q => { const p = classifyPayload(q); return p.kind === 'url' ? registrable(safeHost(p.url).replace(/^www\./, '')) : null; });
-    if (doms.some(Boolean)) {
-      const p = Promise.all(doms.map(d => d ? domainAgeFor(d) : null)).then(ages => { if (ages.some(Boolean)) commit(analyse(ages)); }).catch(() => { });
-      (c.pending = c.pending || []).push(p);
-    }
+    r.case = c; r.ages = [];
+    r.recommit = () => commit(analyse(r.ages));
   }
+  // Domain age is an explicit lookup: the person presses the button, after reading what it sends and where.
+  document.addEventListener('click', async e => {
+    const btn = e.target.closest && e.target.closest('[data-im-age]'); if (!btn || !last) return;
+    const d = btn.dataset.imAge, r = last, out = document.querySelector(`[data-im-age-out="${CSS.escape(d)}"]`);
+    btn.disabled = true; if (out) out.textContent = `Asking about ${d}…`;
+    const age = await domainAgeFor(d).catch(() => null);
+    btn.disabled = false;
+    if (out) out.textContent = !age ? `Could not find when ${d} was registered.` : `${d} was registered ${age.ageDays} day${age.ageDays === 1 ? '' : 's'} ago${age.ageDays < 60 ? ', which is very new' : ''}.`;
+    if (!age) return;
+    qrDomains(r).forEach((x, i) => { if (x === d) r.ages[i] = age; });
+    if (r.recommit) { try { r.recommit(); } catch (err) { console.debug('intake-media: could not add the domain age', err); } }
+  });
   function persist(c) {
     const sb = SB(); if (!sb.store) return;
     const list = sb.store.get('scambunker.cases', []), row = list.find(x => x.id === c.id); if (!row) return;
     ['local', 'final'].forEach(k => { if (row[k] && c[k]) { row[k].observations = c[k].observations; ['verdict', 'category', 'risk', 'headline', 'advice'].forEach(f => { row[k][f] = c[k][f]; }); } });
     if (c.local) { row.verdict = c.local.verdict; row.risk = c.local.risk; row.headline = c.local.headline; }
-    row.caseExtras = c.caseExtras; sb.store.set('scambunker.cases', list);
+    row.mediaIntake = c.mediaIntake; sb.store.set('scambunker.cases', list);
   }
   document.addEventListener('sb:case', e => {
     const c = e.detail, r = last;
@@ -593,24 +652,12 @@
   // ---------- Investigator intake form (and shells without registerIntake): read the dropped image, fill the form ----------
   function watchForm() {
     if (mode.form) return;
-    const preview = $('#preview'), textEl = $('#text'), urlEl = $('#url'), go = $('#go');
+    const preview = $('#preview'), textEl = $('#text'), go = $('#go');
     if (!preview || !textEl) return;
     mode.form = true;
     let waitingGo = false;
-    // What this module typed into the form, so it can be taken out again when the image is removed or replaced.
-    let filled = { text: [], url: '' };
-    const unfill = () => {
-      // Simple mode has just written its own input into the form: leave it alone.
-      if (document.documentElement.dataset.simpleState === 'checking') { filled = { text: [], url: '' }; return; }
-      let t = textEl.value, changed = false;
-      filled.text.forEach(piece => { if (piece && t.includes(piece)) { t = t.replace(piece, ''); changed = true; } });
-      if (changed) textEl.value = t.replace(/\n{3,}/g, '\n\n').trim();
-      if (filled.url && urlEl && urlEl.value === filled.url) { urlEl.value = ''; changed = true; }
-      filled = { text: [], url: '' };
-      if (changed) textEl.dispatchEvent(new Event('input', { bubbles: true }));
-    };
+    // The extracted text and link are not typed into the form: the form's contents are sent to the local server.
     const onImage = async () => {
-      unfill();
       const src = preview.getAttribute('src');
       // Simple mode already ran the adapters on this file before handing it to the form.
       if (!src || !/^blob:/.test(src) || $('#drop-full')?.hidden || document.documentElement.dataset.simpleState === 'checking') return;
@@ -619,14 +666,10 @@
       const r = await process(file, { text: textEl.value });
       r.previewSrc = src;
       if (preview.getAttribute('src') !== src) return;
-      const addText = piece => { filled.text.push(piece); textEl.value = textEl.value.trim() ? `${textEl.value.trim()}\n\n${piece}` : piece; };
-      if (r.ocr && r.ocr.text && !textEl.value.includes(r.ocr.text.slice(0, 40))) addText(r.ocr.text);
-      r.qr.forEach(q => { const p = classifyPayload(q); if (p.kind === 'url' && urlEl && !urlEl.value.trim()) { urlEl.value = p.url; filled.url = p.url; } else { const line = analyzeQr(q).caseText; if (!textEl.value.includes(line)) addText(line); } });
-      if ((r.ocr && r.ocr.text) || r.qr.length) textEl.dispatchEvent(new Event('input', { bubbles: true }));
       if (waitingGo) { waitingGo = false; go && go.click(); }
     };
     new MutationObserver(onImage).observe(preview, { attributes: true, attributeFilter: ['src'] });
-    $('#clear-img')?.addEventListener('click', () => { if (active) active.ctrl.abort(); waitingGo = false; if (box) box.hidden = true; unfill(); });
+    $('#clear-img')?.addEventListener('click', () => { if (active) active.ctrl.abort(); waitingGo = false; if (box) box.hidden = true; });
     const hold = e => {
       if (!active) return;
       e.preventDefault(); e.stopImmediatePropagation();
