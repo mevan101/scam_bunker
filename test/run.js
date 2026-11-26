@@ -17,6 +17,6 @@ let fail = 0;
 for (const [name, input, ok] of cases) { const v = H.analyze(input); const pass = ok(v); if (!pass) fail++; console.log(`${pass ? '✓' : '✗'} ${name} → ${v.verdict} (${v.score})`); }
 const typo = H.analyzeUrl('https://paypa1.com/login'); assert(typo.risk >= 30, 'typosquat detection'); console.log('✓ typosquat paypa1.com → risk', typo.risk);
 const puny = H.analyzeUrl('https://xn--pple-43d.com'); assert(puny.risk >= 30, 'punycode detection'); console.log('✓ punycode → risk', puny.risk);
-for (const f of ['server.js', 'public/app.js', 'public/forensics.js', 'public/scam.js', 'public/custody.js']) new vm.Script(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'));
+for (const f of ['server.js', 'public/app.js', 'public/forensics.js', 'public/scam.js', 'public/custody.js', 'public/video.js']) new vm.Script(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'));
 console.log('✓ all sources parse');
 process.exit(fail ? 1 : 0);

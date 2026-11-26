@@ -155,6 +155,7 @@ function caseFileText(c) {
   if (c.heuristics) parts.push(`LOCAL HEURISTIC ENGINE RESULTS:\n${JSON.stringify(c.heuristics).slice(0, 6000)}`);
   if (c.forensics) parts.push(`IMAGE FORENSICS EXTRACTION:\n${JSON.stringify(c.forensics).slice(0, 9000)}`);
   const extra = factcheck.caseFileSections(c); if (extra) parts.push(extra);
+  if (c.video) parts.push(`VIDEO CONTAINER METADATA AND KEYFRAMES:\n${JSON.stringify(c.video).slice(0, 7000)}`);
   if (c.corroboration) parts.push(`WEB CORROBORATION SEARCH RESULTS:\n${JSON.stringify(c.corroboration).slice(0, 5000)}`);
   return parts.join('\n\n');
 }
