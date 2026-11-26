@@ -3,8 +3,11 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const net = require('net');
+const dns = require('dns').promises;
 
 const PORT = process.env.PORT || 4400;
+const HOST = process.env.HOST || '127.0.0.1'; // localhost only by default, so others on your network can't spend your API key
 const PUB = path.join(__dirname, 'public');
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const ANTHROPIC_URL = (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/$/, '') + '/v1/messages';
@@ -126,6 +129,25 @@ async function handleLead(req, res) {
   send(res, 200, parsed ? { verdict: parsed } : { raw });
 }
 
+// SSRF guard: only fetch public internet hosts, never localhost / LAN / cloud metadata.
+function isPrivateIp(ip) {
+  if (net.isIPv4(ip)) {
+    const [a, b] = ip.split('.').map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19)) || a >= 224;
+  }
+  const v = ip.toLowerCase();
+  if (v.startsWith('::ffff:')) return isPrivateIp(v.slice(7));
+  return v === '::' || v === '::1' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80');
+}
+async function assertPublicUrl(u) {
+  const { protocol, hostname } = new URL(u);
+  if (!/^https?:$/.test(protocol)) throw new Error('Only http(s) URLs can be fetched');
+  const host = hostname.replace(/^\[|\]$/g, '');
+  const addrs = net.isIP(host) ? [{ address: host }] : await dns.lookup(host, { all: true });
+  if (!addrs.length || addrs.some(a => isPrivateIp(a.address))) throw new Error('Refusing to fetch a private or local network address');
+}
+
 async function handleFetch(req, res) {
   const { url } = await readBody(req);
   if (!/^https?:\/\//i.test(url || '')) return send(res, 400, { error: 'invalid url' });
@@ -140,6 +162,7 @@ async function handleFetch(req, res) {
   // Plain fetch fallback: follow redirects manually so the chain is visible
   const chain = []; let cur = url; let html = ''; let status = 0;
   for (let i = 0; i < 8; i++) {
+    await assertPublicUrl(cur); // re-checked on every redirect hop
     const r = await fetch(cur, { redirect: 'manual', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DeduceInvestigator/1.0)' }, signal: AbortSignal.timeout(12000) });
     status = r.status; chain.push({ url: cur, status });
     const loc = r.headers.get('location');
@@ -174,7 +197,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && u.pathname === '/api/fetch') return await handleFetch(req, res);
     if (req.method === 'POST' && u.pathname === '/api/search') return await handleSearch(req, res);
     let p = path.normalize(path.join(PUB, u.pathname === '/' ? 'index.html' : u.pathname));
-    if (!p.startsWith(PUB)) return send(res, 403, 'forbidden', 'text/plain');
+    if (p !== PUB && !p.startsWith(PUB + path.sep)) return send(res, 403, 'forbidden', 'text/plain');
     fs.readFile(p, (err, data) => {
       if (err) return send(res, 404, 'not found', 'text/plain');
       res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/octet-stream' });
@@ -185,7 +208,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`Deduce running → http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`Deduce running → http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   console.log(`  Claude agents: ${ANTHROPIC_KEY ? 'ON' : 'off (set ANTHROPIC_API_KEY)'} · Firecrawl: ${FIRECRAWL_KEY ? 'ON' : 'off (set FIRECRAWL_API_KEY)'}`);
 });

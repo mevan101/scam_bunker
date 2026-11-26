@@ -35,7 +35,7 @@
     <p class="lede">Drop in an image, paste the post or message, add the link. The forensics run on your device. If you've turned the specialist agents on, they review the evidence and the lead investigator gives the verdict.</p>
 
     <label class="drop" id="drop">
-      <input type="file" id="file" accept="image/*" hidden>
+      <input type="file" id="file" accept="image/*" class="sr-only" aria-label="Choose an image to investigate">
       <div class="drop-empty" id="drop-empty">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2l1.6-1.6a2 2 0 012.8 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
         <strong>Drop an image or click to choose</strong>
@@ -70,7 +70,7 @@
   </section>
 
   <!-- RESULTS -->
-  <section class="results" id="results" aria-live="polite">
+  <section class="results" id="results" aria-label="Investigation results">
     <div class="placeholder card" id="placeholder">
       <div class="ph-art" aria-hidden="true">
         <svg viewBox="0 0 220 140"><g fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"><rect x="18" y="22" width="70" height="52" rx="4"/><rect x="132" y="14" width="70" height="44" rx="4"/><rect x="120" y="86" width="82" height="40" rx="4"/><rect x="26" y="92" width="58" height="34" rx="4"/></g><g stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="3 4"><path d="M88 48L132 36M88 56l32 44M84 108h36M160 58v28"/></g><g fill="var(--accent)"><circle cx="88" cy="48" r="3"/><circle cx="132" cy="36" r="3"/><circle cx="120" cy="100" r="3"/><circle cx="84" cy="108" r="3"/><circle cx="160" cy="86" r="3"/></g></svg>
@@ -89,30 +89,30 @@
 
     <div id="report" hidden>
       <div class="verdict card" id="verdict">
-        <div class="gauge" id="gauge"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" class="g-bg"/><circle cx="60" cy="60" r="50" class="g-fg" id="g-fg"/></svg><div class="g-num"><b id="g-val">0</b><span>risk</span></div></div>
+        <div class="gauge" id="gauge"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" class="g-bg"/><circle cx="60" cy="60" r="50" class="g-fg" id="g-fg"/></svg><div class="g-num"><b id="g-val">0</b><span>risk</span></div></div>
         <div class="v-body">
           <div class="eyebrow" id="v-source">Preliminary · local engines</div>
-          <h2 id="v-title">—</h2>
+          <h2 id="v-title" aria-live="polite">—</h2>
           <div class="v-tags" id="v-tags"></div>
           <p class="v-headline" id="v-headline"></p>
         </div>
       </div>
 
-      <nav class="tabs" role="tablist" id="tabs">
-        <button role="tab" aria-selected="true" data-tab="deduction">Deduction</button>
-        <button role="tab" data-tab="agents">Agents <span class="count" id="agents-count"></span></button>
-        <button role="tab" data-tab="image">Image lab</button>
-        <button role="tab" data-tab="links">Links &amp; entities</button>
-        <button role="tab" data-tab="timeline">Timeline</button>
-        <button role="tab" data-tab="next">Next moves</button>
-      </nav>
+      <div class="tabs" role="tablist" aria-label="Report sections" id="tabs">
+        <button role="tab" aria-selected="true" data-tab="deduction" id="tab-deduction" aria-controls="panel-deduction">Deduction</button>
+        <button role="tab" data-tab="agents" id="tab-agents" aria-controls="panel-agents">Agents <span class="count" id="agents-count"></span></button>
+        <button role="tab" data-tab="image" id="tab-image" aria-controls="panel-image">Image lab</button>
+        <button role="tab" data-tab="links" id="tab-links" aria-controls="panel-links">Links &amp; entities</button>
+        <button role="tab" data-tab="timeline" id="tab-timeline" aria-controls="panel-timeline">Timeline</button>
+        <button role="tab" data-tab="next" id="tab-next" aria-controls="panel-next">Next moves</button>
+      </div>
 
-      <div class="panel card" data-panel="deduction"></div>
-      <div class="panel card" data-panel="agents" hidden></div>
-      <div class="panel card" data-panel="image" hidden></div>
-      <div class="panel card" data-panel="links" hidden></div>
-      <div class="panel card" data-panel="timeline" hidden></div>
-      <div class="panel card" data-panel="next" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-deduction" aria-labelledby="tab-deduction" data-panel="deduction"></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-agents" aria-labelledby="tab-agents" data-panel="agents" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-image" aria-labelledby="tab-image" data-panel="image" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-links" aria-labelledby="tab-links" data-panel="links" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-timeline" aria-labelledby="tab-timeline" data-panel="timeline" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-next" aria-labelledby="tab-next" data-panel="next" hidden></div>
 
       <div class="report-actions">
         <button class="ghost" id="btn-export">Export case report</button>

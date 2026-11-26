@@ -1,6 +1,6 @@
 :root {
   --bg: #0d1117; --bg-2: #121823; --surface: #161d2a; --surface-2: #1c2434; --line: #263044; --line-2: #33405a;
-  --ink: #e9edf4; --ink-2: #b4bdcc; --muted: #7d889c;
+  --ink: #e9edf4; --ink-2: #b4bdcc; --muted: #8b96a9;
   --accent: #e8a33d; --accent-ink: #1a1206; --accent-soft: rgba(232,163,61,.13);
   --red: #f0625a; --red-soft: rgba(240,98,90,.14); --amber: #f2b84b; --amber-soft: rgba(242,184,75,.14);
   --green: #46c28e; --green-soft: rgba(70,194,142,.14); --blue: #6aa8ff; --blue-soft: rgba(106,168,255,.13); --violet: #b08cff; --violet-soft: rgba(176,140,255,.14);
@@ -11,9 +11,9 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --bg: #f4f1ea; --bg-2: #ece7dc; --surface: #fffdf8; --surface-2: #f7f3ea; --line: #e2dccd; --line-2: #d2c9b5;
-    --ink: #1b1d22; --ink-2: #3f4450; --muted: #737a87; --accent: #b86e0c; --accent-ink: #fff; --accent-soft: rgba(184,110,12,.1);
-    --red: #c9362e; --red-soft: rgba(201,54,46,.09); --amber: #a8700a; --amber-soft: rgba(168,112,10,.1); --green: #1d8a5b; --green-soft: rgba(29,138,91,.1);
-    --blue: #2f6fd6; --blue-soft: rgba(47,111,214,.09); --violet: #6c47d1; --violet-soft: rgba(108,71,209,.09);
+    --ink: #1b1d22; --ink-2: #3f4450; --muted: #5f6673; --accent: #94570a; --accent-ink: #fff; --accent-soft: rgba(184,110,12,.1);
+    --red: #a8241d; --red-soft: rgba(168,36,29,.08); --amber: #7a5000; --amber-soft: rgba(122,80,0,.09); --green: #146b46; --green-soft: rgba(29,138,91,.1);
+    --blue: #2259b8; --blue-soft: rgba(34,89,184,.08); --violet: #5a36bd; --violet-soft: rgba(108,71,209,.09);
     --shadow: 0 1px 2px rgba(60,40,10,.05), 0 14px 34px -22px rgba(60,40,10,.25); color-scheme: light;
   }
 }
@@ -224,3 +224,11 @@ select { padding-right: 8px; }
 
 .results, .intake { min-width: 0; }
 [hidden] { display: none !important; }
+
+/* Accessibility */
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.drop:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+textarea:focus-visible, input:focus-visible, select:focus-visible { outline: none; }
+.tabs button:focus-visible { outline-offset: -2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

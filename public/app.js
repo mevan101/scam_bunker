@@ -73,7 +73,12 @@ How I want you to work:
 
   // ---------- Tabs ----------
   $$('#tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
-  function showTab(t) { $$('#tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t)); $$('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== t); }
+  $('#tabs').addEventListener('keydown', e => {
+    const tabs = $$('#tabs button'), i = tabs.indexOf(document.activeElement); if (i < 0) return;
+    const j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key]; if (j === undefined) return;
+    e.preventDefault(); const n = tabs[(j + tabs.length) % tabs.length]; n.focus(); showTab(n.dataset.tab);
+  });
+  function showTab(t) { $$('#tabs button').forEach(b => { const on = b.dataset.tab === t; b.setAttribute('aria-selected', on); b.tabIndex = on ? 0 : -1; }); $$('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== t); }
   const panel = n => $(`[data-panel="${n}"]`);
 
   // ---------- Investigation ----------
@@ -325,7 +330,7 @@ How I want you to work:
       ${ent.length ? `<section><h3>Extracted entities</h3><div class="ent">${ent.map(([k, v]) => `<div class="box"><div class="k">${k}</div><ul>${v.map(x => `<li>${x}</li>`).join('')}</ul></div>`).join('')}</div></section>` : ''}
       ${h.coordination.length ? `<section><h3>Coordination signals</h3><ul class="list">${h.coordination.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
       ${h.playbook.length ? `<section><h3>Known playbook on ${esc(h.platform)}</h3><ul class="list">${h.playbook.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
-      ${(c.corroboration || []).length ? `<section><h3>Web corroboration</h3>${c.corroboration.map(r => `<div class="linkcard"><a href="${esc(r.url)}" target="_blank" rel="noopener"><b>${esc(r.title)}</b></a><ul><li>${esc(r.description || '')}</li></ul></div>`).join('')}</section>` : ''}`;
+      ${(c.corroboration || []).length ? `<section><h3>Web corroboration</h3>${c.corroboration.filter(r => /^https?:\/\//i.test(r.url || "")).map(r => `<div class="linkcard"><a href="${esc(r.url)}" target="_blank" rel="noopener"><b>${esc(r.title)}</b></a><ul><li>${esc(r.description || '')}</li></ul></div>`).join('')}</section>` : ''}`;
   }
 
   function renderTimeline(c) {
