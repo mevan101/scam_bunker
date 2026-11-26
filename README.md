@@ -14,6 +14,7 @@ Drop in an image, a post, a DM or a link. Scam Bunker dates the image, checks wh
 | **Detects AI generation** | C2PA / Content Credentials, IPTC `DigitalSourceType = trainedAlgorithmicMedia`, embedded Stable Diffusion / ComfyUI prompts, and signatures from Midjourney, DALL·E, Firefly, Imagen, FLUX, Ideogram, Leonardo and others. Generator canvas sizes and noise statistics count only as weak signals |
 | **Exposes hidden data** | GPS (with map), camera serial number, owner and author fields, original-document IDs, embedded prompts and comments |
 | **Detects manipulation** | Error-level analysis heatmap with hotspot statistics, editing-software traces, impossible timestamp orderings |
+| **Finds the original source** | Provenance tab: fetches copies you found by reverse image search, compares them with perceptual hashes (dHash + pHash, crop and mirror aware), ranks which copy is closest to the original, and dates them via EXIF, `Last-Modified` and the Wayback Machine. Flags recycled images (archived years before the claimed event) and forged capture dates. Optional automatic reverse search with `SERPAPI_API_KEY` |
 | **Traces where it's been** | Facebook `FBMD` markers, platform resize dimensions (Instagram, Facebook, X, WhatsApp), stripped EXIF, recompression quality |
 | **Classifies scams** | Phishing, investment/crypto, romance/pig-butchering, job/task, giveaway, advance-fee, impersonation, tech support, recovery scams, marketplace fraud |
 | **Detects coordination** | Copy-paste comment rings, hashtag stuffing, mass-tagging, "my advisor" testimonial networks |
@@ -62,13 +63,16 @@ Images are parsed **in your browser**. Nothing leaves your machine unless you ch
 public/forensics.js   image container parsers (JPEG/PNG/WebP/HEIC), EXIF/XMP/IPTC/C2PA, ELA, AI signatures
 public/scam.js        rule engine: scam patterns, link analysis, entity extraction, coordination signals
 public/app.js         case orchestration, local reasoning, UI
+public/provenance.js  original-source trace: perceptual hashing, copy comparison, provenance verdict, Provenance tab
 public/osint.js       subject workspace, username sweep UI, dossiers, export, domain-age observations
 public/dossier.js     pure entity-resolution (union-find), risk scoring, SHA-256
 server/osint.js       /api/osint/username · /api/osint/domain (RDAP) · /api/osint/wallet
-server/net-guard.js   SSRF guard shared by every server-side fetch
 data/sites.json       username-check definitions (CC BY-SA 4.0, see data/README.md)
 server.js             zero-dependency Node server: static files + /api/agent, /api/lead, /api/fetch, /api/search
-test/run.js           npm test
+server/provenance.js  /api/provenance/* : SSRF-guarded image fetch, Wayback CDX, page publish date, optional SerpApi reverse search
+server/net-guard.js   shared SSRF guard (checks the address actually connected to, on every redirect)
+test/run.js           npm test (heuristics)
+test/provenance.test.js  npm test (hashing, verdict, Wayback parser, SSRF guard)
 ```
 
 ## Limitations

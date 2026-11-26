@@ -63,3 +63,4 @@
   .os-bar .grow { min-width: 0; }
   .drawer.osint .verdict { flex-direction: row; align-items: center; }
 }
+.drawer.osint form { padding: 0; }

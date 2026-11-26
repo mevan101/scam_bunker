@@ -1,0 +1,47 @@
+/* Events tab (public/events.js). Scoped to its panel; uses the shared design tokens only. */
+#panel-events .ev-lede { max-width: 80ch; margin: 4px 0 18px; }
+#panel-events .ev-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#panel-events .ev-end { justify-content: flex-end; margin-top: 18px; }
+#panel-events .ev-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+#panel-events .ev-head h3 { margin: 0; }
+#panel-events .ev-inline { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+#panel-events .ev-inline select { width: auto; padding: 6px 10px; }
+#panel-events .ev-status:not(:empty) { margin-top: 10px; }
+#panel-events .ev-log { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--ink-2); }
+#panel-events input[type=text], #panel-events input[type=number], #panel-events input[type=datetime-local] { width: 100%; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; outline: none; color: var(--ink); color-scheme: inherit; }
+#panel-events .ev-manual { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-2); padding: 12px 16px; }
+#panel-events .ev-manual summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+#panel-events .ev-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 14px; margin-top: 14px; }
+#panel-events .ev-form .field { margin-bottom: 12px; }
+#panel-events .ev-span { grid-column: 1 / -1; }
+#panel-events .ev-tablewrap { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+#panel-events .ev-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 980px; }
+#panel-events .ev-table th, #panel-events .ev-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; overflow-wrap: break-word; }
+#panel-events .ev-table td:first-child { white-space: nowrap; }
+#panel-events .ev-table td:first-child .w { display: block; width: max-content; margin-top: 4px; }
+#panel-events .ev-table thead th { background: var(--bg-2); white-space: nowrap; }
+#panel-events .ev-table thead button { background: none; border: 0; padding: 0; cursor: pointer; font: 600 12px var(--sans); color: var(--ink-2); }
+#panel-events .ev-table thead button:hover { color: var(--ink); }
+#panel-events .ev-table tbody tr:last-child td { border-bottom: 0; }
+#panel-events .ev-table a, #panel-events .ev-sub a { color: var(--blue); overflow-wrap: anywhere; }
+#panel-events .ev-sub { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+#panel-events .ev-mono, #panel-events code { font: 12px var(--mono); }
+#panel-events .ev-src { font: 500 10.5px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; white-space: nowrap; }
+#panel-events .ev-warn { color: var(--amber); font-size: 12px; margin-top: 3px; }
+#panel-events .ev-act { white-space: nowrap; }
+#panel-events .ev-flag { border: 1px solid var(--line); border-left: 3px solid var(--blue); border-radius: 0 10px 10px 0; background: var(--bg-2); padding: 12px 14px; margin-bottom: 10px; }
+#panel-events .ev-flag.strong { border-left-color: var(--red); } #panel-events .ev-flag.moderate { border-left-color: var(--amber); }
+#panel-events .ev-flag header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#panel-events .ev-flag header .ev-sub { margin: 0; }
+#panel-events .ev-flag p { margin: 6px 0 0; font-size: 13.5px; }
+#panel-events .ev-innocent { color: var(--ink-2); }
+#panel-events .ev-tl { position: relative; padding-left: 112px; overflow: hidden; }
+#panel-events .ev-axis { position: relative; height: 18px; font: 11px var(--mono); color: var(--muted); }
+#panel-events .ev-axis span { position: absolute; transform: translateX(-50%); }
+#panel-events .ev-lane { position: relative; margin-bottom: 8px; }
+#panel-events .ev-day { position: absolute; left: -112px; width: 104px; top: 8px; font: 600 12px var(--mono); color: var(--ink-2); }
+#panel-events .ev-track { position: relative; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-2); min-height: 40px; overflow: hidden; }
+#panel-events .ev-grid { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+#panel-events .ev-bar { position: absolute; height: 28px; padding: 5px 8px; border-radius: 6px; background: var(--surface-2); border: 1.5px solid var(--line-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); min-width: 10px; }
+#panel-events .ev-bar.f-strong { border-color: var(--red); } #panel-events .ev-bar.f-moderate { border-color: var(--amber); } #panel-events .ev-bar.f-weak { border-color: var(--blue); }
+@media (max-width: 640px) { #panel-events .ev-tl { padding-left: 0; } #panel-events .ev-day { position: static; margin-bottom: 4px; } }

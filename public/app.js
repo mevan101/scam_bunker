@@ -60,12 +60,14 @@ How I want you to work:
   const drop = $('#drop');
   ['dragenter', 'dragover'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('over'); }));
   ['dragleave', 'drop'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('over'); }));
-  drop.addEventListener('drop', ev => { const f = ev.dataTransfer.files[0]; if (f && f.type.startsWith('image/') || f && /\.(heic|avif|webp)$/i.test(f.name)) setImage(f); });
-  $('#file').addEventListener('change', e => e.target.files[0] && setImage(e.target.files[0]));
+  const VID = () => window.ScamBunkerVideo; // public/video.js handles MP4/MOV/WebM
+  drop.addEventListener('drop', ev => { const f = ev.dataTransfer.files[0]; if (VID()?.isVideo(f)) setVideo(f); else if (f && f.type.startsWith('image/') || f && /\.(heic|avif|webp)$/i.test(f.name)) setImage(f); });
+  $('#file').addEventListener('change', e => { const f = e.target.files[0]; if (f) VID()?.isVideo(f) ? setVideo(f) : setImage(f); });
+  function setVideo(f) { imageFile = null; VID().setFile(f); }
   document.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) setImage(it.getAsFile()); });
-  $('#clear-img').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); imageFile = null; $('#file').value = ''; $('#drop-full').hidden = true; $('#drop-empty').hidden = false; });
+  $('#clear-img').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); imageFile = null; VID()?.setFile(null); $('#file').value = ''; $('#drop-full').hidden = true; $('#drop-empty').hidden = false; });
   function setImage(f) {
-    imageFile = f; $('#preview').src = URL.createObjectURL(f); $('#file-name').textContent = `${f.name} · ${(f.size / 1024).toFixed(0)} KB`;
+    VID()?.setFile(null); imageFile = f; $('#preview').src = URL.createObjectURL(f); $('#file-name').textContent = `${f.name} · ${(f.size / 1024).toFixed(0)} KB`;
     $('#drop-full').hidden = false; $('#drop-empty').hidden = true;
   }
   $$('[data-sample]').forEach(b => b.addEventListener('click', () => { const s = SAMPLES[b.dataset.sample]; $('#text').value = s.text; $('#url').value = s.url; $('#platform').value = s.platform; investigate(); }));
@@ -75,7 +77,7 @@ How I want you to work:
   // ---------- Tabs ----------
   $$('#tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
   $('#tabs').addEventListener('keydown', e => {
-    const tabs = $$('#tabs button'), i = tabs.indexOf(document.activeElement); if (i < 0) return;
+    const tabs = $$('#tabs button').filter(b => !b.hidden), i = tabs.indexOf(document.activeElement); if (i < 0) return;
     const j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key]; if (j === undefined) return;
     e.preventDefault(); const n = tabs[(j + tabs.length) % tabs.length]; n.focus(); showTab(n.dataset.tab);
   });
@@ -85,7 +87,7 @@ How I want you to work:
   // ---------- Investigation ----------
   async function investigate() {
     const text = $('#text').value.trim(), url = $('#url').value.trim();
-    if (!text && !url && !imageFile) { toast('Add an image, some text or a link first'); return; }
+    if (!text && !url && !imageFile && !VID()?.file) { toast('Add an image, a video, some text or a link first'); return; }
     const go = $('#go'); go.disabled = true; go.firstElementChild.textContent = 'Investigating…';
     $('#placeholder').hidden = true; $('#report').hidden = false; showTab('deduction');
     if (innerWidth < 1020) $('#results').scrollIntoView({ behavior: 'smooth' });
@@ -100,6 +102,10 @@ How I want you to work:
         c.agents.metadata = { status: 'run' }; renderAll(c);
         c.forensics = await DeduceForensics.analyze(imageFile);
         c.agents.metadata = { status: 'done', report: metadataReport(c.forensics) };
+      } else if (VID()?.file) {
+        c.agents.metadata = { status: 'run' }; renderAll(c);
+        c.video = await VID().analyze(VID().file);
+        c.agents.metadata = { status: 'done', report: VID().report(c.video) };
       }
       c.offenders = matchOffenders(c);
       c.local = localVerdict(c);
@@ -117,9 +123,11 @@ How I want you to work:
         try { c.corroboration = (await post('/api/search', { query: q })).results; } catch { }
       }
 
+      await Promise.allSettled(c.pending || []); // async module lookups (e.g. fact-checks) that feed the agents
+
       // 3. Agent team
       if (server.ai) {
-        const caseData = { persona: c.persona, platform: c.platform, url, text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown ? `${c.page.title || ''}\n${JSON.stringify(c.page.redirects || '')}\n${c.page.markdown}` : null, corroboration: c.corroboration, imageData: c.forensics?.visionData };
+        const caseData = { persona: c.persona, platform: c.platform, url, text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown ? `${c.page.title || ''}\n${JSON.stringify(c.page.redirects || '')}\n${c.page.markdown}` : null, corroboration: c.corroboration, imageData: c.forensics?.visionData, video: c.video ? VID().summarize(c.video) : null, ...c.caseExtras };
         const roster = ['scam', 'osint', 'factcheck']; if (c.forensics) roster.unshift('forensics');
         roster.forEach(a => c.agents[a] = { status: 'run' }); c.agents.lead = { status: 'wait' };
         renderAgents(c); $('#agents-count').textContent = '…';
@@ -153,15 +161,17 @@ How I want you to work:
 
   // ---------- Repeat-offender profiling ----------
   // Identifiers a scammer reuses across campaigns. Big platforms and shorteners are excluded: they identify nobody.
+  const SHARED_HOST_PARENT = /^(www\.)?(github\.io|pages\.dev|vercel\.app|netlify\.app|web\.app|firebaseapp\.com|blogspot\.com|wixsite\.com|square\.site|carrd\.co|notion\.site|linktr\.ee|beacons\.ai|bio\.link)$/i; // the parent itself is shared; subdomains (scam-x.vercel.app) still identify
   const NOT_IDENTIFYING = /(^|\.)(facebook|instagram|linkedin|twitter|x|tiktok|youtube|google|whatsapp|telegram|reddit|threads|bsky|discord|snapchat|bit|t|lnkd|tinyurl|goo|ow|is|buff|rebrand|cutt|rb|linktr|wa)\.(com|net|org|ly|me|in|gl|gd|co|ee|app)$/i;
   function indicators(h, f) {
     const out = [];
     const add = (type, value, label) => value && out.push({ type, key: `${type}:${value}`, label: label || value });
     (h.entities.wallets || []).forEach(w => add('wallet', w.addr, `${w.chain} wallet ${w.addr}`));
+    // Handles are weak indicators only (trivially re-registered / impersonated): they never trigger the confirmed repeat-offender escalation below.
     (h.entities.handles || []).forEach(x => add('handle', x.replace(/^@/, '').toLowerCase(), x));
-    (h.entities.phones || []).forEach(x => { const d = x.replace(/\D/g, ''); if (d.length >= 9) add('phone', d.slice(-10), x); });
+    (h.entities.phones || []).forEach(x => { const d = x.replace(/\D/g, ''); if (d.length >= 9) add('phone', x.startsWith('+') ? d : d.slice(-10), x); });
     (h.entities.emails || []).forEach(x => add('email', x.toLowerCase()));
-    (h.links || []).forEach(l => { if (l.host && !NOT_IDENTIFYING.test(l.host)) add('domain', l.host.replace(/^www\./, '')); });
+    (h.links || []).forEach(l => { if (l.host && !NOT_IDENTIFYING.test(l.host) && !SHARED_HOST_PARENT.test(l.host)) add('domain', l.host.replace(/^www\./, '')); });
     if (f?.sha256) add('image', f.sha256, `Identical image (SHA-256 ${f.sha256.slice(0, 12)}…)`);
     if (f?.exif?.BodySerialNumber) add('camera', f.exif.BodySerialNumber, `Camera serial ${f.exif.BodySerialNumber}`);
     const seen = new Set(); return out.filter(i => !seen.has(i.key) && seen.add(i.key));
@@ -300,14 +310,14 @@ How I want you to work:
     $('#v-title').textContent = v.verdict || 'Analysing…';
     $('#v-headline').textContent = v.headline || '';
     $('#v-source').textContent = c.final ? `Final verdict · lead investigator after ${Object.keys(c.agents).length - 1} reports` : server.ai ? 'Preliminary · local engines, agents deliberating…' : 'Local engines · press “Investigate with Claude” for the agent team';
-    const tags = [v.category, v.confidence != null && `confidence ${v.confidence}%`, c.platform, c.forensics && `AI: ${(v.ai_involvement || {}).assessment || c.forensics.ai.verdict}`].filter(Boolean);
+    const tags = [v.estimative, v.category, v.confidence != null && `confidence ${v.confidence}%`, c.platform, c.forensics && `AI: ${(v.ai_involvement || {}).assessment || c.forensics.ai.verdict}`].filter(Boolean);
     $('#v-tags').innerHTML = tags.map(t => `<span class="tag">${esc(t)}</span>`).join('');
     const risk = +v.risk || 0; $('#g-val').textContent = risk; $('#g-fg').style.strokeDashoffset = 314 - 314 * risk / 100;
   }
 
   function renderDeduction(c) {
     const v = V(c);
-    const obs = (v.observations || []).map(o => `<div class="ob"><div><span class="k">Observation</span><p>${esc(o.fact)}</p></div><div><span class="k">Inference</span><p>${esc(o.inference)}</p></div><span class="w ${esc(o.weight)}">${esc(o.weight)}</span></div>`).join('');
+    const obs = (v.observations || []).map(o => `<div class="ob"><div><span class="k">Observation</span><p>${esc(o.fact)}</p></div><div><span class="k">Inference</span><p>${esc(o.inference)}</p></div><span>${o.grade ? `<span class="tag" title="Admiralty grade: ${esc(o.gradeMeaning || '')}"><span class="sr-only">Grade </span>${esc(o.grade)}</span> ` : ''}<span class="w ${esc(o.weight)}">${esc(o.weight)}</span></span></div>`).join('');
     const boxes = [];
     if (v.image_dating) boxes.push(`<div class="box"><div class="k">Image dates back to</div><div class="big">${esc(v.image_dating.earliest || 'Unknown from file')}</div><p>${esc(v.image_dating.basis)}</p></div>`);
     if (v.ai_involvement) boxes.push(`<div class="box"><div class="k">AI involvement</div><div class="big">${esc(v.ai_involvement.assessment)}</div><p>${esc(v.ai_involvement.basis)}</p></div>`);
@@ -384,10 +394,10 @@ How I want you to work:
 
   function renderTimeline(c) {
     const f = c.forensics;
-    const items = (f?.timeline || []).map(t => ({ ...t }));
+    const items = [...(f?.timeline || []), ...(c.video?.timeline || [])].map(t => ({ ...t }));
     items.push({ when: c.at.slice(0, 19), what: 'Case opened in Scam Bunker', src: 'This investigation', trust: 'low' });
     items.sort((a, b) => a.when.localeCompare(b.when));
-    panel('timeline').innerHTML = `${!f ? '<p class="empty">Add an image to rebuild its timeline from embedded timestamps.</p>' : !f.earliest ? '<div class="callout">The file has no surviving embedded timestamps, which is typical after social-media upload. To date it, run a reverse image search and use the earliest indexed copy (TinEye: sort by Oldest).</div>' : ''}
+    panel('timeline').innerHTML = `${!f && c.video ? (c.video.earliest ? '' : '<div class="callout">The video has no surviving embedded timestamps, which is typical after platform re-encoding. Reverse-search its keyframes (Video lab) and use the earliest indexed copy.</div>') : !f ? '<p class="empty">Add an image to rebuild its timeline from embedded timestamps.</p>' : !f.earliest ? '<div class="callout">The file has no surviving embedded timestamps, which is typical after social-media upload. To date it, run a reverse image search and use the earliest indexed copy (TinEye: sort by Oldest).</div>' : ''}
       <div class="tl">${items.map(t => `<div class="tl-item ${t.trust === 'low' ? 'low' : ''}"><time>${esc(t.when.replace('T', ' · '))}</time><p>${esc(t.what)}</p><small>${esc(t.src)} · trust ${esc(t.trust)}</small></div>`).join('')}</div>`;
   }
 
@@ -401,7 +411,7 @@ How I want you to work:
     const c = current; if (!c) return;
     let prompt;
     try {
-      ({ prompt } = await post('/api/prompt', { hasImage: !!c.forensics, case: { persona: c.persona, platform: c.platform, url: c.url, text: c.text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown || null, corroboration: c.corroboration } }));
+      ({ prompt } = await post('/api/prompt', { hasImage: !!c.forensics, case: { persona: c.persona, platform: c.platform, url: c.url, text: c.text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown || null, corroboration: c.corroboration, video: c.video ? VID().summarize(c.video) : null, ...c.caseExtras } }));
     } catch (e) { toast('Could not build the prompt: ' + e.message); return; }
     let copied = false; try { await navigator.clipboard.writeText(prompt); copied = true; } catch { }
     const short = prompt.length < 7000;
@@ -413,7 +423,7 @@ How I want you to work:
   // ---------- History ----------
   function saveCase(c) {
     const v = V(c); const list = store.get('scambunker.cases', []);
-    list.unshift({ id: c.id, at: c.at, indicators: c.indicators || [], text: c.text.slice(0, 4000), url: c.url, platform: c.platform, verdict: v.verdict, risk: v.risk, headline: v.headline, final: c.final || null, local: c.local, heuristics: c.heuristics, agents: c.agents, forensics: c.forensics ? { ...DeduceForensics.summarize(c.forensics), elaUrl: null } : null });
+    list.unshift({ id: c.id, at: c.at, indicators: c.indicators || [], text: c.text.slice(0, 4000), url: c.url, platform: c.platform, verdict: v.verdict, risk: v.risk, headline: v.headline, final: c.final || null, local: c.local, heuristics: c.heuristics, agents: c.agents, provenance: c.provenance || null, forensics: c.forensics ? { ...DeduceForensics.summarize(c.forensics), elaUrl: null } : null });
     store.set('scambunker.cases', list.slice(0, 200));
   }
   $('#btn-history').addEventListener('click', () => {
@@ -442,9 +452,9 @@ How I want you to work:
   // ---------- Export ----------
   function summaryText(c) {
     const v = V(c);
-    return [`DEDUCE CASE REPORT · ${new Date(c.at).toLocaleString()}`, `Verdict: ${v.verdict} (${v.category}) · risk ${v.risk}/100 · confidence ${v.confidence}%`, c.platform && `Platform: ${c.platform}`, c.url && `URL: ${c.url}`, '', v.headline, '', 'DEDUCTION', v.deduction, '', 'EVIDENCE', ...(v.observations || []).map(o => `- [${o.weight}] ${o.fact} → ${o.inference}`),
+    return [`DEDUCE CASE REPORT · ${new Date(c.at).toLocaleString()}`, `Verdict: ${v.verdict} (${v.category}) · risk ${v.risk}/100 · confidence ${v.confidence}%`, v.estimative && `Assessment: ${v.estimative}`, c.platform && `Platform: ${c.platform}`, c.url && `URL: ${c.url}`, '', v.headline, '', 'DEDUCTION', v.deduction, '', 'EVIDENCE', ...(v.observations || []).map(o => `- [${o.weight}${o.grade ? ' · ' + o.grade : ''}] ${o.fact} → ${o.inference}`),
       v.image_dating && `\nIMAGE DATING: ${v.image_dating.earliest || 'unknown'}, ${v.image_dating.basis}`, v.ai_involvement && `AI INVOLVEMENT: ${v.ai_involvement.assessment}, ${v.ai_involvement.basis}`,
-      (v.hidden_info || []).length && '\nHIDDEN INFO\n' + v.hidden_info.map(x => '- ' + x).join('\n'), '\nNEXT STEPS', ...(v.next_steps || []).map(x => '- ' + x), '\nADVICE', v.advice].filter(x => x !== null && x !== undefined && x !== false).join('\n');
+      (v.hidden_info || []).length && '\nHIDDEN INFO\n' + v.hidden_info.map(x => '- ' + x).join('\n'), ...(c.provenance?.reportLines || []), ...(c.grading?.reportLines || []), '\nNEXT STEPS', ...(v.next_steps || []).map(x => '- ' + x), '\nADVICE', v.advice].filter(x => x !== null && x !== undefined && x !== false).join('\n');
   }
   $('#btn-copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(summaryText(current)); toast('Summary copied'); } catch { toast('Clipboard blocked'); } });
   $('#btn-export').addEventListener('click', () => {

@@ -12,7 +12,7 @@
     const v = String(raw ?? '').trim();
     if (!v) return null;
     if (type === 'handle') { const h = v.replace(/^[@$]/, '').toLowerCase(); return /^[a-z0-9._-]{2,40}$/.test(h) ? { type, key: `handle:${h}`, label: '@' + h } : null; }
-    if (type === 'phone') { const d = v.replace(/\D/g, ''); return d.length >= 9 ? { type, key: `phone:${d.slice(-10)}`, label: v } : null; }
+    if (type === 'phone') { const d = v.replace(/\D/g, ''); return d.length >= 9 ? { type, key: `phone:${v.startsWith('+') ? d : d.slice(-10)}`, label: v } : null; } // same rule as app.js: E.164 keeps the country code
     if (type === 'email') { const e = v.toLowerCase(); return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? { type, key: `email:${e}`, label: e } : null; }
     if (type === 'domain') {
       let h = v.toLowerCase();

@@ -318,7 +318,8 @@ function parseTronscan(j, address) {
 }
 
 async function handleWallet(body, res, send) {
-  const address = String(body.address ?? '').trim();
+  let address = String(body.address ?? '').trim();
+  if (/^bc1/i.test(address)) address = address.toLowerCase(); // bech32 is case-insensitive
   const chain = normalizeChain(body.chain, address);
   if (!chain) throw bad('Unknown chain. Use btc, tron or eth');
   if (!WALLET_RE[chain].test(address)) throw bad(`Not a valid ${chain.toUpperCase()} address`);

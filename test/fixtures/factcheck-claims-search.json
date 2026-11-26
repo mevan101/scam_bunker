@@ -1,0 +1,43 @@
+{
+  "_note": "Shape follows the Google Fact Check Tools v1alpha1 claims:search reference. Values are invented (no real people); example.org publishers are fictional.",
+  "claims": [
+    {
+      "text": "A lemon and baking soda drink cures cancer in a week",
+      "claimant": "Viral social media post",
+      "claimDate": "2026-03-02T00:00:00Z",
+      "claimReview": [
+        {
+          "publisher": { "name": "Example Fact Check", "site": "factcheck.example.org" },
+          "url": "https://factcheck.example.org/2026/03/lemon-baking-soda-cancer",
+          "title": "No, lemon and baking soda do not cure cancer",
+          "reviewDate": "2026-03-04T10:00:00Z",
+          "textualRating": "False",
+          "languageCode": "en"
+        },
+        {
+          "publisher": { "site": "verify.example.net" },
+          "url": "javascript:alert(1)",
+          "title": "Unsafe link that must be dropped",
+          "textualRating": "False",
+          "languageCode": "en"
+        }
+      ]
+    },
+    {
+      "text": "Baking soda treats some cancers, say scientists",
+      "claimant": "Example Health Blog",
+      "claimReview": [
+        {
+          "publisher": { "name": "Example Science Desk", "site": "science.example.com" },
+          "url": "https://science.example.com/checks/baking-soda",
+          "title": "Baking soda and cancer: what the studies say",
+          "reviewDate": "2025-11-20T00:00:00Z",
+          "textualRating": "Misleading",
+          "languageCode": "en"
+        }
+      ]
+    },
+    { "text": "Claim with no reviews is dropped", "claimReview": [] }
+  ],
+  "nextPageToken": "CAo"
+}

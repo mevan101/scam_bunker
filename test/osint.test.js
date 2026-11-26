@@ -62,7 +62,8 @@ test('unionFind basics', () => {
 });
 test('indicatorFor uses the same key format as app.js indicators()', () => {
   assert.strictEqual(D.indicatorFor('handle', '@Mrs_Jessica_Trades').key, 'handle:mrs_jessica_trades');
-  assert.strictEqual(D.indicatorFor('phone', '+44 7700 900123').key, 'phone:7700900123');
+  assert.strictEqual(D.indicatorFor('phone', '+44 7700 900123').key, 'phone:447700900123');
+  assert.strictEqual(D.indicatorFor('phone', '07700 900123').key, 'phone:7700900123');
   assert.strictEqual(D.indicatorFor('email', 'HR@Amaz0n-Jobs.example').key, 'email:hr@amaz0n-jobs.example');
   assert.strictEqual(D.indicatorFor('domain', 'https://www.coinbase-pro-wallet.xyz/login').key, 'domain:coinbase-pro-wallet.xyz');
   assert.strictEqual(D.indicatorFor('wallet', 'TJYeasTPa6gpEEfYqCP9sMBc7NJqKPDJvT').chain, 'Tron (USDT-TRC20)');
