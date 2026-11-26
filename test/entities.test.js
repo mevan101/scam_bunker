@@ -48,6 +48,10 @@ const sig = [
   ['i18n-hi-mum', 'Coucou maman, j\'ai perdu mon téléphone, voici mon nouveau numéro. Tu peux me faire un virement de 400 € ?'],
 ];
 for (const [id, t] of sig) { const v = H.analyze({ text: t }); check(v.hits.some(h => h.id === id && h.signature) && v.score >= 55 && ['Likely scam', 'Scam'].includes(v.verdict), `signature ${id} + ask → ${v.verdict} (${v.score}, ${v.category})`); }
+const mumPhotos = H.analyze({ text: 'Hi Mum, this is my new number. Can you send me some photos of the dog?' });
+check(!mumPhotos.signatureFloor && !['Likely scam', 'Scam'].includes(mumPhotos.verdict), `a photo request is not a payment ask → ${mumPhotos.verdict} (${mumPhotos.score})`);
+const mumUsd = H.analyze({ text: 'Hi Mum, this is my new number. Can you send 500 USD today?' });
+check(mumUsd.signatureFloor && mumUsd.verdict === 'Likely scam', `an amount with a currency code is a payment ask → ${mumUsd.verdict} (${mumUsd.score})`);
 const mumOnly = H.analyze({ text: 'Hi Mum, this is my new number, my phone broke' });
 check(!mumOnly.signatureFloor && mumOnly.verdict === 'Suspicious', `signature without an ask is not floored → ${mumOnly.verdict} (${mumOnly.score})`);
 check(H.analyze({ text: 'Buy three Apple gift cards and send me the codes' }).category === 'Gift-card payment scam', 'gift-card signature gets a scheme category');
