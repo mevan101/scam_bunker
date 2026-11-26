@@ -10,11 +10,11 @@ It covers the deception people actually meet: phishing and smishing, QR-code sca
 
 **Why we built it and the principles we hold to:** [docs/MISSION.md](docs/MISSION.md). **What we are building next:** [docs/PRODUCT.md](docs/PRODUCT.md). **How verification works here:** [docs/METHODOLOGY.md](docs/METHODOLOGY.md).
 
-![Scam Bunker case report: a crypto "mentor" scam on the Deduction tab, with verdict, segmented risk scale and graded evidence chain](docs/screenshot.png)
+![Scam Bunker in Simple mode: a fake job offer checked, with a plain verdict, the reasons quoting the exact words, and what to do now](docs/screenshot.png)
 
 <p>
-  <img src="docs/screenshot-dark.png" alt="The same case report in the dark theme" width="68%">
-  <img src="docs/screenshot-mobile.png" alt="A phishing SMS case report on a phone" width="28%">
+  <img src="docs/screenshot-dark.png" alt="A crypto “mentor” message checked in Simple mode, dark theme" width="68%">
+  <img src="docs/screenshot-mobile.png" alt="A bank text message checked on a phone: “This is very likely a scam”" width="28%">
 </p>
 
 The interface follows a small design system documented in [docs/DESIGN.md](docs/DESIGN.md).
@@ -91,7 +91,8 @@ Images are parsed **in your browser**. Nothing leaves your machine unless you ch
 ```
 public/forensics.js   image container parsers (JPEG/PNG/WebP/HEIC), EXIF/XMP/IPTC/C2PA, ELA, AI signatures
 public/scam.js        rule engine: scam patterns, link analysis, entity extraction, coordination signals
-public/app.js         case orchestration, local reasoning, UI
+public/app.js         case orchestration, local reasoning, Investigator report
+public/simple.js      Simple mode: mode switch, smart input + intake adapters, plain-language answer, module contracts
 public/provenance.js  original-source trace: perceptual hashing, copy comparison, provenance verdict, Provenance tab
 public/osint.js       subject workspace, username sweep UI, dossiers, export, domain-age observations
 public/dossier.js     pure entity-resolution (union-find), risk scoring, SHA-256
