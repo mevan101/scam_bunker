@@ -432,6 +432,17 @@
     return it;
   }
 
+  // Private by default: say exactly what a trace sends, and to whom, before the click.
+  function traceSendsNote(text) {
+    const entries = parseLines(text), urls = [...new Set(entries.flatMap(e => [e.url, e.pageUrl]).filter(Boolean))];
+    if (!urls.length) return 'Nothing is sent until you click Trace sources.';
+    const hosts = [...new Set(urls.map(host))], n = urls.length === 1 ? 'this link' : `these ${urls.length} links`;
+    const where = isStatic() ? `Your browser downloads ${n} from ${hosts.join(', ')} and sends ${urls.length === 1 ? 'it' : 'them'} to archive.org (Wayback Machine).`
+      : `Your Scam Bunker server downloads ${n} from ${hosts.join(', ')} and sends ${urls.length === 1 ? 'it' : 'them'} to web.archive.org (Wayback Machine).`;
+    return urls.some(u => /[?#]/.test(u)) ? `${where} Links are sent in full: remove anything after “?” first if a link is private.` : where;
+  }
+  document.addEventListener('input', e => { if (e.target.id === 'prov-cands' && $('#prov-sends')) $('#prov-sends').textContent = traceSendsNote(e.target.value); });
+
   async function trace() {
     const c = SB.current; if (!c || !c.forensics || busy) return;
     const entries = parseLines($('#prov-cands').value);
@@ -600,7 +611,7 @@
         </div></div></div>
       </section>
       <section aria-labelledby="prov-find-h"><h3 id="prov-find-h">1 · Find copies</h3>
-        ${srv.reverseSearch ? `<div class="callout"><label class="field" style="margin:0 0 8px"><span>Public URL of this image, if it is published somewhere (automatic Google Lens search via SerpApi)</span><input type="url" id="prov-rev-url" placeholder="https://…/image.jpg"></label><button type="button" class="primary sm" id="prov-rev-run">Search automatically</button> <span class="muted" id="prov-rev-status" role="status"></span><div id="prov-rev-results"></div></div>`
+        ${srv.reverseSearch ? `<div class="callout"><label class="field" style="margin:0 0 8px"><span>Public URL of this image, if it is published somewhere (automatic Google Lens search via SerpApi)</span><input type="url" id="prov-rev-url" placeholder="https://…/image.jpg"></label><button type="button" class="primary sm" id="prov-rev-run" aria-describedby="prov-rev-sends">Search automatically</button> <span class="muted" id="prov-rev-status" role="status"></span><p class="muted os-sends" id="prov-rev-sends">Your Scam Bunker server sends the image URL you enter to SerpApi (Google Lens). Nothing is sent until you click.</p><div id="prov-rev-results"></div></div>`
           : isStatic() ? `${localAppHtml('Automatic reverse search', 'Google Lens search through SerpApi needs a secret API key, which only the local server can hold.')}<p class="muted">Search by hand:</p>`
           : `<p class="muted">Automatic reverse search is off (set <code>SERPAPI_API_KEY</code> on the server to enable it). Search by hand:</p>`}
         <ol class="prov-steps"><li>Open each engine below and upload the case image (drag the file in).</li><li>Look for the <b>largest</b> and <b>oldest</b> copies: TinEye → sort by “Oldest”; Google Lens → “Exact matches”; Bing → “Pages with this image”.</li><li>Right-click each promising result's picture → “Copy image address”, and paste it below. Add the page it appeared on after a space; a page URL on its own also works.</li></ol>
@@ -613,8 +624,9 @@
           <label class="field"><span>Date of the event the post claims to show</span><input type="date" id="prov-claimed" value="${esc(claimedVal)}" aria-describedby="prov-claimed-hint"></label>
           <p class="muted grow" id="prov-claimed-hint" style="align-self:center;margin:0 0 14px">${auto ? `Detected from the post: ${esc(auto.basis)}. Change it if that is wrong.` : 'Not detected in the post text. Enter it to test for a recycled image.'}</p>
         </div>
-        <button type="button" class="primary sm" id="prov-run"${busy ? ' disabled' : ''}>Trace sources</button>
+        <button type="button" class="primary sm" id="prov-run"${busy ? ' disabled' : ''} aria-describedby="prov-sends">Trace sources</button>
         <span class="muted" id="prov-status" role="status" aria-live="polite" style="margin-left:10px">${esc(statusMsg)}</span>
+        <p class="muted os-sends" id="prov-sends" aria-live="polite">${esc(traceSendsNote(prevCands))}</p>
       </section>
       ${verdictHtml(p)}
       ${(p.items || []).length ? `<section aria-labelledby="prov-copies-h"><h3 id="prov-copies-h">Copies compared</h3>${p.items.filter(i => !i.isCase).map(i => card(i, p)).join('')}<p class="muted">Similarity thresholds (bits that differ, out of 64): 0–6 same image, 7–10 likely the same with light edits, 11–18 related or heavily edited, above 18 different. Bigger, less compressed copies with camera EXIF are closer to the original.</p></section>` : ''}

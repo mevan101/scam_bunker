@@ -172,6 +172,12 @@ async function main() {
     await assert.rejects(mk(async () => new Response('<html>', { status: 200, headers: { 'content-type': 'text/html' } })).image('https://news.example/story'), e => e.code === 'local_only' && /web page/.test(e.message));
     await assert.rejects(mk(async () => new Response('', { status: 404 })).image('https://news.example/gone.jpg'), e => e.code === 'local_only' && /HTTP 404/.test(e.message));
   });
+  await test('sendsNote says exactly what is sent and to whom', () => {
+    assert.equal(SD.sendsNote([{ what: 'domain', values: ['example.top'], to: 'rdap.org' }]), 'Sends the domain example.top to rdap.org.');
+    assert.equal(SD.sendsNote([{ what: 'domain', values: ['a.example', 'b.example'], to: 'rdap.org' }, { what: 'BTC wallet', values: [], to: 'mempool.space' }, { what: 'TRON wallet', values: ['T1'], to: 'api.trongrid.io' }], { via: 'Your Scam Bunker server' }),
+      'Your Scam Bunker server sends the domains a.example and b.example to rdap.org and the TRON wallet T1 to api.trongrid.io.');
+    assert.equal(SD.sendsNote([{ what: 'domain', values: [], to: 'rdap.org' }]), '');
+  });
   await test('localAppHtml escapes and links the README quick start', () => {
     const esc = x => String(x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
     const h = SD.localAppHtml(esc, 'Username <sweep>', 'x"y');

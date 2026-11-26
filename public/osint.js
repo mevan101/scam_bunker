@@ -92,11 +92,15 @@
           <button type="button" class="ghost" id="os-run" ${canLookup() ? '' : 'disabled title="The Scam Bunker server is not reachable"'}>Save &amp; run public checks</button>
           ${s ? `<button type="button" class="ghost" id="os-dossier">View dossier</button><button type="button" class="ghost" id="os-delete">Delete subject</button>` : ''}
         </div>
+        <p class="muted os-sends" id="os-sends" aria-live="polite"></p>
       </form>
       <div id="os-results" class="os-section" style="margin-top:18px">${s ? findingsHtml(s) : ''}</div>`;
     $('#os-subject', p).addEventListener('change', e => { state.subjectId = e.target.value || null; renderInvestigate(); });
     $('#os-form', p).addEventListener('submit', e => { e.preventDefault(); const saved = saveForm(); if (saved) toast(`Saved subject “${saved.name}”`); });
     $('#os-run', p).addEventListener('click', () => { const saved = saveForm(); if (saved) runChecks(saved.id); });
+    const form = $('#os-form', p), showSends = () => { $('#os-sends', p).textContent = subjectSendsNote(new FormData(form)); };
+    $('#os-run', p).setAttribute('aria-describedby', 'os-sends');
+    form.addEventListener('input', showSends); showSends();
     $('#os-dossier', p)?.addEventListener('click', () => { state.cluster = 's:' + state.subjectId; showOsTab('dossiers'); });
     $('#os-delete', p)?.addEventListener('click', () => {
       if (!confirm(`Delete the subject file “${s.name}”? Linked cases are kept.`)) return;
@@ -132,6 +136,21 @@
   }
 
   // ---------- Public checks ----------
+  // What "Save & run public checks" sends, and to whom (same limits as runChecks).
+  const via = () => SB.isStatic() ? null : 'Your Scam Bunker server';
+  function subjectSendsNote(fd) {
+    const vals = n => splitList(fd.get(n)).map(v => v.replace(/^@/, ''));
+    const RE = window.ScamBunkerOsintCore?.WALLET_RE || {}, wallets = vals('wallets').slice(0, MAX_LOOKUPS), chain = c => wallets.filter(w => RE[c]?.test(w));
+    const st = SB.isStatic(), keys = SB.server();
+    const note = direct.sendsNote([
+      { what: 'username', values: st ? [] : vals('usernames').slice(0, MAX_USERNAMES), to: 'about 60 public platforms' },
+      { what: 'domain', values: vals('domains').slice(0, MAX_LOOKUPS), to: 'rdap.org' },
+      { what: 'BTC wallet', values: chain('btc'), to: 'mempool.space' },
+      { what: 'TRON wallet', values: chain('tron'), to: st ? 'api.trongrid.io' : 'api.trongrid.io (or Tronscan, if a key is set)' },
+      { what: 'ETH wallet', values: st ? [] : chain('eth'), to: 'Etherscan, if a key is set' }
+    ], { via: via() });
+    return note ? `${note} Nothing is sent until you click.` : '';
+  }
   async function runChecks(id) {
     if (state.running) return;
     const s = getSubject(id); if (!s) return;
@@ -422,12 +441,21 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
   // ---------- Current case: domain age via RDAP ----------
   const domainObs = (d, r) => ({ fact: `${d} was registered ${plural(r.ageDays, 'day')} ago (${fmtDate(r.registeredAt)}${r.registrar ? ', ' + r.registrar : ''})`, inference: 'Newly registered domain. Phishing and fake-investment sites are usually days or weeks old when they are used; established businesses rarely are.', weight: r.ageDays < 30 ? 'strong' : 'moderate', source: 'rdap' });
   function addObs(v, ob) { if (v && Array.isArray(v.observations) && !v.observations.some(o => o.fact === ob.fact)) v.observations.unshift(ob); }
+  function caseDomains(c) {
+    const risk = new Map((c.heuristics?.links || []).filter(l => l.host).map(l => [l.host.replace(/^www\./, ''), l.risk || 0]));
+    return (c.indicators || []).filter(i => i.type === 'domain').map(i => i.key.slice(7)).sort((a, b) => (risk.get(b) || 0) - (risk.get(a) || 0)).slice(0, 3);
+  }
+  // Private by default: a case's domains are only sent to RDAP when the user clicks, after a note saying what goes where.
   async function checkCaseDomains(c) {
     if (!c || c._osintDomains || !canLookup()) return;
-    c._osintDomains = true;
-    const risk = new Map((c.heuristics?.links || []).filter(l => l.host).map(l => [l.host.replace(/^www\./, ''), l.risk || 0]));
-    const doms = (c.indicators || []).filter(i => i.type === 'domain').map(i => i.key.slice(7)).sort((a, b) => (risk.get(b) || 0) - (risk.get(a) || 0)).slice(0, 3);
+    const doms = caseDomains(c);
     if (!doms.length) return;
+    c._osintDomains = true; c._osintAge = 'run'; refreshAgeCards();
+    try { await checkDomains(c, doms); c._osintAge = 'done'; }
+    catch (e) { c._osintAge = 'error'; c._osintAgeError = e.message; c._osintDomains = false; }
+    finally { refreshAgeCards(); }
+  }
+  async function checkDomains(c, doms) {
     const results = await Promise.all(doms.map(d => lookupDomain({ domain: d }).then(r => [d, r]).catch(e => [d, { error: e.message }])));
     c.domainAges = Object.fromEntries(results.map(([d, r]) => [d, r.error ? { error: r.error } : { registeredAt: r.registeredAt || null, ageDays: r.ageDays ?? null, registrar: r.registrar || null, young: !!r.young, registered: r.registered !== false }]));
     const young = results.filter(([, r]) => r.young && r.ageDays != null);
@@ -441,10 +469,11 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
     addReasons(c, plain.reasons);
     addActions(c, plain.actions);
     const obs = young.map(([d, r]) => domainObs(d, r));
-    if (!obs.length) return;
-    c._osintObs = obs;
-    obs.forEach(ob => { addObs(c.local, ob); addObs(c.final, ob); });
-    if (SB.current === c) SB.renderAll();
+    if (obs.length) {
+      c._osintObs = obs;
+      obs.forEach(ob => { addObs(c.local, ob); addObs(c.final, ob); });
+      if (SB.current === c) SB.renderAll();
+    }
     patchSavedCase(c);
   }
   function patchSavedCase(c) {
@@ -462,10 +491,43 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
   }
   document.addEventListener('sb:mode', syncMode);
   document.addEventListener('sb:ready', syncMode);
-  document.addEventListener('sb:case', e => { checkCaseDomains(e.detail).catch(err => console.debug('domain age check skipped:', err)); });
+  // Domain-age card: in the Simple result and in the Investigator deduction panel. Both are re-rendered by their owners,
+  // so the card is re-attached after each render.
+  function ageCardHtml(c, simple) {
+    const doms = c && canLookup() ? caseDomains(c) : [];
+    if (!doms.length) return '';
+    const ages = c.domainAges || {}, done = doms.filter(d => ages[d]);
+    let body;
+    if (c._osintAge === 'run') body = `<p class="muted" role="status">Checking the public registration records…</p>`;
+    else if (done.length) body = `<ul class="list">${done.map(d => { const a = ages[d]; return `<li>${a.error ? `${esc(d)}: the record could not be read (${esc(a.error)})` : a.registeredAt ? `${esc(d)} was registered on ${esc(fmtDate(a.registeredAt))}${a.ageDays != null ? ` (${plural(a.ageDays, 'day')} before this check)` : ''}` : `${esc(d)}: no public registration record was found`}</li>`; }).join('')}</ul>${simple && !done.some(d => ages[d].young) ? '<p class="muted">An older website is not proof it is safe: scammers also use hacked or look-alike sites.</p>' : ''}`;
+    else body = `${c._osintAge === 'error' ? `<p class="muted" role="status">The check did not work: ${esc(c._osintAgeError || 'unknown error')}. You can try again.</p>` : ''}
+      <button type="button" class="ghost ${simple ? 's-btn' : 'sm'}" data-os-age aria-describedby="os-age-note-${simple ? 's' : 'i'}">${simple ? 'Check how old the website is' : 'Check domain age (RDAP)'}</button>
+      <p class="muted os-sends" id="os-age-note-${simple ? 's' : 'i'}">${esc(direct.sendsNote([{ what: 'domain', values: doms, to: 'rdap.org' }], { via: via() }))}</p>`;
+    return simple
+      ? `<section class="s-card s-sec os-age-check" aria-labelledby="os-age-h"><h3 id="os-age-h">How old is the website?</h3><p class="s-sec-lede">Scam websites are often only days or weeks old. The public registration record shows when a website was created.</p>${body}</section>`
+      : `<section class="callout os-age-check" aria-labelledby="os-age-hi"><div><b id="os-age-hi">Domain age</b>${body}</div></section>`;
+  }
+  function mountAgeCard(box, simple) {
+    if (!box) return;
+    const old = $(':scope > .os-age-check', box), html = ageCardHtml(SB.current, simple);
+    if (old && old.dataset.html === html) return;
+    const hadFocus = old && old.contains(document.activeElement);
+    old?.remove();
+    if (!html || box.hidden && simple) return;
+    const t = document.createElement('template'); t.innerHTML = html.trim(); const el = t.content.firstChild; el.dataset.html = html;
+    const before = simple ? $(':scope > [data-tour="actions"]', box) : null;
+    box.insertBefore(el, before || null);
+    if (hadFocus) ($('[data-os-age]', el) || $('h3, b', el))?.focus?.();
+  }
+  const simpleBox = () => document.getElementById('s-result'), dedBox = () => document.querySelector('[data-panel="deduction"]');
+  function refreshAgeCards() { mountAgeCard(simpleBox(), true); mountAgeCard(dedBox(), false); }
+  const watch = box => box && new MutationObserver(() => mountAgeCard(box, box === simpleBox())).observe(box, { childList: true });
+  watch(simpleBox()); watch(dedBox());
+  document.addEventListener('sb:case', refreshAgeCards);
+  document.addEventListener('click', e => { if (e.target.closest('[data-os-age]')) checkCaseDomains(SB.current); });
   document.addEventListener('sb:case-complete', e => {
-    const c = e.detail; if (!c?._osintObs) return;
-    c._osintObs.forEach(ob => { addObs(c.local, ob); addObs(c.final, ob); });
+    const c = e.detail; if (!c?.domainAges) return;
+    (c._osintObs || []).forEach(ob => { addObs(c.local, ob); addObs(c.final, ob); });
     patchSavedCase(c);
     if (SB.current === c) SB.renderAll();
   });

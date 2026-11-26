@@ -84,7 +84,16 @@ function localAppHtml(esc, what, detail) {
   return `<div class="callout handoff sb-local-only" role="note"><div><b>${esc(what)}: available in the local app</b> ${esc(detail || '')} It runs on your own computer in a minute, with no dependencies to install.</div><a class="primary sm" style="color:var(--on-btn);text-decoration:none" href="${LOCAL_APP_URL}" target="_blank" rel="noopener">Quick start ↗</a></div>`;
 }
 
-const api = { LOCAL_APP_URL, create, localAppHtml };
+// Private by default: every lookup that sends case data to a third party says exactly what goes where, before the click.
+// parts: [{ what: 'domain', values: ['example.top'], to: 'rdap.org' }] → "Sends the domain example.top to rdap.org."
+const listWords = xs => xs.length < 2 ? (xs[0] || '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+function sendsNote(parts, { via } = {}) {
+  const bits = (parts || []).filter(p => p && p.values && p.values.length)
+    .map(p => `the ${p.what}${p.values.length > 1 ? 's' : ''} ${listWords(p.values)} to ${p.to}`);
+  return bits.length ? `${via ? `${via} sends` : 'Sends'} ${listWords(bits)}.` : '';
+}
+
+const api = { LOCAL_APP_URL, create, localAppHtml, sendsNote };
 if (typeof window !== 'undefined' && typeof window.fetch === 'function') Object.assign(api, create());
 if (isNode) module.exports = api;
 else root.ScamBunkerDirect = api;
