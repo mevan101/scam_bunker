@@ -116,6 +116,8 @@ const fixture = f => fs.readFileSync(path.join(__dirname, 'fixtures', f));
     assert.strictEqual(r.hourly.time.slice(11), '09:00');
     assert.strictEqual(r.check.result, 'contradicted'); assert.strictEqual(r.check.strength, 'moderate'); // never "proof"
     const rain = S.checkClaim(r, 'rain'); assert.ok(['consistent', 'unclear'].includes(rain.result)); assert.strictEqual(rain.strength, 'weak');
+    const melt = S.summarizeWeather({ daily: { time: ['2024-04-02'], weather_code: [3], temperature_2m_max: [12], snowfall_sum: [0] }, hourly: { time: ['2024-04-02T00:00', '2024-04-02T12:00'], snow_depth: [0.4, 0.3] } });
+    assert.strictEqual(S.checkClaim(melt, 'snow').result, 'consistent', 'lying snow on a warm day without an hour is not a contradiction');
     await S.weather({ lat: 23.811, lon: 90.409, date: '2024-07-15' }); assert.strictEqual(calls.length, 1, 'cached by rounded grid');
     await assert.rejects(S.weather({ lat: 123, lon: 0, date: '2024-07-15' }), e => e.status === 400);
     await assert.rejects(S.weather({ lat: 1, lon: 1, date: '2999-01-01' }), e => e.status === 400);

@@ -114,11 +114,13 @@ function parseWeatherInput(b) {
 
 function summarizeWeather(j, hour = null) {
   if (!j || !j.daily || !Array.isArray(j.daily.time)) throw httpError(502, 'Unexpected Open-Meteo response', 'upstream');
-  const d = j.daily, i = 0, pick = k => (d[k] ? d[k][i] : null);
+  const d = j.daily, i = 0, pick = k => (d[k] ? d[k][i] : null), h = j.hourly || {};
+  const sameDay = (h.time || []).map((t, k) => (String(t).slice(0, 10) === d.time[i] ? h.snow_depth?.[k] : null)).filter(v => v != null);
   const daily = {
     date: d.time[i], code: pick('weather_code'), text: wmoText(pick('weather_code')),
     tmax: pick('temperature_2m_max'), tmin: pick('temperature_2m_min'), precip: pick('precipitation_sum'), snow: pick('snowfall_sum'),
     cloud: pick('cloud_cover_mean'), sunrise: pick('sunrise'), sunset: pick('sunset'),
+    snowDepth: sameDay.length ? Math.max(...sameDay) : null,
   };
   let hourly = null;
   if (hour != null && j.hourly && Array.isArray(j.hourly.time)) {
@@ -138,7 +140,8 @@ function checkClaim(s, claim) {
   const temp = x.temp ?? s.daily.tmax;
   if (code == null) return { claim, result: 'unverifiable', strength: 'weak', why: 'No reanalysis value for this date/place.' };
   const rainy = (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95 || precip >= 0.5;
-  const snowy = (code >= 71 && code <= 77) || code === 85 || code === 86 || snow > 0 || (x.snowDepth ?? 0) > 0;
+  const depth = x.snowDepth ?? s.daily.snowDepth;
+  const snowy = (code >= 71 && code <= 77) || code === 85 || code === 86 || snow > 0 || (depth ?? 0) > 0;
   const r = (result, strength, why) => ({ claim, result, strength, why });
   switch (claim) {
     case 'clear': return code <= 1 || (cloud != null && cloud < 30) ? r('consistent', 'weak', `Model shows ${x.text.toLowerCase()} (${cloud ?? '?'}% cloud).`)
@@ -149,7 +152,7 @@ function checkClaim(s, claim) {
     case 'rain': return rainy ? r('consistent', 'weak', `Model shows ${x.text.toLowerCase()}, ${precip} mm.`)
       : (cloud ?? 100) < 20 ? r('contradicted', 'moderate', `Model shows ${x.text.toLowerCase()} with ${cloud}% cloud and no precipitation.`)
       : r('unclear', 'weak', 'Model shows no precipitation, but showers can be local.');
-    case 'snow': return snowy ? r('consistent', 'weak', `Model shows snowfall ${snow} cm / snow depth ${x.snowDepth ?? '?'} m.`)
+    case 'snow': return snowy ? r('consistent', 'weak', `Model shows snowfall ${snow} cm / snow depth ${depth ?? '?'} m.`)
       : temp != null && temp >= 10 ? r('contradicted', 'moderate', `No snowfall or snow cover in the model, and ${temp} °C.`)
       : r('unclear', 'weak', 'No snow in the model; check elevation and nearby grid cells.');
     case 'fog': return code === 45 || code === 48 ? r('consistent', 'weak', 'Model flags fog.') : r('unclear', 'weak', 'Reanalysis rarely resolves fog; absence is not evidence.');
