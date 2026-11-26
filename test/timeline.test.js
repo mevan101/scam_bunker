@@ -115,7 +115,7 @@ test('bounds: earliest possible from the file, existed-by from the archive; stro
 });
 
 test('video, corroboration, RDAP, crt.sh and event listings are merged', () => {
-  const c = { at: '2026-11-26T10:00:00Z', text: '', url: '',
+  const c = { at: '2026-11-26T10:00:00Z', text: '', url: 'https://events.example.org/e/1',
     video: { timeline: [{ when: '2025-01-02T03:04:05', what: 'Container created (movie header)', src: 'MP4 mvhd creation_time (UTC by spec, 1904 epoch)', trust: 'medium' }, { when: '2025-01-02T09:04:05', what: 'Recorded (device local time, zone unknown)', src: 'Apple com.apple.quicktime.creationdate', trust: 'high' }] },
     corroborate: { sun: { date: '2025-01-02', time: '09:00', offset: '+06:00', lat: 23.7, lon: 90.4 }, wx: { date: '2025-01-02', time: '', offsetMin: 360, timezone: 'Asia/Dhaka', text: 'Clear sky', claim: 'rain', result: 'contradicted', url: 'https://open-meteo.com/' }, crt: { domain: 'riverton-relief.example', firstSeen: '2025-01-01T00:00:00', url: 'https://crt.sh/' } },
     domainAges: { 'riverton-relief.example': { registeredAt: '2024-12-30T00:00:00Z', registrar: 'Example Registrar' } } };
@@ -152,6 +152,19 @@ test('svg is labelled and escapes content; export lines include contradictions',
   assert.match(s, /role="img"/); assert.match(s, /<title id="tlv-t">/); assert(!s.includes('<img'), 'escaped');
   const L = T.reportLines(rows);
   assert.strictEqual(L[1], 'DATING TIMELINE'); assert(L.some(l => /! \[strong\]/.test(l))); assert(L.some(l => /timezone unknown/.test(l)));
+});
+
+test('review fixes: unlinked listings skipped, multi-date posts give no fallback claim, domains never date media, page dates do not bound', () => {
+  const listings = [C.normalizeListing({ id: 'L9', url: 'https://events.example.org/e/9', title: 'Unrelated', start: '2025-01-05T18:00', tz: 'Asia/Dhaka' })];
+  assert(!T.collect(baseCase(), { ...opts, listings }).some(r => r.kind === 'event'));
+  const c = baseCase(); c.text = 'Archive photo from 2019, reposted in 2024';
+  assert(!T.collect(c, opts).some(r => r.kind === 'claimed'));
+  const m = baseCase(); m.forensics.timeline = []; m.domainAges = { 'a.example': { registeredAt: '2020-01-01T00:00:00Z' } };
+  assert.strictEqual(T.bounds(T.collect(m, opts)).early, null);
+  const t = { at: '2026-11-26T10:00:00Z', text: '', domainAges: m.domainAges };
+  assert.strictEqual(T.bounds(T.collect(t, opts)).early.kind, 'domain');
+  const pc = provCase(); pc.provenance.verdict.dates = pc.provenance.verdict.dates.filter(d => d.kind === 'page');
+  assert.strictEqual(T.bounds(T.collect(pc, opts)).late.kind, 'case');
 });
 
 console.log(failed ? `✗ timeline: ${failed} failed` : 'timeline: all tests passed');

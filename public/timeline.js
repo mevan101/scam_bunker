@@ -73,7 +73,7 @@
     let n = 0;
     const add = (raw, zoneHint, o) => {
       const p = parseWhen(raw, zoneHint, o.precision); if (!p) return null;
-      const r = { id: 'r' + (++n), ...p, kind: o.kind, what: o.what, src: o.src, origin: o.origin, grade: o.grade, group: o.group || null, href: safeHref(o.href) || null, tab: o.tab || null, flags: [], note: o.note || '' };
+      const r = { id: 'r' + (++n), ...p, kind: o.kind, what: o.what, src: o.src, origin: o.origin, grade: o.grade, group: o.group || null, href: safeHref(o.href) || null, tab: o.tab || null, flags: [], note: o.note || '', media: !!o.media };
       rows.push(r); return r;
     };
 
@@ -135,7 +135,7 @@
 
     // Claimed event date in the post
     let claimed = c.provenance && c.provenance.claimed;
-    if (!claimed && opts.parseClaimedDate) { try { claimed = opts.parseClaimedDate([c.text || '', c.page && c.page.markdown ? String(c.page.markdown).slice(0, 4000) : ''].join('\n'), c.at); } catch { claimed = null; } }
+    if (!claimed && opts.parseClaimedDate) { try { const txt = [c.text || '', c.page && c.page.markdown ? String(c.page.markdown).slice(0, 4000) : ''].join('\n'); claimed = new Set(txt.match(/\b(19[89]\d|20\d\d)\b/g) || []).size > 1 ? null : opts.parseClaimedDate([c.text || '', c.page && c.page.markdown ? String(c.page.markdown).slice(0, 4000) : ''].join('\n'), c.at); } catch { claimed = null; } }
     if (claimed && claimed.date) add(claimed.date, null, { kind: 'claimed', what: `Event date the post claims (“${String(claimed.basis || '').slice(0, 80)}”)`, src: 'The post under investigation', origin: 'Claim', grade: 'F6', precision: claimed.precision || 'day', href: c.url });
 
     // Corroboration checks (corroborate.js stores the inputs of the last run)
@@ -158,15 +158,17 @@
     }
 
     // Event listings (events.js comparison), if any
+    const caseLinks = new Set([c.url, ...((c.heuristics && c.heuristics.links) || []).map(x => x.url || x)].map(u => safeHref(u)).filter(Boolean).map(u => u.replace(/[?#].*$/, '').replace(/\/$/, '')));
+    const linked = l => [l.url, l.finalUrl].map(u => safeHref(u)).filter(Boolean).some(u => caseLinks.has(u.replace(/[?#].*$/, '').replace(/\/$/, '')));
     for (const l of opts.listings || []) {
-      if (l.startUtc == null) continue;
+      if (l.startUtc == null || !linked(l)) continue; // the Events comparison is shared; only listings this case links to
       const sl = l.startLocal, o = { kind: 'event', what: `Event listing starts: ${l.title || l.id}${l.city ? ' (' + l.city + ')' : ''}`, src: `${l.platform || 'Listing'} ${l.id}`, origin: 'Events', grade: l.manual ? 'D3' : 'C3', href: l.finalUrl || l.url, tab: 'events', precision: l.allDay ? 'day' : 'minute' };
       if (sl && !sl.floating && sl.offsetMin != null) add(`${sl.date}T${sl.time}:00`, { kind: 'offset', offsetMin: sl.offsetMin, label: l.tz ? `${l.tz} (UTC${fmtOffset(sl.offsetMin)})` : null }, o);
       else add(new Date(l.startUtc), 'utc', o);
     }
 
     // Case opened
-    if (c.at) add(c.at, 'utc', { kind: 'case', what: 'Case opened in Scam Bunker', src: 'This investigation', origin: 'Case', grade: 'A1' });
+    if (c.at) add(c.at, 'utc', { kind: 'case', what: 'Case opened in Scam Bunker', src: 'This investigation', origin: 'Case', grade: 'A1', media: !!(c.forensics || c.video) });
 
     const ORDER = { capture: 0, created: 1, modified: 2, existed: 3, page: 4, domain: 5, claimed: 6, check: 7, event: 8, device: 9, case: 10 };
     rows.sort((a, b) => a.ms - b.ms || (ORDER[a.kind] ?? 99) - (ORDER[b.kind] ?? 99));
@@ -182,13 +184,13 @@
     // 1. Capture after a copy was already seen (EXIF forged, re-dated, or the wrong camera clock)
     for (const cap of rows.filter(r => r.kind === 'capture')) {
       const prior = existed.filter(e => span(cap)[0] > span(e)[1]).sort((a, b) => a.ms - b.ms)[0];
-      if (prior) flag(cap, 'strong', `Captured after a copy already existed (${prior.src}, ${fmt(prior)}). The capture date is forged or the clock was wrong.`, prior);
+      if (prior) flag(cap, prior.grade[0] <= 'B' ? 'strong' : 'moderate', `Captured after a copy already existed (${prior.src}, ${fmt(prior)}). The capture date is forged or the clock was wrong.`, prior);
     }
     // 2. Claimed event date after a copy existed (recycled media)
     for (const cl of rows.filter(r => r.kind === 'claimed')) {
       const earlier = rows.filter(r => ['existed', 'page', 'capture'].includes(r.kind) && span(cl)[0] > span(r)[1]).sort((a, b) => a.ms - b.ms);
       const best = earlier.find(r => r.kind === 'existed') || earlier[0];
-      if (best) flag(cl, best.kind === 'existed' ? 'strong' : 'moderate', `The post claims ${fmtWhen(cl)}, but ${best.kind === 'capture' ? 'the media was captured' : best.kind === 'page' ? 'a page carrying a copy existed' : 'a matching copy existed'} by ${fmt(best)} (${best.src}). Possibly recycled media.`, best);
+      if (best) flag(cl, best.kind === 'existed' && best.grade[0] <= 'B' ? 'strong' : 'moderate', `The post claims ${fmtWhen(cl)}, but ${best.kind === 'capture' ? 'the media was captured' : best.kind === 'page' ? 'a page carrying a copy existed' : 'a matching copy existed'} by ${fmt(best)} (${best.src}). Possibly recycled media.`, best);
     }
     // 3. Modified before captured/created, within the same file (same clock, so no zone slack)
     const groups = new Map();
@@ -209,13 +211,15 @@
 
   // ---------- Interval: earliest and latest possible date of the content ----------
   function bounds(rows) {
+    const media = rows.some(r => r.media || r.origin === 'Image file' || r.origin === 'Video file'); // a domain record never dates media
     const ok = r => !r.flags.some(f => f.weight === 'strong');
     const rank = g => 'ABCDEF'.indexOf(g[0]) * 10 + (+g[1]);
-    // Latest possible: the earliest independent evidence that it already existed (archives, servers, publishers, the case).
-    const late = rows.filter(r => ['existed', 'page', 'case'].includes(r.kind)).sort((a, b) => a.ms - b.ms || rank(a.grade) - rank(b.grade))[0] || null;
+    // Latest possible: the earliest evidence that this very file existed (archived/served copies, the case). Page dates are
+    // excluded: the image may have been added to the page later.
+    const late = rows.filter(r => ['existed', 'case'].includes(r.kind)).sort((a, b) => a.ms - b.ms || rank(a.grade) - rank(b.grade))[0] || null;
     // Earliest possible: the earliest date the file itself claims (editable) or, for text cases, the linked domain's registration.
     const fileClaims = rows.filter(r => ['capture', 'created'].includes(r.kind) && ok(r)).sort((a, b) => a.ms - b.ms);
-    const early = fileClaims[0] || rows.filter(r => r.kind === 'domain').sort((a, b) => a.ms - b.ms)[0] || null;
+    const early = fileClaims[0] || (media ? null : rows.filter(r => r.kind === 'domain').sort((a, b) => a.ms - b.ms)[0]) || null;
     return { early: early && (!late || early.ms <= late.ms) ? early : null, late };
   }
 
