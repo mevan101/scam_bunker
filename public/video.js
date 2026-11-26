@@ -273,7 +273,7 @@
 
   // ======================= Interpretation (dates, hidden data, AI signals) =======================
   const VIDEO_GENERATORS = [
-    { re: /\bsora\b/i, gen: 'OpenAI Sora' }, { re: /runway(ml)?|gen-?[234]\b/i, gen: 'Runway' }, { re: /\bpika(\s?labs)?\b/i, gen: 'Pika' },
+    { re: /\bsora\b/i, gen: 'OpenAI Sora' }, { re: /runwayml|\brunway[\s_-]?(gen|act|ai\b)/i, gen: 'Runway' }, { re: /\bpika[\s_.-]?(labs|art)\b/i, gen: 'Pika' },
     { re: /\bkling\b|kuaishou/i, gen: 'Kling' }, { re: /luma(\s?ai|\s?dream\s?machine)/i, gen: 'Luma Dream Machine' }, { re: /\bveo\s?\d?\b|google\s?deepmind/i, gen: 'Google Veo' },
     { re: /hailuo|minimax/i, gen: 'MiniMax Hailuo' }, { re: /synthesia/i, gen: 'Synthesia' }, { re: /heygen/i, gen: 'HeyGen' }, { re: /\bd-id\b/i, gen: 'D-ID' },
     { re: /\bhedra\b/i, gen: 'Hedra' }, { re: /haiper/i, gen: 'Haiper' }, { re: /stable[\s-]?video|\bSVD\b/i, gen: 'Stable Video Diffusion' }, { re: /\bwan\s?2\.\d|\bhunyuan/i, gen: 'Open-weights video model (Wan / Hunyuan)' },
@@ -352,7 +352,7 @@
 
     // AI signals: declared metadata first, statistics only as weak hints.
     const hay = [raw.xmp || '', JSON.stringify(raw.udta || {}), JSON.stringify(raw.keys || {}), JSON.stringify(raw.tags || {}), v.encoder, v.software, v.title, raw.writingApp || '', raw.muxingApp || ''].join('\n');
-    if (/trainedAlgorithmicMedia/i.test(hay) || /c2pa\.ai_generat|"ai_generated"/i.test(hay)) v.ai.signals.push({ label: 'Metadata declares AI generation (IPTC trainedAlgorithmicMedia / C2PA assertion)', strength: 'proof' });
+    if (/trainedAlgorithmicMedia/i.test(hay) || /c2pa\.ai_generat|"ai_generated"\s*:\s*(true|"true"|"yes"|1)\b/i.test(hay)) v.ai.signals.push({ label: 'Metadata declares AI generation (IPTC trainedAlgorithmicMedia / C2PA assertion)', strength: 'proof' });
     for (const g of VIDEO_GENERATORS) if (g.re.test(hay)) { v.ai.signals.push({ label: `${g.gen} named in the metadata`, strength: 'strong' }); v.ai.generators.push(g.gen); }
     if (v.c2pa) v.notes.push('Content Credentials (C2PA) marker present but not validated. Check it at contentcredentials.org/verify');
     if (v.duration && v.duration <= 10.5 && !v.hasAudio && !v.make && !v.model) v.ai.weak.push(`Short (${v.duration.toFixed(1)} s), silent clip with no device metadata: typical of AI video generators, but also of GIF conversions and edited clips`);

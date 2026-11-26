@@ -149,6 +149,14 @@ test('version-1 mvhd (64-bit times), zero times, FFmpeg + generator name', () =>
   assert.ok(v.ai.weak.some(w => /silent clip/.test(w)) && v.ai.weak.some(w => /16 fps/.test(w)));
 });
 
+test('ordinary words are not generator names; ai_generated=false is not proof', () => {
+  const mk = (k, val) => Buffer.concat([box('ftyp', fourcc('mp42'), u32(0)), box('moov', mvhd(0, C1, C1, 1000, 30000), appleMeta([[k, val]]))]);
+  const a = V.parseContainer(new Uint8Array(mk('com.apple.quicktime.title', 'Airport runway inspection, Gen 3 crew')));
+  assert.deepStrictEqual(a.ai.generators, []); assert.strictEqual(a.ai.verdict, 'none detected');
+  assert.strictEqual(V.parseContainer(new Uint8Array(mk('ai_generated', 'false'))).ai.verdict, 'none detected');
+  assert.deepStrictEqual(V.parseContainer(new Uint8Array(mk('com.apple.quicktime.software', 'RunwayML Gen-3'))).ai.generators, ['Runway']);
+});
+
 test('64-bit largesize boxes and truncated input do not throw', () => {
   const big = Buffer.concat([u32(1), fourcc('free'), u64(24), Buffer.alloc(8)]);
   const full2 = Buffer.concat([box('ftyp', fourcc('mp42'), u32(0)), big, box('moov', mvhd(0, C1, C1, 1000, 1000))]);
