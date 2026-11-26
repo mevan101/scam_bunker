@@ -40,7 +40,8 @@
       <div class="eyebrow">Scheduling observations</div>
       <h3>Event listing overlap check</h3>
       <p class="muted ev-lede">Paste listing URLs from Luma, Meetup, Eventbrite, community or sponsor pages. Times are normalised to UTC and to each venue's local time, and overlaps are flagged with an honest strength and the innocent explanations. These are scheduling observations, not findings of misconduct; only the sponsoring programs can verify funding or approval.</p>
-      <section>
+      <p class="callout" id="ev-static" role="note" hidden><b>Manual entry in the web version.</b> Fetching listing pages needs the local app (<code>npm start</code>), because a browser cannot read other sites' pages. Add each listing by hand below; overlap flags, time zones, the timeline and the claims ledger all work here, on your device.</p>
+      <section id="ev-url-sec">
         <label class="field"><span>Listing URLs (one per line)</span><textarea id="ev-urls" rows="3" placeholder="https://lu.ma/…&#10;https://www.meetup.com/…/events/…"></textarea></label>
         <div class="ev-row"><button class="primary sm" id="ev-fetch" type="button">Fetch listings</button><button class="ghost" id="ev-demo" type="button">Load fictional demo</button><button class="ghost" id="ev-clear" type="button">Clear all</button></div>
         <div id="ev-status" class="ev-status" role="status" aria-live="polite"></div>
@@ -70,6 +71,16 @@
       <div class="ev-row ev-end"><button class="ghost" id="ev-print" type="button">Open printable ledger</button><button class="ghost" id="ev-ledger" type="button">Export claims ledger</button></div>
     </div>`;
 
+  // Static mode (GitHub Pages): no /api, so manual entry comes first and is open; everything else runs locally.
+  let staticApplied = false;
+  function applyMode() {
+    const st = !!SB.isStatic?.();
+    $('#ev-static').hidden = !st;
+    $('#ev-fetch').textContent = st ? 'Fetch listings (local app only)' : 'Fetch listings';
+    if (st && !staticApplied) { staticApplied = true; const m = $('#ev-manual'); $('#ev-url-sec').before(m); m.open = true; if (!F('tz').value) F('tz').value = browserTz; }
+  }
+  document.addEventListener('sb:ready', applyMode);
+
   // ---------- Data ----------
   const listings = () => raw.map((l, i) => C.normalizeListing(l, i));
   function fromExtract(r) {
@@ -86,7 +97,7 @@
     const bad = urls.filter(u => !safeHref(u)); const good = urls.filter(u => safeHref(u));
     const st = $('#ev-status');
     if (!good.length) { toast(bad.length ? 'Only http(s) links can be fetched' : 'Paste at least one listing URL'); return; }
-    if (!SB.server()?.online) { st.innerHTML = '<p class="callout">The local server is offline, so pages cannot be fetched. Add the listings manually below.</p>'; return; }
+    if (SB.isStatic?.() || !SB.server()?.online) { st.innerHTML = `<p class="callout">${SB.isStatic?.() ? 'This is the web version without a server, so pages cannot be fetched. Run the local app (<code>npm start</code>) for URL extraction, or add' : 'The local server is offline, so pages cannot be fetched. Add'} the listings manually${good.length === 1 ? ` <button class="link" type="button" data-ev-manual-url="${esc(good[0])}">with this URL</button>` : ''}.</p>`; return; }
     const btn = $('#ev-fetch'); btn.disabled = true; btn.textContent = 'Fetching…';
     const lines = [];
     for (const u of good) {
@@ -104,6 +115,7 @@
     bad.forEach(u => lines.push(`<li>${esc(u)}: skipped, only http(s) links without embedded credentials are fetched</li>`));
     st.innerHTML = `<ul class="ev-log">${lines.join('')}</ul>`;
     btn.disabled = false; btn.textContent = 'Fetch listings';
+    applyMode();
   }
 
   // ---------- Manual entry / edit ----------
@@ -281,5 +293,6 @@
     if (mu) edit(null, mu.dataset.evManualUrl);
     if (del) { raw = raw.filter(l => l.id !== del.dataset.evDel); save(); render(); toast(`${del.dataset.evDel} removed`); }
   });
+  applyMode();
   render();
 })();

@@ -1,7 +1,9 @@
 // Scam Bunker — "Claims" tab: existing fact-checks for the post's checkable claims (BACKLOG P1-7) and
 // similar earlier cases from public/similar.js (BACKLOG P2-1). Claim extraction and the Google Fact Check Tools
 // lookup run on the server (server/factcheck.js); without GOOGLE_FACTCHECK_API_KEY no third-party call is made and
-// each claim links to Google Fact Check Explorer instead. Results are added to the agents' case file.
+// each claim links to Google Fact Check Explorer instead. In static mode (GitHub Pages) claims are extracted in the
+// browser with the same code (public/shared/claims.js) and each claim gets the Explorer deep link.
+// Results are added to the agents' case file.
 (function () {
   'use strict';
   if (!window.ScamBunker) return;
@@ -33,8 +35,17 @@
     SB.store.set('scambunker.cases', list);
   }
 
+  const isStatic = () => !!(SB.isStatic && SB.isStatic());
+  function local(c) {
+    const X = window.ScamBunkerClaims;
+    if (!X) { render(c); return; }
+    c.factcheck = { available: false, local: true, service: 'Google Fact Check Explorer (manual)', claims: X.extractClaims(String(c.text).slice(0, 12000)) };
+    c.caseExtras = { ...(c.caseExtras || {}), factchecks: forAgents(c.factcheck) };
+    observations(c); persist(c); render(c);
+  }
   async function lookup(c) {
-    if (!c || !c.text || !(SB.server() || {}).online) { render(c); return; }
+    if (!c || !c.text) { render(c); return; }
+    if (isStatic() || !(SB.server() || {}).online) return local(c);
     c.factcheck = { status: 'run', claims: [] }; render(c);
     const p = SB.post('/api/factcheck', { text: c.text })
       .then(r => { c.factcheck = r; })
@@ -69,7 +80,9 @@
     else if (!fc) claims = '<p class="empty">Fact-check lookup needs the Scam Bunker server.</p>';
     else if (fc.status === 'run') claims = '<p class="muted" role="status">Extracting claims and searching published fact-checks…</p>';
     else if (fc.error) claims = `<div class="callout">Could not search fact-checks: ${esc(fc.error)}. Try <a style="color:var(--blue)" href="${EXPLORER_HOME}" target="_blank" rel="noopener">Google Fact Check Explorer ↗</a> by hand.</div>`;
-    else claims = `<p class="muted">${fc.available
+    else claims = `<p class="muted">${fc.local
+      ? 'Claims were extracted in this browser and nothing was sent to a third party. The automatic Google Fact Check Tools search needs the local app (<code>npm start</code>) with <code>GOOGLE_FACTCHECK_API_KEY</code>; here, open each claim in Google Fact Check Explorer.'
+      : fc.available
       ? 'Each claim below was sent to the Google Fact Check Tools API, which searches fact-checks published with ClaimReview markup. A match may be about a different claim. Open it and confirm before relying on the rating.'
       : 'Automatic lookup is off (set <code>GOOGLE_FACTCHECK_API_KEY</code> on the server to enable it). Nothing was sent to a third party. Search each claim in Google Fact Check Explorer by hand.'}</p>
       ${(fc.claims || []).length ? fc.claims.map(cl => claimHtml(cl, fc)).join('') : `<p class="empty">No checkable factual claims found. Claims are sentences with numbers, dates, names, or words such as “cures” or “confirmed”. <a style="color:var(--blue)" href="${EXPLORER_HOME}" target="_blank" rel="noopener">Google Fact Check Explorer ↗</a></p>`}`;
