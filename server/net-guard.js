@@ -36,7 +36,29 @@ async function assertPublicUrl(u) {
 // truncate (stop at maxBytes instead of failing), headers, anyStatus (return non-2xx bodies instead of failing),
 // followRedirects (false: return the 3xx response itself), decompress (gzip/deflate/br, maxBytes applies to the
 // decoded body), isBlocked (ip => bool) and resolve (dns.lookup-compatible): test seams only.
-const DECODERS = new Map([['gzip', zlib.createGunzip], ['x-gzip', zlib.createGunzip], ['deflate', zlib.createInflate], ['br', zlib.createBrotliDecompress]]);
+const { Transform } = require('stream');
+// HTTP "deflate" is meant to be zlib-wrapped, but many servers send raw deflate: pick by the first two bytes.
+function createDeflate() {
+  let inner = null;
+  return new Transform({
+    transform(chunk, _enc, cb) {
+      if (!inner) {
+        inner = chunk.length > 1 && (chunk[0] & 0x0f) === 8 && ((chunk[0] << 8) | chunk[1]) % 31 === 0 ? zlib.createInflate() : zlib.createInflateRaw();
+        inner.on('data', d => this.push(d)); inner.on('error', e => this.destroy(e));
+      }
+      inner.write(chunk, () => cb());
+    },
+    flush(cb) { if (!inner) return cb(); inner.once('end', () => cb()); inner.end(); },
+  });
+}
+const DECODERS = new Map([['gzip', zlib.createGunzip], ['x-gzip', zlib.createGunzip], ['deflate', createDeflate], ['br', zlib.createBrotliDecompress]]);
+// Content-Encoding lists codings in the order applied ("gzip, br"); decode in reverse. Unknown codings, or more than three
+// layers, are left as is.
+function decoderChain(header) {
+  const codings = String(header || '').toLowerCase().split(',').map(c => c.trim()).filter(c => c && c !== 'identity');
+  if (!codings.length || codings.length > 3 || !codings.every(c => DECODERS.has(c))) return null;
+  return codings.reverse().map(c => DECODERS.get(c)());
+}
 function guardedRequest(url, opts = {}) {
   const { maxBytes = 15 * 1024 * 1024, timeoutMs = 15000, maxRedirects = 5, accept = null, truncate = false, headers = {}, isBlocked = isPrivateIp,
     anyStatus = false, followRedirects = true, decompress = false, resolve: resolveHost = dns.lookup } = opts;
@@ -80,12 +102,11 @@ function guardedRequest(url, opts = {}) {
       if (status >= 300 && status < 400 && loc) { res.destroy(); return done(null, result(Buffer.alloc(0))); }
       if (!anyStatus && (status < 200 || status >= 300)) { res.destroy(); return done(httpError(502, `Remote server answered HTTP ${status}`, 'http_status')); }
       if (accept && !accept.test(type)) { res.destroy(); return done(Object.assign(httpError(415, `Not an accepted content type (${type || 'none'})`, 'bad_type'), { contentType: type, finalUrl: cur })); }
-      const enc = String(res.headers['content-encoding'] || '').toLowerCase().trim();
-      const makeDecoder = decompress ? DECODERS.get(enc) : null;
+      const decoders = decompress ? decoderChain(res.headers['content-encoding']) : null;
       const declared = +res.headers['content-length'];
-      if (!truncate && !makeDecoder && declared > maxBytes) { res.destroy(); return done(httpError(413, `File is larger than ${Math.round(maxBytes / 1048576)} MB`, 'too_large')); }
-      const stream = makeDecoder ? res.pipe(makeDecoder()) : res;
-      const stop = () => { res.destroy(); if (stream !== res) stream.destroy(); };
+      if (!truncate && !decoders && declared > maxBytes) { res.destroy(); return done(httpError(413, `File is larger than ${Math.round(maxBytes / 1048576)} MB`, 'too_large')); }
+      const stream = decoders ? decoders.reduce((src, d) => src.pipe(d), res) : res;
+      const stop = () => { res.destroy(); for (const d of decoders || []) d.destroy(); };
       const chunks = []; let size = 0;
       const finish = () => done(null, result(Buffer.concat(chunks)));
       stream.on('data', c => {
@@ -101,7 +122,7 @@ function guardedRequest(url, opts = {}) {
       stream.on('end', finish);
       stream.on('error', e => done(e.status ? e : httpError(502, `Could not read response: ${e.code || e.message}`, 'network')));
       res.on('close', () => { if (!res.complete) done(httpError(502, 'Connection closed before the response ended', 'network')); });
-      if (stream !== res) res.on('error', e => { stream.destroy(); done(e.status ? e : httpError(502, `Could not read response: ${e.code || e.message}`, 'network')); });
+      for (const src of [res, ...(decoders || [])]) if (src !== stream) src.on('error', e => { stop(); done(e.status ? e : httpError(502, `Could not read response: ${e.code || e.message}`, 'network')); });
     });
     const timer = setTimeout(() => req.destroy(httpError(504, 'Timed out', 'timeout')), left);
     req.on('error', e => { clearTimeout(timer); reject(e.status ? e : httpError(502, `Could not fetch: ${e.code || e.message}`, 'network')); });

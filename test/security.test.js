@@ -149,3 +149,17 @@ test('HTML scanning keeps the old results on ordinary pages', () => {
   assert.equal(scan.htmlText('<script>a</script', { skip: ['script'] }).trim(), '');
   assert.deepEqual(scan.rawElements('<script type="application/ld+json">{"a":1}</script>', 'script'), [{ tag: '<script type="application/ld+json">', content: '{"a":1}', closed: true }]);
 });
+
+test('decoding: stacked Content-Encoding and raw or zlib deflate are decoded; unknown codings are left as is', async () => {
+  const text = '<title>Decoded</title>'.repeat(50);
+  const bodies = {
+    '/stacked': ['gzip, br', zlib.brotliCompressSync(zlib.gzipSync(text))],
+    '/raw': ['deflate', zlib.deflateRawSync(text)], '/zlib': ['deflate', zlib.deflateSync(text)],
+    '/unknown': ['gzip, zstd', Buffer.from(text)],
+  };
+  const srv = await listen((q, s) => { const [enc, b] = bodies[q.url]; s.writeHead(200, { 'content-type': 'text/html', 'content-encoding': enc }); s.end(b); });
+  const base = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    for (const p of Object.keys(bodies)) assert.equal((await guardedRequest(base + p, { isBlocked: () => false, decompress: true })).buffer.toString(), text, p);
+  } finally { srv.close(); }
+});
