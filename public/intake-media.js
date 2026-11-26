@@ -558,8 +558,9 @@
   }
   document.addEventListener('sb:case', e => {
     const c = e.detail, r = last;
-    if (!c || !r || r.consumed || !(r.qr.length || (r.ocr && r.ocr.text))) return;
-    if (r.via !== 'adapter' && !(c.imagePreview && c.imagePreview === r.previewSrc)) return;
+    if (!c || !r || c._intakeMediaObs || !(r.qr.length || (r.ocr && r.ocr.text))) return;
+    // Simple mode reads the file again for every check; the Investigator form reuses one reading per attached image.
+    if (r.via === 'adapter' ? r.consumed : !(c.imagePreview && c.imagePreview === r.previewSrc)) return;
     r.consumed = true;
     try { applyToCase(c, r); } catch (err) { console.debug('intake-media: could not add reasons', err); }
   });
@@ -596,7 +597,18 @@
     if (!preview || !textEl) return;
     mode.form = true;
     let waitingGo = false;
+    // What this module typed into the form, so it can be taken out again when the image is removed or replaced.
+    let filled = { text: [], url: '' };
+    const unfill = () => {
+      let t = textEl.value, changed = false;
+      filled.text.forEach(piece => { if (piece && t.includes(piece)) { t = t.replace(piece, ''); changed = true; } });
+      if (changed) textEl.value = t.replace(/\n{3,}/g, '\n\n').trim();
+      if (filled.url && urlEl && urlEl.value === filled.url) { urlEl.value = ''; changed = true; }
+      filled = { text: [], url: '' };
+      if (changed) textEl.dispatchEvent(new Event('input', { bubbles: true }));
+    };
     const onImage = async () => {
+      unfill();
       const src = preview.getAttribute('src');
       // Simple mode already ran the adapters on this file before handing it to the form.
       if (!src || !/^blob:/.test(src) || $('#drop-full')?.hidden || document.documentElement.dataset.simpleState === 'checking') return;
@@ -605,13 +617,14 @@
       const r = await process(file, { text: textEl.value });
       r.previewSrc = src;
       if (preview.getAttribute('src') !== src) return;
-      if (r.ocr && r.ocr.text && !textEl.value.includes(r.ocr.text.slice(0, 40))) textEl.value = textEl.value.trim() ? `${textEl.value.trim()}\n\n${r.ocr.text}` : r.ocr.text;
-      r.qr.forEach(q => { const p = classifyPayload(q); if (p.kind === 'url' && urlEl && !urlEl.value.trim()) urlEl.value = p.url; else { const line = analyzeQr(q).caseText; if (!textEl.value.includes(line)) textEl.value = (textEl.value.trim() ? textEl.value.trim() + '\n' : '') + line; } });
+      const addText = piece => { filled.text.push(piece); textEl.value = textEl.value.trim() ? `${textEl.value.trim()}\n\n${piece}` : piece; };
+      if (r.ocr && r.ocr.text && !textEl.value.includes(r.ocr.text.slice(0, 40))) addText(r.ocr.text);
+      r.qr.forEach(q => { const p = classifyPayload(q); if (p.kind === 'url' && urlEl && !urlEl.value.trim()) { urlEl.value = p.url; filled.url = p.url; } else { const line = analyzeQr(q).caseText; if (!textEl.value.includes(line)) addText(line); } });
       if ((r.ocr && r.ocr.text) || r.qr.length) textEl.dispatchEvent(new Event('input', { bubbles: true }));
       if (waitingGo) { waitingGo = false; go && go.click(); }
     };
     new MutationObserver(onImage).observe(preview, { attributes: true, attributeFilter: ['src'] });
-    $('#clear-img')?.addEventListener('click', () => { if (active) active.ctrl.abort(); waitingGo = false; if (box) box.hidden = true; });
+    $('#clear-img')?.addEventListener('click', () => { if (active) active.ctrl.abort(); waitingGo = false; if (box) box.hidden = true; unfill(); });
     const hold = e => {
       if (!active) return;
       e.preventDefault(); e.stopImmediatePropagation();
