@@ -354,6 +354,9 @@
     const hay = [raw.xmp || '', JSON.stringify(raw.udta || {}), JSON.stringify(raw.keys || {}), JSON.stringify(raw.tags || {}), v.encoder, v.software, v.title, raw.writingApp || '', raw.muxingApp || ''].join('\n');
     if (/trainedAlgorithmicMedia/i.test(hay) || /c2pa\.ai_generat|"ai_generated"\s*:\s*(true\b|"(true|yes)"|1\b)/i.test(hay)) v.ai.signals.push({ label: 'Metadata declares AI generation (IPTC trainedAlgorithmicMedia / C2PA assertion)', strength: 'proof' });
     for (const g of VIDEO_GENERATORS) if (g.re.test(hay)) { v.ai.signals.push({ label: `${g.gen} named in the metadata`, strength: 'strong' }); v.ai.generators.push(g.gen); }
+    // Bare "Runway" / "Pika" are ordinary words, so only count them when they lead a software/encoder field.
+    const softFields = [v.software, v.encoder, raw.writingApp, raw.muxingApp].map(s => String(s || '').trim());
+    for (const [re, gen] of [[/^runway\b/i, 'Runway'], [/^pika\b/i, 'Pika']]) if (!v.ai.generators.includes(gen) && softFields.some(s => re.test(s))) { v.ai.signals.push({ label: `${gen} named as the software that wrote the file`, strength: 'strong' }); v.ai.generators.push(gen); }
     if (v.c2pa) v.notes.push('Content Credentials (C2PA) marker present but not validated. Check it at contentcredentials.org/verify');
     if (v.duration && v.duration <= 10.5 && !v.hasAudio && !v.make && !v.model) v.ai.weak.push(`Short (${v.duration.toFixed(1)} s), silent clip with no device metadata: typical of AI video generators, but also of GIF conversions and edited clips`);
     if (v.fps && [8, 16, 24].includes(Math.round(v.fps)) && !v.make && !v.model && v.duration <= 12) v.ai.weak.push(`${Math.round(v.fps)} fps with no device metadata: a common frame rate for generated clips; phones usually record 30 or 60 fps`);
