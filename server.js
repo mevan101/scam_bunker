@@ -2,6 +2,7 @@
 // AI provider (first match wins): ANTHROPIC_API_KEY · LLM_BASE_URL (+LLM_API_KEY, LLM_MODEL) for any OpenAI-compatible API
 // (Groq, OpenRouter, LM Studio…) · a local Ollama, detected automatically. With none, the claude.ai handoff still works.
 // Optional: FIRECRAWL_API_KEY (web fetch + corroboration search) · SERPAPI_API_KEY (automatic reverse image search)
+// · ETHERSCAN_API_KEY · TRONGRID_API_KEY / TRONSCAN_API_KEY (optional, wallet lookups in server/osint.js)
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -10,6 +11,7 @@ const provenance = require('./server/provenance');
 const factcheck = require('./server/factcheck');
 const corroborate = require('./server/corroborate');
 const events = require('./server/events');
+const osint = require('./server/osint');
 
 const PORT = process.env.PORT || 4400;
 const HOST = process.env.HOST || '127.0.0.1'; // localhost only by default, so others on your network can't spend your API key
@@ -263,6 +265,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && u.pathname === '/api/prompt') return await handlePrompt(req, res);
     if (req.method === 'POST' && u.pathname === '/api/fetch') return await handleFetch(req, res);
     if (req.method === 'POST' && u.pathname === '/api/search') return await handleSearch(req, res);
+    if (req.method === 'POST' && osint.routes[u.pathname]) return await osint.routes[u.pathname](await readBody(req, 64 * 1024), res, send);
     if (req.method === 'POST' && factcheck.routes[u.pathname]) return send(res, 200, await factcheck.routes[u.pathname](await readBody(req)));
     if (req.method === 'POST' && u.pathname === '/api/events/extract') return send(res, 200, await events.extractFromUrl((await readBody(req)).url));
     if (req.method === 'POST' && provenance.routes[u.pathname]) return send(res, 200, await provenance.routes[u.pathname](await readBody(req)));

@@ -34,7 +34,7 @@ How I want you to work:
   const VERDICT_COLOR = { 'Scam': 'var(--red)', 'Likely scam': 'var(--red)', 'Suspicious': 'var(--amber)', 'Misleading / manipulated': 'var(--amber)', 'Coordinated / inauthentic': 'var(--violet)', 'AI-generated content': 'var(--violet)', 'Edited image': 'var(--amber)', 'Likely legitimate': 'var(--green)', 'No strong red flags': 'var(--green)', 'Insufficient evidence': 'var(--muted)' };
 
   const SAMPLES = {
-    crypto: { platform: 'Instagram', url: 'https://instagram.com/coinbase.support_desk', text: `Hello dear 😊 sorry, I think I texted the wrong number... but you seem very kind. My uncle is an expert trader and he taught me how to earn 30% daily profit on USDT. It's guaranteed and risk-free, I already made $48,000 this month!\n\nIf you want I can be your mentor. Just download the app from https://coinbase-pro-wallet.xyz/login and deposit 500 USDT to start. Send to TJYeasTPa6gpEEfYqCP9sMBc7NJqKPDJvT\n\nAct now, only 3 spots left this week. Please don't tell anyone, keep it between us. Message me on WhatsApp +44 7700 900123` },
+    crypto: { platform: 'Instagram', url: 'https://instagram.com/coinbase.support_desk', text: `Hello dear 😊 sorry, I think I texted the wrong number... but you seem very kind. My uncle is an expert trader and he taught me how to earn 30% daily profit on USDT. It's guaranteed and risk-free, I already made $48,000 this month!\n\nIf you want I can be your mentor. Just download the app from https://coinbase-pro-wallet.xyz/login and deposit 500 USDT to start. Send to TEYn928TQKfNmvWSAm7RYc5CG8NJQw5B6S\n\nAct now, only 3 spots left this week. Please don't tell anyone, keep it between us. Message me on WhatsApp +44 7700 900123` },
     job: { platform: 'LinkedIn', url: 'https://lnkd.in/eXq3Zt9', text: `Hi! I'm a recruiter at Amaz0n Global Talent. We reviewed your profile and you've been selected for a remote job — no experience required. Earn $350 per day reviewing products from home (task-based, 1-2 hours).\n\nTo activate your account you will need to pay a $95 training fee for the starter kit, refunded with your first salary. Please contact our HR manager on Telegram @amazon_hr_onboarding to continue. Limited slots, reply within 24 hours.` },
     phish: { platform: 'Email / SMS', url: 'http://chase.com.secure-verify-account.top/signin?ref=sms', text: `CHASE ALERT: Unusual sign-in activity detected on your account. Your account has been temporarily suspended. To restore access, verify your identity and confirm your card details immediately: http://chase.com.secure-verify-account.top/signin\nDo not share this message. Reply STOP to opt out.` },
     viral: { platform: 'Facebook', url: '', text: `BREAKING 🚨 SHARE BEFORE IT'S DELETED!! Doctors don't want you to know this: a simple lemon and baking soda drink cures cancer in 7 days. Scientists confirm it is 100% TRUE but the mainstream media won't report it because big pharma pays them. Do your own research. Wake up people! Type AMEN if you agree and tag 10 friends 🙏🙏🙏` },
@@ -432,14 +432,16 @@ How I want you to work:
     const repeat = Object.values(idx).filter(i => i.n > 1).sort((a, b) => b.n - a.n);
     $('#offender-index').innerHTML = repeat.length ? `<h4>Repeat offenders across your cases</h4><ul class="list red">${repeat.slice(0, 12).map(i => `<li><b>${esc(i.label)}</b> · ${esc(i.type)} · in ${i.n} cases</li>`).join('')}</ul>` : '';
     $('#history-list').innerHTML = list.length ? list.map(x => `<div class="hist" data-id="${x.id}"><span class="d" style="background:${VERDICT_COLOR[x.verdict] || 'var(--muted)'}"></span><div class="t"><b>${esc(x.verdict)} · ${x.risk}</b><span>${esc(x.text || x.url || 'Image case')}</span></div><small class="muted">${new Date(x.at).toLocaleDateString()}</small></div>`).join('') : '<p class="empty">No saved cases yet.</p>';
-    $$('#history-list .hist').forEach(el => el.addEventListener('click', () => {
-      const x = list.find(i => i.id === el.dataset.id); if (!x) return;
-      current = { ...x, imagePreview: null, forensics: x.forensics ? { ...x.forensics, reverse: [], timeline: x.forensics.timeline || [], ai: x.forensics.ai, elaUrl: '' } : null };
-      $('#text').value = x.text; $('#url').value = x.url || '';
-      $('#placeholder').hidden = true; $('#report').hidden = false; renderAll(current); showTab('deduction'); $('#dlg-history').close();
-    }));
+    $$('#history-list .hist').forEach(el => el.addEventListener('click', () => { if (openCase(el.dataset.id)) $('#dlg-history').close(); }));
     $('#dlg-history').showModal();
   });
+  function openCase(id) {
+    const x = store.get('scambunker.cases', []).find(i => i.id === id); if (!x) return false;
+    current = { ...x, imagePreview: null, forensics: x.forensics ? { ...x.forensics, reverse: [], timeline: x.forensics.timeline || [], ai: x.forensics.ai, elaUrl: '' } : null };
+    $('#text').value = x.text; $('#url').value = x.url || '';
+    $('#placeholder').hidden = true; $('#report').hidden = false; renderAll(current); showTab('deduction');
+    return true;
+  }
   $('#history-clear').addEventListener('click', () => { store.set('scambunker.cases', []); $('#history-list').innerHTML = '<p class="empty">No saved cases yet.</p>'; });
 
   // ---------- Persona ----------
@@ -463,7 +465,7 @@ How I want you to work:
   function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); }
 
   // Public API for feature modules (public/*.js) — see CONTRIBUTING.md
-  window.ScamBunker = { get current() { return current; }, esc, post, toast, panel, showTab, store, renderAll: () => current && renderAll(current), server: () => server };
+  window.ScamBunker = { get current() { return current; }, esc, post, toast, panel, showTab, store, renderAll: () => current && renderAll(current), openCase, server: () => server };
 
   init();
 })();
