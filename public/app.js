@@ -117,9 +117,11 @@ How I want you to work:
         try { c.corroboration = (await post('/api/search', { query: q })).results; } catch { }
       }
 
+      await Promise.allSettled(c.pending || []); // async module lookups (e.g. fact-checks) that feed the agents
+
       // 3. Agent team
       if (server.ai) {
-        const caseData = { persona: c.persona, platform: c.platform, url, text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown ? `${c.page.title || ''}\n${JSON.stringify(c.page.redirects || '')}\n${c.page.markdown}` : null, corroboration: c.corroboration, imageData: c.forensics?.visionData };
+        const caseData = { persona: c.persona, platform: c.platform, url, text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown ? `${c.page.title || ''}\n${JSON.stringify(c.page.redirects || '')}\n${c.page.markdown}` : null, corroboration: c.corroboration, imageData: c.forensics?.visionData, ...c.caseExtras };
         const roster = ['scam', 'osint', 'factcheck']; if (c.forensics) roster.unshift('forensics');
         roster.forEach(a => c.agents[a] = { status: 'run' }); c.agents.lead = { status: 'wait' };
         renderAgents(c); $('#agents-count').textContent = '…';
@@ -401,7 +403,7 @@ How I want you to work:
     const c = current; if (!c) return;
     let prompt;
     try {
-      ({ prompt } = await post('/api/prompt', { hasImage: !!c.forensics, case: { persona: c.persona, platform: c.platform, url: c.url, text: c.text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown || null, corroboration: c.corroboration } }));
+      ({ prompt } = await post('/api/prompt', { hasImage: !!c.forensics, case: { persona: c.persona, platform: c.platform, url: c.url, text: c.text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown || null, corroboration: c.corroboration, ...c.caseExtras } }));
     } catch (e) { toast('Could not build the prompt: ' + e.message); return; }
     let copied = false; try { await navigator.clipboard.writeText(prompt); copied = true; } catch { }
     const short = prompt.length < 7000;
