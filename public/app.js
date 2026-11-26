@@ -310,7 +310,7 @@ How I want you to work:
     $('#v-title').textContent = v.verdict || 'Analysing…';
     $('#v-headline').textContent = v.headline || '';
     $('#v-source').textContent = c.final ? `Final verdict · lead investigator after ${Object.keys(c.agents).length - 1} reports` : server.ai ? 'Preliminary · local engines, agents deliberating…' : 'Local engines · press “Investigate with Claude” for the agent team';
-    const tags = [v.estimative, v.category, v.confidence != null && `confidence ${v.confidence}%`, c.platform, c.forensics && `AI: ${(v.ai_involvement || {}).assessment || c.forensics.ai.verdict}`].filter(Boolean);
+    const tags = [v.estimative, v.category, !v.estimative && v.confidence != null && `signal strength ${v.confidence}%`, c.platform, c.forensics && `AI: ${(v.ai_involvement || {}).assessment || c.forensics.ai.verdict}`].filter(Boolean);
     $('#v-tags').innerHTML = tags.map(t => `<span class="tag">${esc(t)}</span>`).join('');
     const risk = +v.risk || 0; $('#g-val').textContent = risk; $('#g-fg').style.strokeDashoffset = 314 - 314 * risk / 100;
   }
@@ -452,7 +452,7 @@ How I want you to work:
   // ---------- Export ----------
   function summaryText(c) {
     const v = V(c);
-    return [`DEDUCE CASE REPORT · ${new Date(c.at).toLocaleString()}`, `Verdict: ${v.verdict} (${v.category}) · risk ${v.risk}/100 · confidence ${v.confidence}%`, v.estimative && `Assessment: ${v.estimative}`, c.platform && `Platform: ${c.platform}`, c.url && `URL: ${c.url}`, '', v.headline, '', 'DEDUCTION', v.deduction, '', 'EVIDENCE', ...(v.observations || []).map(o => `- [${o.weight}${o.grade ? ' · ' + o.grade : ''}] ${o.fact} → ${o.inference}`),
+    return [`SCAM BUNKER CASE REPORT · ${new Date(c.at).toLocaleString()}`, `Verdict: ${v.verdict} (${v.category}) · risk ${v.risk}/100${v.estimative ? '' : ` · signal strength ${v.confidence}%`}`, v.estimative && `Assessment: ${v.estimative}`, c.platform && `Platform: ${c.platform}`, c.url && `URL: ${c.url}`, '', v.headline, '', 'DEDUCTION', v.deduction, '', 'EVIDENCE', ...(v.observations || []).map(o => `- [${o.weight}${o.grade ? ' · ' + o.grade : ''}] ${o.fact} → ${o.inference}`),
       v.image_dating && `\nIMAGE DATING: ${v.image_dating.earliest || 'unknown'}, ${v.image_dating.basis}`, v.ai_involvement && `AI INVOLVEMENT: ${v.ai_involvement.assessment}, ${v.ai_involvement.basis}`,
       (v.hidden_info || []).length && '\nHIDDEN INFO\n' + v.hidden_info.map(x => '- ' + x).join('\n'), ...(c.provenance?.reportLines || []), ...(c.grading?.reportLines || []), '\nNEXT STEPS', ...(v.next_steps || []).map(x => '- ' + x), '\nADVICE', v.advice].filter(x => x !== null && x !== undefined && x !== false).join('\n');
   }
