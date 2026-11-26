@@ -104,6 +104,7 @@ How I want you to work:
       c.offenders = matchOffenders(c);
       c.local = localVerdict(c);
       renderAll(c);
+      document.dispatchEvent(new CustomEvent('sb:case', { detail: c })); // modules hook in here
 
       // 2. Web fetch + corroboration
       if (url && server.online) {
@@ -136,6 +137,7 @@ How I want you to work:
         renderAll(c);
       }
       saveCase(c);
+      document.dispatchEvent(new CustomEvent('sb:case-complete', { detail: c }));
     } catch (e) {
       console.error(e); toast('Something went wrong: ' + e.message);
     } finally { go.disabled = false; go.firstElementChild.textContent = 'Open investigation'; }
@@ -449,6 +451,9 @@ How I want you to work:
   });
 
   function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); }
+
+  // Public API for feature modules (public/*.js) — see CONTRIBUTING.md
+  window.ScamBunker = { get current() { return current; }, esc, post, toast, panel, showTab, store, renderAll: () => current && renderAll(current), server: () => server };
 
   init();
 })();
