@@ -26,7 +26,7 @@ const clean = s => String(s || '').replace(/https?:\/\/\S+/g, ' ').replace(/[\u{
 function sentences(text) {
   const out = [];
   for (const line of String(text || '').split(/\n+/)) {
-    for (const part of line.split(/(?<=[.!?…])\s+|[!?]{2,}\s*/)) {
+    for (const part of line.split(/(?<=[.!?…])\s+|(?<=[!?]{2})(?=\S)/)) {
       // "Doctors don't want you to know this: <claim>" → keep the claim after the colon when it is substantial
       const i = part.indexOf(': ');
       if (i > 0 && part.slice(i + 2).split(/\s+/).length >= 5) out.push(part.slice(0, i), part.slice(i + 2)); else out.push(part);

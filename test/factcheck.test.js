@@ -38,6 +38,7 @@ const VIRAL = "BREAKING 🚨 SHARE BEFORE IT'S DELETED!! Doctors don't want you 
     assert.deepStrictEqual(F.extractClaims('Did the government really ban 5 kinds of bread in 2025?'), []);
     assert.deepStrictEqual(F.extractClaims('My uncle is an expert trader and he taught me how to earn 30% daily profit on USDT.'), []);
     assert.deepStrictEqual(F.extractClaims(''), []);
+    assert.deepStrictEqual(F.extractClaims('Did the government really ban 5 kinds of bread in 2025?! Officials say 12 bakeries in Northvale closed in 2026??'), []);
   });
   await test('claims: URLs, hashtags and handles are stripped from claim text', () => {
     const c = F.extractClaims('Scientists confirmed in 2026 that the moon is hollow https://example.org/x #truth @someone_example');
