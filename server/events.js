@@ -5,6 +5,7 @@ const http = require('http');
 const https = require('https');
 const dns = require('dns');
 const { Readable } = require('stream');
+const zlib = require('zlib');
 const { assertPublicUrl, isPrivateIp, httpError } = require('./net-guard');
 const core = require('../public/events-core');
 
@@ -35,9 +36,13 @@ function pinnedLookup(hostname, options, cb) {
 function guardedHop(url, { headers = {}, timeoutMs = 12000 } = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
-    const req = (u.protocol === 'https:' ? https : http).get(u, { lookup: pinnedLookup, headers: { ...headers, 'Accept-Encoding': 'identity' } }, res => {
+    const req = (u.protocol === 'https:' ? https : http).get(u, { lookup: pinnedLookup, headers: { ...headers, 'Accept-Encoding': 'gzip, deflate, br' } }, res => {
       res.on('close', () => clearTimeout(timer));
-      resolve({ status: res.statusCode, headers: { get: k => { const v = res.headers[k.toLowerCase()]; return Array.isArray(v) ? v.join(', ') : v ?? null; } }, body: Readable.toWeb(res) });
+      const enc = String(res.headers['content-encoding'] || '').toLowerCase().trim();
+      const unzip = { gzip: zlib.createGunzip, 'x-gzip': zlib.createGunzip, deflate: zlib.createInflate, br: zlib.createBrotliDecompress }[enc];
+      const stream = unzip ? res.pipe(unzip()) : res;
+      if (unzip) res.on('error', e => stream.destroy(e));
+      resolve({ status: res.statusCode, headers: { get: k => { const v = res.headers[k.toLowerCase()]; return Array.isArray(v) ? v.join(', ') : v ?? null; } }, body: Readable.toWeb(stream) });
     });
     const timer = setTimeout(() => req.destroy(httpError(504, 'Timed out', 'timeout')), timeoutMs);
     req.on('error', e => { clearTimeout(timer); reject(e.status ? e : httpError(502, `Could not fetch: ${e.code || e.message}`, 'network')); });
@@ -115,7 +120,8 @@ function parseJsonLd(html) {
       const loc = [].concat(n.location || [])[0] || {};
       const place = typeof loc === 'string' ? { name: loc } : loc;
       const addr = place.address;
-      const geo = place.geo && Number.isFinite(+place.geo.latitude) && Number.isFinite(+place.geo.longitude) ? { lat: +place.geo.latitude, lon: +place.geo.longitude } : null;
+      const num = v => v === null || v === undefined || v === '' ? NaN : +v, la = num(place.geo?.latitude), lo = num(place.geo?.longitude);
+      const geo = Number.isFinite(la) && Number.isFinite(lo) && (la || lo) ? { lat: la, lon: lo } : null;
       out.push({
         title: clean(n.name), start: n.startDate ? String(n.startDate).trim() : '', end: n.endDate ? String(n.endDate).trim() : '',
         timeZone: n.eventSchedule?.scheduleTimezone || n.timezone || n.timeZone || '',
@@ -341,6 +347,7 @@ function extractFromHtml(html, { baseUrl = '', fetchedYear = new Date().getUTCFu
 
 async function extractFromUrl(url, opts = {}) {
   if (!/^https?:\/\//i.test(url || '')) throw httpError(400, 'Only http(s) listing URLs can be fetched');
+  if (/^https?:\/\/[^/?#]*@/i.test(url)) throw httpError(400, 'URLs with embedded credentials are not fetched');
   const page = await fetchFollow(url, opts);
   const out = { url, finalUrl: page.finalUrl, redirects: page.chain, status: page.status, contentType: page.contentType, fetchedAt: new Date().toISOString() };
   let r;

@@ -96,7 +96,7 @@
   function isShortener(u) { const x = safeUrl(u); return !!x && SHORTENERS.test(x.hostname); }
   function eventIdFromUrl(u) {
     const x = safeUrl(u); if (!x || isShortener(u)) return null;
-    const host = x.hostname.replace(/^www\./, ''), segs = x.pathname.split('/').filter(Boolean).map(s => decodeURIComponent(s));
+    const host = x.hostname.replace(/^www\./, ''), segs = x.pathname.split('/').filter(Boolean).map(s => { try { return decodeURIComponent(s); } catch { return s; } });
     const { platform } = platformOf(u);
     const out = (id, kind) => id ? { platform, id: String(id), kind } : null;
     let m;
@@ -141,7 +141,7 @@
   function isOnline(l) { return !l.venueAddress && !l.geo && ONLINE.test(l.venueName || ''); }
   function venueMatch(a, b) {
     if (isOnline(a) || isOnline(b)) return { score: 0, basis: 'online event' };
-    const geoOk = g => g && Number.isFinite(g.lat) && Number.isFinite(g.lon);
+    const geoOk = g => g && Number.isFinite(g.lat) && Number.isFinite(g.lon) && (g.lat || g.lon);
     if (geoOk(a.geo) && geoOk(b.geo)) {
       const d = haversineM(a.geo, b.geo);
       if (d <= 100) return { score: 0.95, basis: `coordinates ${Math.round(d)} m apart` };

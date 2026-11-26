@@ -273,3 +273,19 @@ test('venue match: same name but far-apart coordinates or unrelated addresses is
   const c = core.venueMatch({ venueName: 'Community Hall', venueAddress: '12 Lakeview Road' }, { venueName: 'Community Hall', venueAddress: '7 Quay Street' });
   assert.ok(c.score < 0.85);
 });
+
+test('fetch hardening: gzip bodies are decoded, credential URLs refused, odd paths and null geo tolerated', async () => {
+  const zlib = require('zlib');
+  const html = fx('jsonld-event.html');
+  const srv = require('http').createServer((q, s) => { s.writeHead(200, { 'content-type': 'text/html', 'content-encoding': 'gzip' }); s.end(zlib.gzipSync(html)); });
+  await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  try {
+    const r = await ev.fetchFollow(`http://127.0.0.1:${srv.address().port}/`, { guard: async () => {} }); // IP literal: no DNS lookup, guard stubbed
+    assert.equal(r.body, html);
+  } finally { srv.close(); }
+  await assert.rejects(ev.extractFromUrl('https://user:secret@example.org/e/1'), /embedded credentials/);
+  assert.doesNotThrow(() => core.eventIdFromUrl('https://www.meetup.com/g/events/%E0%A4%A/'));
+  const r = ev.extractFromHtml('<script type="application/ld+json">{"@type":"Event","name":"X","startDate":"2025-11-02T10:00:00+06:00","location":{"@type":"Place","name":"Hall","geo":{"latitude":null,"longitude":null}}}</script>');
+  assert.equal(r.fields.geo, undefined);
+  assert.ok(core.venueMatch({ venueName: 'Hall A', venueAddress: '1 Main St', geo: { lat: 0, lon: 0 } }, { venueName: 'Hall A', venueAddress: '1 Main St', geo: { lat: 23.7, lon: 90.4 } }).score >= 0.85);
+});
