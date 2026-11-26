@@ -31,8 +31,12 @@ function metaRefreshUrl(html) {
   for (const tag of html$.tagsNamed(html, ['meta'])) {
     const a = attrs(tag);
     if ((a['http-equiv'] || '').toLowerCase() !== 'refresh') continue;
-    const m = /^\s*\d+\s*;\s*url\s*=\s*["']?([^"'>\s]+)/i.exec(a.content || '');
-    if (m) return m[1];
+    const m = /^\s*\d+(?:\.\d*)?\s*[;,]\s*url\s*=\s*(\S[\s\S]*)$/i.exec(a.content || '');
+    if (!m) continue;
+    const v = m[1].trim(), q = v[0];
+    const end = v.indexOf(q, 1);
+    const url = q === '"' || q === "'" ? v.slice(1, end === -1 ? undefined : end) : v; // like browsers: a quoted URL ends at its quote
+    if (url) return url;
   }
   return null;
 }
