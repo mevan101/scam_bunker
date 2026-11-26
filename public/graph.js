@@ -446,11 +446,12 @@
     return best;
   }
   function bindSvg(svg) {
-    let drag = null;
+    let drag = null, pointerAt = -1e9;
     const pt = e => { const r = svg.getBoundingClientRect(); return [(e.clientX - r.left) * view.w / r.width, (e.clientY - r.top) * view.h / r.height]; };
     svg.addEventListener('pointerdown', e => { if (e.button !== 0) return; const [x, y] = pt(e); drag = { x, y, tx: view.tx, ty: view.ty, moved: false, node: e.target.closest('.lg-n'), id: e.pointerId }; });
     svg.addEventListener('pointermove', e => {
       if (!drag || drag.id !== e.pointerId) return;
+      pointerAt = performance.now();
       const [x, y] = pt(e);
       if (!drag.moved && Math.hypot(x - drag.x, y - drag.y) > 4) { drag.moved = true; svg.setPointerCapture(e.pointerId); svg.classList.add('lg-panning'); }
       if (drag.moved) { view.tx = drag.tx + x - drag.x; view.ty = drag.ty + y - drag.y; apply(); }
@@ -474,6 +475,8 @@
       if (e.key === 'Home') { e.preventDefault(); select(0, { focus: true, pan: true }); return; }
       if (e.key === 'End') { e.preventDefault(); select(g.nodes.length - 1, { focus: true, pan: true }); }
     });
+    // Screen readers may activate a node with a bare click (no pointer events); pointer clicks are handled on pointerup.
+    svg.addEventListener('click', e => { if (performance.now() - pointerAt < 500) return; const n = e.target.closest('.lg-n'); if (n) select(+n.dataset.i, { focus: true }); });
     svg.addEventListener('focusin', e => { const n = e.target.closest('.lg-n'); if (n && sel !== +n.dataset.i) select(+n.dataset.i); });
   }
 
