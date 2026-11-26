@@ -5,7 +5,7 @@
 //   POST /api/osint/wallet   {chain, address}     public ledger summary (BTC: mempool.space, TRON: TronGrid, ETH: Etherscan with key)
 const fs = require('fs');
 const path = require('path');
-const { assertPublicUrl } = require('./net-guard');
+const { guardedRequest } = require('./net-guard');
 
 const UA = 'Mozilla/5.0 (compatible; ScamBunker/0.1; open-source scam investigation tool)';
 const SITE_TIMEOUT = 8000;
@@ -47,37 +47,24 @@ function normalizeChain(c, address = '') {
 }
 const EXPLORER = { btc: a => `https://mempool.space/address/${a}`, tron: a => `https://tronscan.org/#/address/${a}`, eth: a => `https://etherscan.io/address/${a}` };
 
-// ---------- Guarded fetch: SSRF check on every hop, manual redirects, capped body ----------
-async function guardedFetch(url, { timeout = SITE_TIMEOUT, maxRedirects = 5, headers = {}, signal } = {}) {
-  const sig = signal || AbortSignal.timeout(timeout);
+// ---------- Guarded fetch: connect-time address check on every hop, manual redirects, capped body ----------
+// guardedRequest checks the address each socket actually connects to, so a DNS-rebinding answer cannot slip past.
+async function guardedFetch(url, { timeout = SITE_TIMEOUT, maxRedirects = 5, headers = {}, maxBytes = MAX_BODY, isBlocked, resolve } = {}) {
+  const deadline = Date.now() + timeout;
   const redirects = [];
   let cur = url;
   for (let hop = 0; hop <= maxRedirects; hop++) {
-    await assertPublicUrl(cur);
-    const r = await fetch(cur, { redirect: 'manual', signal: sig, headers: { 'User-Agent': UA, 'Accept-Language': 'en', ...headers } });
-    const loc = r.headers.get('location');
-    if (r.status >= 300 && r.status < 400 && loc) {
+    const r = await guardedRequest(cur, { followRedirects: false, anyStatus: true, decompress: true, truncate: true, maxBytes, timeoutMs: Math.max(1, deadline - Date.now()),
+      headers: { 'User-Agent': UA, 'Accept-Language': 'en', ...headers }, ...(isBlocked ? { isBlocked } : {}), ...(resolve ? { resolve } : {}) });
+    const hdrs = { get: k => { const v = r.headers[String(k).toLowerCase()]; return Array.isArray(v) ? v.join(', ') : v ?? null; } };
+    if (r.status >= 300 && r.status < 400 && r.location) {
       redirects.push({ url: cur, status: r.status });
-      try { await r.body?.cancel(); } catch { /* ignore */ }
-      cur = new URL(loc, cur).href;
+      cur = new URL(r.location, cur).href;
       continue;
     }
-    return { status: r.status, finalUrl: cur, redirects, body: await readCapped(r), headers: r.headers };
+    return { status: r.status, finalUrl: cur, redirects, body: r.buffer.toString('utf8'), headers: hdrs };
   }
   return { status: 310, finalUrl: cur, redirects, body: '', tooManyRedirects: true };
-}
-async function readCapped(r, max = MAX_BODY) {
-  if (!r.body) return '';
-  const reader = r.body.getReader(); const chunks = []; let n = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value); n += value.length;
-      if (n >= max) { await reader.cancel(); break; }
-    }
-  } catch { /* partial body is fine */ }
-  return Buffer.concat(chunks.map(c => Buffer.from(c))).toString('utf8');
 }
 
 // ---------- Username sweep ----------
@@ -137,7 +124,7 @@ async function checkSite(site, username, fetcher = guardedFetch) {
     const c = classify(site, resp, username);
     return { ...base, status: c.status, httpStatus: resp.status, ms: Date.now() - t0, ...(c.note ? { note: c.note } : {}) };
   } catch (e) {
-    const timedOut = e.name === 'TimeoutError' || e.name === 'AbortError';
+    const timedOut = e.code === 'timeout' || e.name === 'TimeoutError' || e.name === 'AbortError';
     return { ...base, status: 'unknown', ms: Date.now() - t0, note: timedOut ? `No answer within ${SITE_TIMEOUT / 1000}s` : `Network error: ${e.cause?.code || e.message}` };
   }
 }
@@ -364,4 +351,4 @@ async function handleWallet(body, res, send) {
 
 const routes = { '/api/osint/username': handleUsername, '/api/osint/domain': handleDomain, '/api/osint/wallet': handleWallet };
 
-module.exports = { routes, validateUsername, validateDomain, normalizeChain, classify, checkSite, pool, parseRdap, domainCandidates, parseMempoolAddress, parseMempoolTxs, parseTronscan, parseTrongridAccount, parseTrc20Transfers, rateLimiter, sites, USERNAME_RE, WALLET_RE };
+module.exports = { routes, guardedFetch, validateUsername, validateDomain, normalizeChain, classify, checkSite, pool, parseRdap, domainCandidates, parseMempoolAddress, parseMempoolTxs, parseTronscan, parseTrongridAccount, parseTrc20Transfers, rateLimiter, sites, USERNAME_RE, WALLET_RE };

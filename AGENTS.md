@@ -14,7 +14,7 @@ Several agents (Claude Code, Devin) and humans work on this repo in parallel. Th
   - Agent briefs and the handoff prompt live in `public/shared/prompt.js`, which both the server and the browser load. Edit them there.
   - Keep edits to `public/app.js`, `public/index.html`, `server.js` minimal (a script tag, a route line, a tab button).
 - **Design system.** Use the existing CSS custom properties and component classes (see `docs/DESIGN.md` once merged). Do not restyle globally.
-- **Security.** Any server-side fetch of a user-supplied URL must go through `assertPublicUrl` (SSRF guard), re-checked on every redirect. Escape all user/remote content with `esc()` before inserting HTML. Only render `http(s)` links.
+- **Security.** Any server-side fetch of a user-supplied or remote URL must go through `guardedRequest` in `server/net-guard.js` (address checked at connect time on every redirect hop, size cap, timeout). `assertPublicUrl` + `fetch()` is not enough: `fetch` resolves DNS again. Parse remote HTML with `server/html-scan.js`, not lazy `[\s\S]*?` regexes. The local API refuses foreign `Host`/`Origin` and non-JSON POSTs; send `Content-Type: application/json`. Escape all user/remote content with `esc()` before inserting HTML. Only render `http(s)` links.
 - **Accessibility.** WCAG 2.2 AA: labels, keyboard access, visible focus, 4.5:1 contrast in both themes.
 - **Tests.** Add zero-dependency tests under `test/` and make sure `npm test` passes. Verify UI changes in a real browser (Playwright) before opening a PR.
 

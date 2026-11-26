@@ -1,12 +1,8 @@
 // Event-listing extraction: fetch a listing page through the SSRF guard and pull out scheduling facts.
 // Preference order per field: schema.org Event JSON-LD > OpenGraph/meta > .ics / Google Calendar link > visible text.
 // Every field carries its source so the UI and the claims ledger can show provenance.
-const http = require('http');
-const https = require('https');
-const dns = require('dns');
-const { Readable } = require('stream');
-const zlib = require('zlib');
-const { assertPublicUrl, isPrivateIp, httpError } = require('./net-guard');
+const { assertPublicUrl, guardedRequest, httpError } = require('./net-guard');
+const html$ = require('./html-scan');
 const core = require('../public/events-core');
 
 const UA = 'Mozilla/5.0 (compatible; ScamBunkerEventCheck/1.0; +https://github.com/mevan101/scam_bunker)';
@@ -14,6 +10,7 @@ const MAX_HOPS = 8;
 
 // ---------- Fetch (guard re-checked on every hop, chain recorded) ----------
 async function readCapped(res, maxBytes) {
+  if (Buffer.isBuffer(res.body)) return res.body.subarray(0, maxBytes).toString('utf8');
   const reader = res.body?.getReader(); if (!reader) return '';
   const chunks = []; let size = 0;
   while (true) {
@@ -23,47 +20,38 @@ async function readCapped(res, maxBytes) {
   }
   return Buffer.concat(chunks.map(c => Buffer.from(c))).subarray(0, maxBytes).toString('utf8');
 }
-// Single GET without following redirects. The address is checked again at connect time (pinned DNS lookup), so a
-// rebinding resolver cannot pass assertPublicUrl with one answer and connect to another.
-function pinnedLookup(hostname, options, cb) {
-  dns.lookup(hostname, { ...options, all: true }, (err, addrs) => {
-    if (err) return cb(err);
-    if (!addrs.length || addrs.some(a => isPrivateIp(a.address))) return cb(httpError(403, 'Refusing to fetch a private or local network address', 'ssrf_blocked'));
-    if (options && options.all) return cb(null, addrs);
-    cb(null, addrs[0].address, addrs[0].family);
-  });
+// Single GET without following redirects, through guardedRequest: the address is checked at connect time, so a
+// rebinding resolver cannot pass assertPublicUrl with one answer and connect to another. Body capped at maxBytes.
+async function guardedHop(url, { headers = {}, timeoutMs = 12000, maxBytes = 1500000, isBlocked, resolve } = {}) {
+  const r = await guardedRequest(url, { followRedirects: false, anyStatus: true, decompress: true, truncate: true, maxBytes, timeoutMs, headers,
+    ...(isBlocked ? { isBlocked } : {}), ...(resolve ? { resolve } : {}) });
+  return { status: r.status, headers: { get: k => { const v = r.headers[k.toLowerCase()]; return Array.isArray(v) ? v.join(', ') : v ?? null; } }, body: r.buffer };
 }
-const DECODERS = new Map([['gzip', zlib.createGunzip], ['x-gzip', zlib.createGunzip], ['deflate', zlib.createInflate], ['br', zlib.createBrotliDecompress]]);
-
-function guardedHop(url, { headers = {}, timeoutMs = 12000 } = {}) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const req = (u.protocol === 'https:' ? https : http).get(u, { lookup: pinnedLookup, headers: { ...headers, 'Accept-Encoding': 'gzip, deflate, br' } }, res => {
-      res.on('close', () => clearTimeout(timer));
-      try {
-      const enc = String(res.headers['content-encoding'] || '').toLowerCase().trim();
-      const unzip = DECODERS.get(enc);
-      const stream = unzip ? res.pipe(unzip()) : res;
-      if (unzip) res.on('error', e => stream.destroy(e));
-      resolve({ status: res.statusCode, headers: { get: k => { const v = res.headers[k.toLowerCase()]; return Array.isArray(v) ? v.join(', ') : v ?? null; } }, body: Readable.toWeb(stream) });
-      } catch (e) { res.destroy(); reject(httpError(502, `Could not read response: ${e.message}`, 'network')); }
-    });
-    const timer = setTimeout(() => req.destroy(httpError(504, 'Timed out', 'timeout')), timeoutMs);
-    req.on('error', e => { clearTimeout(timer); reject(e.status ? e : httpError(502, `Could not fetch: ${e.code || e.message}`, 'network')); });
-  });
+function metaRefreshUrl(html) {
+  for (const tag of html$.tagsNamed(html, ['meta'])) {
+    const a = attrs(tag);
+    if ((a['http-equiv'] || '').toLowerCase() !== 'refresh') continue;
+    const m = /^\s*\d+(?:\.\d*)?\s*[;,]\s*url\s*=\s*(\S[\s\S]*)$/i.exec(a.content || '');
+    if (!m) continue;
+    const v = m[1].trim(), q = v[0];
+    const end = v.indexOf(q, 1);
+    const url = q === '"' || q === "'" ? v.slice(1, end === -1 ? undefined : end) : v; // like browsers: a quoted URL ends at its quote
+    if (url) return url;
+  }
+  return null;
 }
-async function fetchFollow(url, { maxBytes = 1500000, fetchImpl = guardedHop, guard = assertPublicUrl } = {}) {
+async function fetchFollow(url, { maxBytes = 1500000, fetchImpl = guardedHop, guard = assertPublicUrl, isBlocked, resolve } = {}) {
   const chain = []; let cur = url, metaRefreshUsed = false;
   for (let i = 0; i < MAX_HOPS; i++) {
     await guard(cur);
-    const r = await fetchImpl(cur, { redirect: 'manual', headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,text/calendar;q=0.9,*/*;q=0.5' }, signal: AbortSignal.timeout(12000) });
+    const r = await fetchImpl(cur, { redirect: 'manual', maxBytes, isBlocked, resolve, headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,text/calendar;q=0.9,*/*;q=0.5' }, signal: AbortSignal.timeout(12000) });
     const loc = r.headers.get('location');
     chain.push({ url: cur, status: r.status });
     if (r.status >= 300 && r.status < 400 && loc) { await r.body?.cancel?.().catch(() => {}); cur = new URL(loc, cur).href; continue; }
     const contentType = r.headers.get('content-type') || '';
     const body = await readCapped(r, maxBytes);
-    const refresh = !metaRefreshUsed && /html/i.test(contentType) && /<meta[^>]+http-equiv=["']?refresh["']?[^>]*content=["']?\s*\d+\s*;\s*url=([^"'>\s]+)/i.exec(body);
-    if (refresh) { metaRefreshUsed = true; chain[chain.length - 1].status = `${r.status} meta-refresh`; cur = new URL(decodeEntities(refresh[1]), cur).href; continue; }
+    const refresh = !metaRefreshUsed && /html/i.test(contentType) && metaRefreshUrl(body);
+    if (refresh) { metaRefreshUsed = true; chain[chain.length - 1].status = `${r.status} meta-refresh`; cur = new URL(refresh, cur).href; continue; }
     return { chain, finalUrl: cur, status: r.status, contentType, body };
   }
   throw new Error(`Too many redirects (more than ${MAX_HOPS})`);
@@ -77,12 +65,14 @@ function decodeEntities(s) {
     return { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' }[k] ?? m;
   });
 }
+const MAX_TAG = 16384; // attributes of absurdly long tags are not parsed
 function attrs(tag) {
   const o = {};
-  for (const m of tag.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g)) o[m[1].toLowerCase()] = decodeEntities(m[2] ?? m[3] ?? m[4] ?? '');
+  if (tag.length > MAX_TAG) return o;
+  for (const [k, v] of Object.entries(html$.tagAttrs(tag))) o[k] = decodeEntities(v);
   return o;
 }
-const clean = s => decodeEntities(String(s ?? '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+const clean = s => decodeEntities(html$.htmlText(String(s ?? ''), { skip: [] })).replace(/\s+/g, ' ').trim();
 const IANA_RE = /^(?:Africa|America|Antarctica|Asia|Atlantic|Australia|Europe|Indian|Pacific|Etc)\/[A-Za-z0-9_+\-/]+$|^UTC$/;
 
 // ---------- Compact calendar date-times (ics, Google Calendar) ----------
@@ -116,8 +106,9 @@ function addressText(a) {
 }
 function parseJsonLd(html) {
   const out = [];
-  for (const m of html.matchAll(/<script\b[^>]*type\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script>/gi)) {
-    let data; const raw = m[1].replace(/^\s*<!\[CDATA\[|\]\]>\s*$/g, '').trim();
+  for (const el of html$.rawElements(html, 'script')) {
+    if (!el.closed || !/^application\/ld\+json$/i.test((attrs(el.tag).type || '').trim())) continue;
+    let data; const raw = el.content.replace(/^\s*<!\[CDATA\[|\]\]>\s*$/g, '').trim();
     try { data = JSON.parse(raw); } catch { try { data = JSON.parse(raw.replace(/[\u0000-\u001f]+/g, ' ')); } catch { continue; } }
     for (const n of walk(data)) {
       if (!isEventType(n['@type'])) continue;
@@ -144,11 +135,13 @@ function parseJsonLd(html) {
 // ---------- OpenGraph / meta / embedded page data ----------
 function parseMeta(html) {
   const meta = {};
-  for (const m of html.matchAll(/<meta\b[^>]*>/gi)) {
-    const a = attrs(m[0]); const k = (a.property || a.name || a.itemprop || '').toLowerCase();
+  const tags = html$.tagsNamed(html, ['meta', 'link']);
+  for (const tag of tags) {
+    if (!/^<meta/i.test(tag)) continue;
+    const a = attrs(tag); const k = (a.property || a.name || a.itemprop || '').toLowerCase();
     if (k && a.content != null && !(k in meta)) meta[k] = a.content.trim();
   }
-  const canonical = /<link\b[^>]*rel=["']?canonical["']?[^>]*>/i.exec(html);
+  const canonical = tags.find(t => /^<link/i.test(t) && (attrs(t).rel || '').toLowerCase().split(/\s+/).includes('canonical'));
   const lat = +(meta['event:location:latitude'] || meta['place:location:latitude'] || meta['og:latitude']);
   const lon = +(meta['event:location:longitude'] || meta['place:location:longitude'] || meta['og:longitude']);
   const tzm = /["'](?:timezone|time_zone|timeZone|tz|event_timezone|ctz)["']\s*:\s*["']([A-Za-z_]+\/[A-Za-z0-9_+\-/]+|UTC)["']/.exec(html);
@@ -160,7 +153,7 @@ function parseMeta(html) {
     venueName: meta['og:site_name'] && meta['event:location'] ? meta['event:location'] : meta['event:location'] || '',
     venueAddress: meta['og:street-address'] || '', city: meta['og:locality'] || '',
     geo: Number.isFinite(lat) && Number.isFinite(lon) && (lat || lon) ? { lat, lon } : null,
-    url: (canonical && attrs(canonical[0]).href) || meta['og:url'] || '',
+    url: (canonical && attrs(canonical).href) || meta['og:url'] || '',
   };
 }
 
@@ -199,8 +192,8 @@ function parseIcs(text) {
 }
 function findIcsLinks(html, baseUrl) {
   const out = [];
-  for (const m of html.matchAll(/<a\b[^>]*href\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>/gi)) {
-    let href = decodeEntities(m[1] ?? m[2] ?? '').trim();
+  for (const tag of html$.tagsNamed(html, ['a'])) {
+    let href = (attrs(tag).href || '').trim(); if (!href) continue;
     if (/^data:text\/calendar/i.test(href)) { out.push({ inline: href }); continue; }
     if (/^webcal:/i.test(href)) href = href.replace(/^webcal:/i, 'https:');
     if (!/\.ics(\?|#|$)|[?&](format|output)=ics\b|\/ical\b/i.test(href)) continue;
@@ -238,9 +231,9 @@ const DATE_RES = [
   new RegExp(`\\b${MON}\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s*(\\d{4})?`, 'i'), // Oct 24, 2024
 ];
 const to24 = (h, ap) => { h = +h; if (!ap) return h; const pm = /^p/i.test(ap); return h === 12 ? (pm ? 12 : 0) : pm ? h + 12 : h; };
+const BLOCK_ENDS = new Set(['p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'section', 'header', 'footer', 'article', 'dt', 'dd']);
 function visibleText(html) {
-  return decodeEntities(html.replace(/<head[\s\S]*?<\/head>|<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<noscript[\s\S]*?<\/noscript>/gi, ' ')
-    .replace(/<\/(p|div|li|h\d|tr|section|header|footer|article|dt|dd)>|<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' '))
+  return decodeEntities(html$.htmlText(html, { skip: ['head', 'script', 'style', 'noscript'], breaks: BLOCK_ENDS }))
     .replace(/[ \t\u00a0]+/g, ' ').replace(/\n\s*/g, '\n').trim();
 }
 function parseTextDate(text, fallbackYear) {
@@ -268,10 +261,10 @@ function parseTextDate(text, fallbackYear) {
 function splitNames(s) { return s.split(/\s*(?:,|;|\band\b|&|\+|\|)\s*/i).map(x => x.trim()).filter(x => x.length >= 2 && x.length <= 60); }
 function parseText(html, fallbackYear) {
   const text = visibleText(html);
-  const h1 = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(html);
-  const title = h1 ? clean(h1[1]) : clean((/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html) || [])[1] || '');
+  const h1 = html$.firstElement(html, 'h1');
+  const title = h1 != null ? clean(h1) : clean(html$.firstElement(html, 'title') || '');
   const d = parseTextDate(text, fallbackYear) || {};
-  const att = /(\d[\d,.]*)\s*(k)?\s+(?:people\s+)?(?:going|attending|attendees|registered|rsvps?|participants|joined|signed up)\b/i.exec(text);
+  const att = /(\d[\d,.]{0,15})\s*(k)?\s+(?:people\s+)?(?:going|attending|attendees|registered|rsvps?|participants|joined|signed up)\b/i.exec(text);
   const programs = [], organizers = [];
   for (const m of text.matchAll(/\b(?:sponsored by|in partnership with|presented by|powered by|supported by|in collaboration with|part of)\s*:?\s*([^\n.!?•·|]{2,90})/gi)) programs.push(...splitNames(m[1]));
   for (const m of text.matchAll(/\b(?:hosted by|organi[sz]ed by|organi[sz]er)\s*:?\s*([^\n.!?•·|]{2,90})/gi)) organizers.push(...splitNames(m[1]));

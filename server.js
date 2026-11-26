@@ -4,9 +4,11 @@
 // Optional: FIRECRAWL_API_KEY (web fetch + corroboration search) · SERPAPI_API_KEY (automatic reverse image search)
 // · ETHERSCAN_API_KEY · TRONGRID_API_KEY / TRONSCAN_API_KEY (optional, wallet lookups in server/osint.js)
 const http = require('http');
+const net = require('net');
 const fs = require('fs');
 const path = require('path');
-const { assertPublicUrl } = require('./server/net-guard');
+const { guardedRequest } = require('./server/net-guard');
+const html$ = require('./server/html-scan');
 const provenance = require('./server/provenance');
 const factcheck = require('./server/factcheck');
 const corroborate = require('./server/corroborate');
@@ -132,7 +134,7 @@ async function handleLead(req, res) {
   send(res, 200, parsed ? { verdict: parsed } : { raw });
 }
 
-// SSRF guard (isPrivateIp / assertPublicUrl) lives in server/net-guard.js, shared with the provenance endpoints.
+// SSRF guard (guardedRequest: connect-time address check on every hop) lives in server/net-guard.js.
 
 // Builds a single self-contained prompt that runs the whole agent team inside one chat (claude.ai, or any assistant).
 async function handlePrompt(req, res) {
@@ -140,6 +142,7 @@ async function handlePrompt(req, res) {
   send(res, 200, { prompt: buildHandoffPrompt(body, factcheck.caseFileSections) });
 }
 
+const FETCH_MAX_BYTES = 400 * 1024;
 async function handleFetch(req, res) {
   const { url } = await readBody(req);
   if (!/^https?:\/\//i.test(url || '')) return send(res, 400, { error: 'invalid url' });
@@ -151,20 +154,15 @@ async function handleFetch(req, res) {
     const j = await r.json();
     if (r.ok && j.data) return send(res, 200, { via: 'firecrawl', title: j.data.metadata?.title, markdown: (j.data.markdown || '').slice(0, 20000), metadata: j.data.metadata, links: (j.data.links || []).slice(0, 80) });
   }
-  // Plain fetch fallback: follow redirects manually so the chain is visible
-  const chain = []; let cur = url; let html = ''; let status = 0;
-  for (let i = 0; i < 8; i++) {
-    await assertPublicUrl(cur); // re-checked on every redirect hop
-    const r = await fetch(cur, { redirect: 'manual', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DeduceInvestigator/1.0)' }, signal: AbortSignal.timeout(12000) });
-    status = r.status; chain.push({ url: cur, status });
-    const loc = r.headers.get('location');
-    if (status >= 300 && status < 400 && loc) { cur = new URL(loc, cur).href; continue; }
-    html = (await r.text()).slice(0, 400000); break;
-  }
+  // Plain fetch fallback. guardedRequest checks the address each socket connects to on every redirect hop (the chain
+  // stays visible), caps the body and times out.
+  const r = await guardedRequest(url, { maxRedirects: 7, anyStatus: true, decompress: true, truncate: true, maxBytes: FETCH_MAX_BYTES, timeoutMs: 12000,
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DeduceInvestigator/1.0)' } });
+  const html = r.buffer.toString('utf8'), status = r.status, chain = r.redirects;
   const meta = {};
-  for (const m of html.matchAll(/<meta\s+[^>]*(?:property|name)=["']([^"']+)["'][^>]*content=["']([^"']*)["'][^>]*>/gi)) meta[m[1]] = m[2];
-  const title = (/<title[^>]*>([^<]*)<\/title>/i.exec(html) || [])[1];
-  const text = html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 15000);
+  for (const tag of html$.tagsNamed(html, ['meta'])) { const a = html$.tagAttrs(tag); const k = a.property || a.name; if (k && 'content' in a) meta[k] = a.content; }
+  const title = html$.firstElement(html, 'title') ?? undefined;
+  const text = html$.htmlText(html, { skip: ['script', 'style'] }).replace(/\s+/g, ' ').slice(0, 15000);
   send(res, 200, { via: 'direct', title, status, redirects: chain, metadata: meta, markdown: text });
 }
 
@@ -194,9 +192,35 @@ if (DEV) {
 }
 const DEV_SNIPPET = `<script>(function(){var boot=null;function c(){var es=new EventSource('/__dev/reload');es.addEventListener('boot',function(e){if(boot&&boot!==e.data)location.reload();boot=e.data});es.onmessage=function(){location.reload()};es.onerror=function(){es.close();setTimeout(c,500)}}c()})();</script>`;
 
+// Local API gate: a page on another site must not be able to drive the API. DNS rebinding makes a foreign name resolve to
+// 127.0.0.1, so the Host must be one of ours; cross-origin pages are refused by Origin; and every POST must be JSON so a
+// browser has to send a CORS preflight, which this server never approves.
+// HOST=0.0.0.0 (the user chose to serve the LAN): any IP address or a .local name on PORT is accepted, but still no
+// other DNS names, because a rebinding page always arrives under the attacker's own domain name.
+const ANY_HOST = process.env.HOST === '0.0.0.0';
+function lanHost(host) {
+  const m = /^(\[[0-9a-f:.]+\]|[^:\[\]]+)(?::(\d+))?$/.exec(host);
+  if (!m || (m[2] || '80') !== String(PORT)) return false;
+  const name = m[1].replace(/^\[|\]$/g, '');
+  return net.isIP(name) !== 0 || name === 'localhost' || /^([a-z0-9-]+\.)+local\.?$/.test(name);
+}
+const OWN_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', HOST.includes(':') ? `[${HOST}]` : HOST].flatMap(h => [`${h}:${PORT}`, ...(+PORT === 80 ? [h] : [])]));
+function apiGate(req, u) {
+  const host = String(req.headers.host || '').toLowerCase();
+  if (!host || !(OWN_HOSTS.has(host) || (ANY_HOST && lanHost(host)))) return [403, 'Host not allowed: open Scam Bunker at http://localhost:' + PORT];
+  const origin = req.headers.origin;
+  if (origin !== undefined && origin !== `http://${host}`) return [403, 'Cross-origin requests are not allowed'];
+  if (req.method === 'POST' && u.pathname.startsWith('/api/') && String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase() !== 'application/json') return [415, 'Content-Type must be application/json'];
+  return null;
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const u = new URL(req.url, 'http://x');
+    if (u.pathname.startsWith('/api/') || u.pathname.startsWith('/__dev/')) {
+      const refused = apiGate(req, u);
+      if (refused) { req.resume(); return send(res, refused[0], { error: refused[1], code: 'request_refused' }); }
+    }
     if (DEV && u.pathname === '/__dev/reload') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
       res.write(`event: boot\ndata: ${BOOT_ID}\n\n`);

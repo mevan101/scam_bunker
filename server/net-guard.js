@@ -4,6 +4,7 @@ const net = require('net');
 const dns = require('dns');
 const http = require('http');
 const https = require('https');
+const zlib = require('zlib');
 
 function isPrivateIp(ip) {
   if (net.isIPv4(ip)) {
@@ -20,8 +21,8 @@ function isPrivateIp(ip) {
 
 function httpError(status, message, code) { const e = new Error(message); e.status = status; if (code) e.code = code; return e; }
 
-// Resolve-then-check. Used by callers that go through global fetch() (which resolves again: see guardedRequest for the
-// stricter variant that checks the address the socket actually connects to).
+// Resolve-then-check only. Never use it as the guard for a fetch of a user or remote URL: the socket resolves again and a
+// rebinding DNS server can answer differently. Use guardedRequest, which checks the address the socket connects to.
 async function assertPublicUrl(u) {
   const { protocol, hostname } = new URL(u);
   if (!/^https?:$/.test(protocol)) throw httpError(400, 'Only http(s) URLs can be fetched');
@@ -31,15 +32,45 @@ async function assertPublicUrl(u) {
 }
 
 // GET a public URL with the guard applied at connect time (custom DNS lookup), on every redirect hop.
-// Options: maxBytes, timeoutMs (whole request incl. redirects), maxRedirects, accept (RegExp on Content-Type),
-// truncate (stop at maxBytes instead of failing), headers, isBlocked (ip => bool; tests only).
+// Options: maxBytes, timeoutMs (whole request incl. redirects and body), maxRedirects, accept (RegExp on Content-Type),
+// truncate (stop at maxBytes instead of failing), headers, anyStatus (return non-2xx bodies instead of failing),
+// followRedirects (false: return the 3xx response itself), decompress (gzip/deflate/br, maxBytes applies to the
+// decoded body), isBlocked (ip => bool) and resolve (dns.lookup-compatible): test seams only.
+const { Transform } = require('stream');
+// HTTP "deflate" is meant to be zlib-wrapped, but many servers send raw deflate: pick by the first two bytes.
+function createDeflate() {
+  let inner = null, head = Buffer.alloc(0);
+  const start = self => {
+    inner = head.length > 1 && (head[0] & 0x0f) === 8 && ((head[0] << 8) | head[1]) % 31 === 0 ? zlib.createInflate() : zlib.createInflateRaw();
+    inner.on('data', d => self.push(d)); inner.on('error', e => self.destroy(e));
+  };
+  return new Transform({
+    transform(chunk, _enc, cb) {
+      if (!inner) { head = Buffer.concat([head, chunk]); if (head.length < 2) return cb(); start(this); chunk = head; }
+      inner.write(chunk, () => cb());
+    },
+    flush(cb) {
+      if (!inner) { if (!head.length) return cb(); start(this); inner.write(head); }
+      inner.once('end', () => cb()); inner.end();
+    },
+  });
+}
+const DECODERS = new Map([['gzip', zlib.createGunzip], ['x-gzip', zlib.createGunzip], ['deflate', createDeflate], ['br', zlib.createBrotliDecompress]]);
+// Content-Encoding lists codings in the order applied ("gzip, br"); decode in reverse. Unknown codings, or more than three
+// layers, are left as is.
+function decoderChain(header) {
+  const codings = String(header || '').toLowerCase().split(',').map(c => c.trim()).filter(c => c && c !== 'identity');
+  if (!codings.length || codings.length > 3 || !codings.every(c => DECODERS.has(c))) return null;
+  return codings.reverse().map(c => DECODERS.get(c)());
+}
 function guardedRequest(url, opts = {}) {
-  const { maxBytes = 15 * 1024 * 1024, timeoutMs = 15000, maxRedirects = 5, accept = null, truncate = false, headers = {}, isBlocked = isPrivateIp } = opts;
+  const { maxBytes = 15 * 1024 * 1024, timeoutMs = 15000, maxRedirects = 5, accept = null, truncate = false, headers = {}, isBlocked = isPrivateIp,
+    anyStatus = false, followRedirects = true, decompress = false, resolve: resolveHost = dns.lookup } = opts;
   const deadline = Date.now() + timeoutMs;
   const redirects = [];
 
   const lookup = (hostname, options, cb) => {
-    dns.lookup(hostname, { ...options, all: true }, (err, addrs) => {
+    resolveHost(hostname, { ...options, all: true }, (err, addrs) => {
       if (err) return cb(err);
       if (!addrs.length || addrs.some(a => isBlocked(a.address))) return cb(httpError(403, 'Refusing to fetch a private or local network address', 'ssrf_blocked'));
       if (options && options.all) return cb(null, addrs);
@@ -57,35 +88,45 @@ function guardedRequest(url, opts = {}) {
     const left = deadline - Date.now();
     if (left <= 0) return reject(httpError(504, 'Timed out', 'timeout'));
     const lib = u.protocol === 'https:' ? https : http;
-    const req = lib.get(u, { lookup, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ScamBunkerProvenance/1.0)', 'Accept-Encoding': 'identity', ...headers } }, res => {
+    const reqHeaders = { 'User-Agent': 'Mozilla/5.0 (compatible; ScamBunkerProvenance/1.0)', ...headers, 'Accept-Encoding': decompress ? 'gzip, deflate, br' : 'identity' };
+    const req = lib.get(u, { lookup, headers: reqHeaders }, res => {
       const status = res.statusCode;
       redirects.push({ url: cur, status });
       const loc = res.headers.location;
-      if (status >= 300 && status < 400 && loc) {
-        res.resume(); clearTimeout(timer);
-        if (n >= maxRedirects) return reject(httpError(502, 'Too many redirects', 'redirects'));
-        return resolve(hop(new URL(loc, cur).href, n + 1)); // re-checked by lookup / IP check on the next hop
+      if (status >= 300 && status < 400 && loc && followRedirects) {
+        res.destroy(); clearTimeout(timer); // never drain a redirect body: it has no cap or deadline
+        if (n >= maxRedirects) return reject(Object.assign(httpError(502, 'Too many redirects', 'redirects'), { finalUrl: cur, redirects }));
+        let next; try { next = new URL(loc, cur).href; } catch { return reject(httpError(502, 'Invalid redirect location', 'redirects')); }
+        return resolve(hop(next, n + 1)); // re-checked by lookup / IP check on the next hop
       }
-      const done = (err, val) => { clearTimeout(timer); err ? reject(err) : resolve(val); };
-      if (status < 200 || status >= 300) { res.resume(); return done(httpError(502, `Remote server answered HTTP ${status}`, 'http_status')); }
+      let settled = false;
+      const done = (err, val) => { if (settled) return; settled = true; clearTimeout(timer); err ? reject(err) : resolve(val); };
+      const result = buffer => ({ status, finalUrl: cur, redirects, headers: res.headers, contentType: type, location: loc || null, buffer });
       const type = String(res.headers['content-type'] || '').toLowerCase();
+      if (status >= 300 && status < 400 && loc) { res.destroy(); return done(null, result(Buffer.alloc(0))); }
+      if (!anyStatus && (status < 200 || status >= 300)) { res.destroy(); return done(httpError(502, `Remote server answered HTTP ${status}`, 'http_status')); }
       if (accept && !accept.test(type)) { res.destroy(); return done(Object.assign(httpError(415, `Not an accepted content type (${type || 'none'})`, 'bad_type'), { contentType: type, finalUrl: cur })); }
+      const decoders = decompress ? decoderChain(res.headers['content-encoding']) : null;
       const declared = +res.headers['content-length'];
-      if (!truncate && declared > maxBytes) { res.destroy(); return done(httpError(413, `File is larger than ${Math.round(maxBytes / 1048576)} MB`, 'too_large')); }
+      if (!truncate && !decoders && declared > maxBytes) { res.destroy(); return done(httpError(413, `File is larger than ${Math.round(maxBytes / 1048576)} MB`, 'too_large')); }
+      const stream = decoders ? decoders.reduce((src, d) => src.pipe(d), res) : res;
+      const stop = () => { res.destroy(); for (const d of decoders || []) d.destroy(); };
       const chunks = []; let size = 0;
-      res.on('data', c => {
+      const finish = () => done(null, result(Buffer.concat(chunks)));
+      stream.on('data', c => {
+        if (settled) return;
         size += c.length;
         if (size > maxBytes) {
-          if (truncate) { chunks.push(c.subarray(0, c.length - (size - maxBytes))); size = maxBytes; res.destroy(); finish(); }
-          else { res.destroy(); done(httpError(413, `File is larger than ${Math.round(maxBytes / 1048576)} MB`, 'too_large')); }
+          if (truncate) { chunks.push(c.subarray(0, c.length - (size - maxBytes))); size = maxBytes; stop(); finish(); }
+          else { stop(); done(httpError(413, `File is larger than ${Math.round(maxBytes / 1048576)} MB`, 'too_large')); }
           return;
         }
         chunks.push(c);
       });
-      let finished = false;
-      const finish = () => { if (finished) return; finished = true; done(null, { status, finalUrl: cur, redirects, headers: res.headers, contentType: type, buffer: Buffer.concat(chunks) }); };
-      res.on('end', finish);
-      res.on('error', e => done(e));
+      stream.on('end', finish);
+      stream.on('error', e => { stop(); done(e.status ? e : httpError(502, `Could not read response: ${e.code || e.message}`, 'network')); });
+      res.on('close', () => { if (!res.complete) done(httpError(502, 'Connection closed before the response ended', 'network')); });
+      for (const src of [res, ...(decoders || [])]) if (src !== stream) src.on('error', e => { stop(); done(e.status ? e : httpError(502, `Could not read response: ${e.code || e.message}`, 'network')); });
     });
     const timer = setTimeout(() => req.destroy(httpError(504, 'Timed out', 'timeout')), left);
     req.on('error', e => { clearTimeout(timer); reject(e.status ? e : httpError(502, `Could not fetch: ${e.code || e.message}`, 'network')); });

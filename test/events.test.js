@@ -280,7 +280,7 @@ test('fetch hardening: gzip bodies are decoded, credential URLs refused, odd pat
   const srv = require('http').createServer((q, s) => { s.writeHead(200, { 'content-type': 'text/html', 'content-encoding': 'gzip' }); s.end(zlib.gzipSync(html)); });
   await new Promise(r => srv.listen(0, '127.0.0.1', r));
   try {
-    const r = await ev.fetchFollow(`http://127.0.0.1:${srv.address().port}/`, { guard: async () => {} }); // IP literal: no DNS lookup, guard stubbed
+    const r = await ev.fetchFollow(`http://127.0.0.1:${srv.address().port}/`, { guard: async () => {}, isBlocked: () => false }); // local test server: guard and address check stubbed
     assert.equal(r.body, html);
   } finally { srv.close(); }
   await assert.rejects(ev.extractFromUrl('https://user:secret@example.org/e/1'), /embedded credentials/);
@@ -294,7 +294,7 @@ test('fetch: hostile Content-Encoding names are ignored rather than crashing', a
   for (const enc of ['constructor', '__proto__', 'toString']) {
     const srv = require('http').createServer((q, s) => { s.writeHead(200, { 'content-type': 'text/html', 'content-encoding': enc }); s.end('<h1>ok</h1>'); });
     await new Promise(r => srv.listen(0, '127.0.0.1', r));
-    try { assert.equal((await ev.fetchFollow(`http://127.0.0.1:${srv.address().port}/`, { guard: async () => {} })).body, '<h1>ok</h1>'); }
+    try { assert.equal((await ev.fetchFollow(`http://127.0.0.1:${srv.address().port}/`, { guard: async () => {}, isBlocked: () => false })).body, '<h1>ok</h1>'); }
     finally { srv.close(); }
   }
 });
