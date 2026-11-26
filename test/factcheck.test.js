@@ -101,6 +101,7 @@ const VIRAL = "BREAKING 🚨 SHARE BEFORE IT'S DELETED!! Doctors don't want you 
     const txt = F.caseFileSections({ factchecks: { available: true, claims: [{ text: 'lemon cures cancer in 7 days', matches }] }, similar: [{ at: '2026-01-02T00:00:00Z', verdict: 'Scam', platform: 'Telegram', similarity: 0.87, snippet: 'Invest now' }] });
     assert(/PRIOR FACT-CHECKS/.test(txt) && /Example Fact Check rated .* as "False" \(2026-03-04\) https:\/\/factcheck\.example\.org/.test(txt));
     assert(/SIMILAR EARLIER CASES/.test(txt) && /87% similar .* "Scam" on Telegram/.test(txt));
+    assert(!txt.includes('Invest now'), 'earlier case text is not sent to the agents');
     assert(/Not searched automatically/.test(F.caseFileSections({ factchecks: { available: false, claims: [{ text: 'x y z' }] } })));
     assert.strictEqual(F.caseFileSections({}), '');
   });

@@ -82,7 +82,7 @@
     if (!c) return;
     const past = SB.store.get('scambunker.cases', []);
     c.similar = findSimilar(c, past);
-    c.caseExtras = { ...(c.caseExtras || {}), similar: c.similar.slice(0, 5).map(({ at, verdict, platform, similarity, snippet }) => ({ at, verdict, platform, similarity, snippet })) };
+    c.caseExtras = { ...(c.caseExtras || {}), similar: c.similar.slice(0, 5).map(({ at, verdict, platform, similarity }) => ({ at, verdict, platform, similarity })) };
     const v = c.final || c.local;
     if (v) { v.observations = (v.observations || []).filter(o => !o.similar); const o = observation(c.similar); if (o) v.observations.unshift(o); }
     SB.renderAll();

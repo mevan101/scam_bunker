@@ -145,7 +145,7 @@ function caseFileSections(c = {}) {
   }
   const sim = c.similar;
   if (Array.isArray(sim) && sim.length) {
-    parts.push(`SIMILAR EARLIER CASES (local template match, word 5-gram Jaccard similarity; links to a reused script, not proof of the same sender):\n${sim.slice(0, 5).map(s => `- ${Math.round(s.similarity * 100)}% similar to a case from ${str(s.at, 10)} judged "${str(s.verdict, 40)}"${s.platform ? ` on ${str(s.platform, 30)}` : ''}: "${str(s.snippet, 120)}"`).join('\n')}`);
+    parts.push(`SIMILAR EARLIER CASES (local template match, word 5-gram Jaccard similarity; links to a reused script, not proof of the same sender; earlier case text stays on the investigator's device):\n${sim.slice(0, 5).map(s => `- ${Math.round(s.similarity * 100)}% similar to a case from ${str(s.at, 10)} judged "${str(s.verdict, 40)}"${s.platform ? ` on ${str(s.platform, 30)}` : ''}`).join('\n')}`);
   }
   return parts.join('\n\n');
 }
