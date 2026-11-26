@@ -1,7 +1,7 @@
 // Zero-dependency tests for the dating timeline (public/timeline.js): merge, sort, time zones, contradictions,
 // bounds and the export lines. Every case below is invented. Run: npm test
 const fs = require('fs'), path = require('path'), vm = require('vm'), assert = require('assert');
-const ctx = { window: {}, URL }; vm.createContext(ctx);
+const ctx = { window: {}, URL, URLSearchParams }; vm.createContext(ctx);
 for (const f of ['provenance.js', 'events-core.js', 'timeline.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '../public', f), 'utf8'), ctx);
 const T = ctx.window.ScamBunkerTimeline, P = ctx.window.ScamBunkerProvenance, C = ctx.window.SBEventsCore;
 let failed = 0;
@@ -179,6 +179,12 @@ test('review fixes 2: archive evidence preferred over HTTP dates; event IDs in q
   assert(T.collect(c, { ...opts, listings: L }).some(r => r.kind === 'event'));
   const r = { at: '2026-11-26T10:00:00Z', text: '', url: 'https://short.example/x', page: { redirects: [{ url: 'https://short.example/x', status: 301 }, { url: 'https://events.example.org/e?id=2', status: 200 }] } };
   assert(T.collect(r, { ...opts, listings: L }).some(x => x.kind === 'event'));
+});
+
+test('listing URL match ignores trailing slash before the query and re-encoding', () => {
+  const L = [C.normalizeListing({ id: 'Q3', url: 'https://events.example.org/e/?id=3&name=a%20b', title: 'Q3', start: '2025-01-05T18:00', tz: 'Asia/Dhaka' })];
+  const c = { at: '2026-11-26T10:00:00Z', text: '', url: 'https://events.example.org/e?name=a+b&id=3&utm_medium=sms' };
+  assert(T.collect(c, { ...opts, listings: L }).some(r => r.kind === 'event'));
 });
 
 console.log(failed ? `✗ timeline: ${failed} failed` : 'timeline: all tests passed');
