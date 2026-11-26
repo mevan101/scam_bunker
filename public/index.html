@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="events.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='13' cy='13' r='8' fill='none' stroke='%23e8a33d' stroke-width='3'/><path d='M19 19l8 8' stroke='%23e8a33d' stroke-width='3.5' stroke-linecap='round'/></svg>">
 </head>
 <body>
@@ -111,6 +112,7 @@
         <button role="tab" data-tab="corroborate" id="tab-corroborate" aria-controls="panel-corroborate">Corroborate</button>
         <button role="tab" data-tab="next" id="tab-next" aria-controls="panel-next">Next moves</button>
         <button role="tab" data-tab="custody" id="tab-custody" aria-controls="panel-custody">Custody log</button>
+        <button role="tab" data-tab="events" id="tab-events" aria-controls="panel-events">Events <span class="count"></span></button>
       </div>
 
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-deduction" aria-labelledby="tab-deduction" data-panel="deduction"></div>
@@ -125,6 +127,7 @@
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-corroborate" aria-labelledby="tab-corroborate" data-panel="corroborate" hidden></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-next" aria-labelledby="tab-next" data-panel="next" hidden></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-custody" aria-labelledby="tab-custody" data-panel="custody" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-events" aria-labelledby="tab-events" data-panel="events" hidden></div>
 
       <div class="report-actions">
         <button class="ghost" data-handoff>Investigate with Claude ↗</button>
@@ -166,5 +169,7 @@
 <script src="factcheck.js"></script>
 <script src="corroborate.js"></script>
 <script src="video.js"></script>
+<script src="events-core.js"></script>
+<script src="events.js"></script>
 </body>
 </html>

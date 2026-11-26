@@ -1,0 +1,14 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Fictional Events//EN
+BEGIN:VEVENT
+UID:fiction-4821@example.org
+SUMMARY:Open Data Workshop\, Spring Edition
+DTSTART;TZID=Europe/London:20250330T013000
+DTEND;TZID=Europe/London:20250330T030000
+LOCATION:Harbourside Library\, Room 2\, 7 Quay Street\, Bristol
+GEO:51.4500;-2.5970
+ORGANIZER;CN="Contoso Builders Guild":mailto:events@example.org
+URL:https://www.meetup.com/contoso-builders/events/304821111/
+END:VEVENT
+END:VCALENDAR
