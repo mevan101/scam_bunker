@@ -419,7 +419,7 @@
   function summarize(v) {
     if (!v) return null;
     const { fields, frames, ...rest } = v;
-    return { ...rest, fields: (fields || []).slice(0, 60), frames: (frames || []).map(f => ({ t: f.t, kind: f.kind, diff: f.diff, hash: f.hash ? { d: f.hash.d, p: f.hash.p } : null, dupOf: f.dupOf ?? null, weak: f.weak || [], noise: f.noise ?? null, width: f.width, height: f.height })) };
+    return { ...rest, fields: (fields || []).slice(0, 60), frames: (frames || []).map(f => ({ idx: f.idx, t: f.t, kind: f.kind, diff: f.diff, hash: f.hash ? { d: f.hash.d, p: f.hash.p } : null, dupOf: f.dupOf ?? null, weak: f.weak || [], noise: f.noise ?? null, width: f.width, height: f.height })) };
   }
   function report(v) {
     const l = [`${v.container} · ${v.width || '?'}×${v.height || '?'} · ${v.duration ? v.duration.toFixed(1) + ' s' : 'duration unknown'}${v.fps ? ' · ' + v.fps + ' fps' : ''} · ${v.videoCodec || 'codec unknown'}${v.hasAudio ? ' + ' + v.audioCodec : ' · no audio'}`,
