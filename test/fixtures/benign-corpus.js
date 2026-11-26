@@ -70,4 +70,5 @@ module.exports = [
   'Ammu, bazar er list ta pathao. 500 taka diye dim.',
   'দোকান আজ বন্ধ থাকবে, কাল খোলা।',
   'Amar number 01711-000000 na, notun number ta pore dibo.',
+  'Your login code is 551204. It expires in 5 minutes. Do not share with anyone.',
 ];

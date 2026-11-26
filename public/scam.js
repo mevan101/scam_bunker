@@ -10,7 +10,7 @@
 //   opts.unless    guard regex tested on the sentence around the match (opts.unlessScope 'adjacent' adds one sentence each side, 'message' tests the whole message)
   const NEG = String.raw`(?<!\b(never|not|don'?t|do not|won'?t|will not|nobody|no one|cannot|can'?t)\b[^.!?\n]{0,40})`;
   const GIFT = String.raw`(gift ?cards?|(itunes|steam|google play|apple|amazon|ebay|razer gold)( gift)? cards?)`;
-  const SAFETY_NOTICE = /\b(never|do not|don'?t|won'?t|will not)\b[^.!?\n]{0,20}\b(share|disclose|forward|give|tell|read out|ask (you )?for)\b[^.!?\n]{0,25}\b(codes?|otp|pin|it|this)\b|(কাউকে|দিবেন না|দেবেন না|বলবেন না|শেয়ার করবেন না|\bkauke\b|\bdiben na\b)/i;
+  const SAFETY_NOTICE = /\b(never|do not|don'?t|won'?t|will not)\b[^.!?\n]{0,20}\b(share|disclose|forward|give|tell|read out|ask (you )?for)\b[^.!?\n]{0,25}\b(codes?|otp|pin|it|this)\b|\b(never|do not|don'?t)\s+(share|disclose|forward|give|tell)\s+(it\s+|this\s+)?(with|to)\s+(anyone|anybody|others|someone)\b|(কাউকে|দিবেন না|দেবেন না|বলবেন না|শেয়ার করবেন না|\bkauke\b|\bdiben na\b)/i;
   const RULES = [
     // ----- Phishing -----
     ['Phishing', 22, new RegExp(NEG + String.raw`\b(verify|confirm|update|unlock|restore)\b[^.!?\n]{0,15}\b(your|ur)\b[^.!?\n]{0,25}\b(account|password|identity|login|payment|card|details)\b`, 'i'), 'Asks you to verify/confirm account or payment details', { id: 'verify-details', ask: true }],
