@@ -1,4 +1,4 @@
-// Deduce heuristic engine — scam / manipulation / coordination detection. Runs offline.
+// Scam Bunker heuristic engine — scam / manipulation / coordination detection. Runs offline.
 (function () {
   const RULES = [
     // category, weight, regex, label

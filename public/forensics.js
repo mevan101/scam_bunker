@@ -1,4 +1,4 @@
-// Deduce image forensics — runs entirely in the browser.
+// Scam Bunker image forensics — runs entirely in the browser.
 // Parses JPEG/PNG/WebP/HEIC containers, EXIF, XMP, IPTC, C2PA (Content Credentials), PNG text chunks,
 // generator signatures, platform re-encode fingerprints, JPEG quality, and error-level analysis.
 (function () {

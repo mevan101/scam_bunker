@@ -12,4 +12,4 @@ jobs:
         run: |
           node server.js & sleep 1
           curl -sf localhost:4400/api/status
-          curl -sf localhost:4400/ | grep -q Deduce
+          curl -sf localhost:4400/ | grep -q Scam Bunker

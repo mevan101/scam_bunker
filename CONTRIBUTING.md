@@ -1,4 +1,4 @@
-# Contributing to Deduce
+# Contributing to Scam Bunker
 
 Thanks for helping people spot deception.
 

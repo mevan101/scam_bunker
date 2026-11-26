@@ -1,4 +1,4 @@
-// Deduce — investigation server. Zero dependencies: `node server.js`
+// Scam Bunker — investigation server. Zero dependencies: `node server.js`
 // AI provider (first match wins): ANTHROPIC_API_KEY · LLM_BASE_URL (+LLM_API_KEY, LLM_MODEL) for any OpenAI-compatible API
 // (Groq, OpenRouter, LM Studio…) · a local Ollama, detected automatically. With none, the claude.ai handoff still works.
 // Optional: FIRECRAWL_API_KEY (web fetch + corroboration search)
@@ -202,7 +202,7 @@ async function assertPublicUrl(u) {
 async function handlePrompt(req, res) {
   const body = await readBody(req);
   const roles = Object.values(AGENTS).map((a, i) => `### Specialist ${i + 1}: ${a.name}\n${a.brief}`).join('\n\n');
-  const prompt = `You are running a multi-agent fraud & disinformation investigation called Deduce. Play every role below in turn, then act as the lead investigator.
+  const prompt = `You are running a multi-agent fraud & disinformation investigation called Scam Bunker. Play every role below in turn, then act as the lead investigator.
 
 ${roles}
 
@@ -283,7 +283,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 detectProvider().then(() => server.listen(PORT, HOST, () => {
-  console.log(`Deduce running → http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+  console.log(`Scam Bunker running → http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   console.log(`  Agent team: ${provider.kind === 'none' ? 'off: install Ollama, or set ANTHROPIC_API_KEY / LLM_BASE_URL (claude.ai handoff still works)' : provider.label + (provider.vision ? ' · vision' : '')}`);
   console.log(`  Firecrawl: ${FIRECRAWL_KEY ? 'ON' : 'off (optional)'}`);
 }));

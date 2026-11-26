@@ -1,5 +1,5 @@
 {
-  "name": "deduce",
+  "name": "scam-bunker",
   "version": "0.1.0",
   "description": "Open-source investigation lab: date images, detect AI generation, expose hidden metadata, and classify scams and disinformation with a team of AI agents.",
   "main": "server.js",

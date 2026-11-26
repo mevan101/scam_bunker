@@ -1,4 +1,4 @@
-// Deduce — orchestration & UI
+// Scam Bunker — orchestration & UI
 (() => {
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -53,7 +53,7 @@ How I want you to work:
     $('#pill-agents').title = server.ai ? `Lead: ${server.leadModel} · specialists: ${server.agentModel}` : 'No AI provider on the server. Use "Investigate with Claude" to run the agent team in claude.ai, or install Ollama for free local agents.';
     $('#pill-web').classList.toggle('on', !!server.online);
     $('#pill-web').lastChild.textContent = server.firecrawl ? 'Web + search' : server.online ? 'Web fetch' : 'Web';
-    $('#persona').value = store.get('deduce.persona', DEFAULT_PERSONA);
+    $('#persona').value = store.get('scambunker.persona', DEFAULT_PERSONA);
   }
 
   // ---------- Intake ----------
@@ -101,6 +101,7 @@ How I want you to work:
         c.forensics = await DeduceForensics.analyze(imageFile);
         c.agents.metadata = { status: 'done', report: metadataReport(c.forensics) };
       }
+      c.offenders = matchOffenders(c);
       c.local = localVerdict(c);
       renderAll(c);
 
@@ -148,6 +149,32 @@ How I want you to work:
   }
   const compactHeuristics = h => ({ score: h.score, verdict: h.verdict, category: h.category, hits: h.hits.map(x => `${x.category}: ${x.label} ["${x.match}"]`), links: h.links, coordination: h.coordination, entities: h.entities, platform: h.platform });
 
+  // ---------- Repeat-offender profiling ----------
+  // Identifiers a scammer reuses across campaigns. Big platforms and shorteners are excluded: they identify nobody.
+  const NOT_IDENTIFYING = /(^|\.)(facebook|instagram|linkedin|twitter|x|tiktok|youtube|google|whatsapp|telegram|reddit|threads|bsky|discord|snapchat|bit|t|lnkd|tinyurl|goo|ow|is|buff|rebrand|cutt|rb|linktr|wa)\.(com|net|org|ly|me|in|gl|gd|co|ee|app)$/i;
+  function indicators(h, f) {
+    const out = [];
+    const add = (type, value, label) => value && out.push({ type, key: `${type}:${value}`, label: label || value });
+    (h.entities.wallets || []).forEach(w => add('wallet', w.addr, `${w.chain} wallet ${w.addr}`));
+    (h.entities.handles || []).forEach(x => add('handle', x.replace(/^@/, '').toLowerCase(), x));
+    (h.entities.phones || []).forEach(x => { const d = x.replace(/\D/g, ''); if (d.length >= 9) add('phone', d.slice(-10), x); });
+    (h.entities.emails || []).forEach(x => add('email', x.toLowerCase()));
+    (h.links || []).forEach(l => { if (l.host && !NOT_IDENTIFYING.test(l.host)) add('domain', l.host.replace(/^www\./, '')); });
+    if (f?.sha256) add('image', f.sha256, `Identical image (SHA-256 ${f.sha256.slice(0, 12)}…)`);
+    if (f?.exif?.BodySerialNumber) add('camera', f.exif.BodySerialNumber, `Camera serial ${f.exif.BodySerialNumber}`);
+    const seen = new Set(); return out.filter(i => !seen.has(i.key) && seen.add(i.key));
+  }
+  function matchOffenders(c) {
+    c.indicators = indicators(c.heuristics, c.forensics);
+    const past = store.get('scambunker.cases', []);
+    const hits = [];
+    for (const ind of c.indicators) {
+      const cases = past.filter(p => (p.indicators || []).some(k => k.key === ind.key));
+      if (cases.length) hits.push({ ...ind, cases: cases.map(p => ({ id: p.id, at: p.at, verdict: p.verdict, platform: p.platform, snippet: (p.text || p.url || '').slice(0, 90) })) });
+    }
+    return hits;
+  }
+
   // ---------- Local reasoning ----------
   function localVerdict(c) {
     const h = c.heuristics, f = c.forensics;
@@ -172,6 +199,17 @@ How I want you to work:
       }
       risk = Math.max(risk, Math.round(f.suspicion * 0.8));
     }
+    (c.offenders || []).forEach(o => {
+      const bad = o.cases.filter(p => ['Scam', 'Likely scam', 'Suspicious', 'Coordinated / inauthentic'].includes(p.verdict)).length;
+      obs.unshift({ fact: `${o.label}`, inference: `Seen before in ${o.cases.length} earlier case${o.cases.length > 1 ? 's' : ''}${bad ? `, ${bad} of them judged a scam or suspicious` : ''}. This is a repeat actor.`, weight: bad ? 'strong' : 'moderate' });
+      const confirmed = o.cases.some(p => ['Scam', 'Likely scam'].includes(p.verdict));
+      if (confirmed && ['wallet', 'phone', 'email', 'domain', 'image'].includes(o.type)) {
+        // Payment / contact identifiers reused from a confirmed scam are among the strongest evidence there is
+        risk = Math.max(risk + 20, 75);
+        if (verdict !== 'Scam') { verdict = 'Likely scam'; category = `Repeat offender (${o.type} reused)`; }
+      } else if (bad) { risk = Math.min(100, risk + 15); if (['No strong red flags', 'Insufficient evidence'].includes(verdict)) { verdict = 'Suspicious'; category = 'Linked to earlier scam cases'; } }
+      risk = Math.min(100, risk);
+    });
     if (!obs.length) obs.push({ fact: 'No pattern matched', inference: 'None of the known scam, manipulation or AI signatures fired. That is not proof of legitimacy.', weight: 'weak' });
 
     const conf = Math.min(92, 35 + obs.filter(o => o.weight === 'strong').length * 12 + obs.filter(o => o.weight === 'moderate').length * 5);
@@ -205,6 +243,7 @@ How I want you to work:
       else if (!Object.keys(f.exif).length) s.push('All camera metadata has been stripped. Either the image passed through a social platform or someone removed it deliberately. Either way, its age has to come from reverse search.');
     }
     if (!s.length) s.push('I see nothing that matches a known deception pattern. The absence of evidence is not evidence of absence, though. Verify the sender through a channel you already trust.');
+    if ((c.offenders || []).length) s.unshift(`We have met this actor before. ${c.offenders[0].label} also appears in ${c.offenders[0].cases.length} earlier case file${c.offenders[0].cases.length > 1 ? 's' : ''}. Scammers change their stories, but they rarely change their wallets or numbers.`);
     if (strong.length >= 3) s.push('Taken together, the innocent explanation can no longer hold.');
     return s.join(' ');
   }
@@ -273,6 +312,7 @@ How I want you to work:
     panel('deduction').innerHTML = `
       <blockquote class="deduction">${esc(v.deduction || '')}</blockquote>
       ${boxes.length ? `<section><div class="grid2">${boxes.join('')}</div></section>` : ''}
+      ${offenderHtml(c)}
       <section><h3>Evidence chain</h3><div class="obs">${obs}</div></section>
       ${(v.disagreements || []).length ? `<section><h3>Where the agents disagreed</h3><ul class="list">${v.disagreements.map(d => `<li>${esc(d)}</li>`).join('')}</ul></section>` : ''}
       ${(v.hidden_info || []).length ? `<section><h3>Hidden in the file</h3><ul class="list red">${v.hidden_info.map(d => `<li>${esc(d)}</li>`).join('')}</ul></section>` : ''}
@@ -283,7 +323,7 @@ How I want you to work:
     const ids = Object.keys(c.agents).sort((a, b) => (a === 'lead') - (b === 'lead'));
     const done = ids.filter(i => c.agents[i].status === 'done').length;
     $('#agents-count').textContent = `${done}/${ids.length}`;
-    const callout = server.ai ? '' : `<div class="callout handoff"><div><b>Run the full agent team without an API key.</b> “Investigate with Claude” packs this case, along with the Image Forensics, Fraud, OSINT, Fact-check and Lead Investigator roles, into one prompt and opens it in claude.ai on your own Claude plan. For free agents that run offline on your machine, install <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a> and run <code>ollama pull gemma3</code>. Deduce detects it on the next start.</div><button type="button" class="primary sm" data-handoff>Investigate with Claude ↗</button></div>`;
+    const callout = server.ai ? '' : `<div class="callout handoff"><div><b>Run the full agent team without an API key.</b> “Investigate with Claude” packs this case, along with the Image Forensics, Fraud, OSINT, Fact-check and Lead Investigator roles, into one prompt and opens it in claude.ai on your own Claude plan. For free agents that run offline on your machine, install <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a> and run <code>ollama pull gemma3</code>. Scam Bunker detects it on the next start.</div><button type="button" class="primary sm" data-handoff>Investigate with Claude ↗</button></div>`;
     panel('agents').innerHTML = callout + `<div class="agents">${ids.map(id => {
       const a = c.agents[id], m = AGENT_META[id];
       const st = { run: 'Investigating', done: 'Reported', err: 'Failed', wait: 'Awaiting reports' }[a.status] || a.status;
@@ -319,6 +359,12 @@ How I want you to work:
       <section><h3>Reverse image search</h3><div class="rev">${f.reverse.map(r => `<a href="${r.url}" target="_blank" rel="noopener"><b>${r.name} ↗</b><span>${esc(r.how)}</span></a>`).join('')}</div></section>`;
   }
 
+  function offenderHtml(c) {
+    const o = c.offenders || [];
+    if (!o.length) return (c.indicators || []).length ? `<section><div class="callout">I added ${c.indicators.length} identifier${c.indicators.length > 1 ? 's' : ''} to your offender index (${[...new Set(c.indicators.map(i => i.type))].join(', ')}). If any reappear in a later case, Scam Bunker will connect them.</div></section>` : '';
+    return `<section class="offender"><h3>Repeat offender</h3><p class="muted">These identifiers have appeared in earlier cases.</p>${o.map(x => `<div class="linkcard"><div class="top"><span class="tag">${esc(x.type)}</span><code>${esc(x.label)}</code><span class="w strong">${x.cases.length}× before</span></div><ul>${x.cases.slice(0, 5).map(p => `<li>${esc(new Date(p.at).toLocaleDateString())} · ${esc(p.verdict)}${p.platform ? ' · ' + esc(p.platform) : ''}: “${esc(p.snippet)}…”</li>`).join('')}</ul></div>`).join('')}</section>`;
+  }
+
   function renderLinks(c) {
     const h = c.heuristics, e = h.entities;
     const mark = (ex, m) => esc(ex).replace(esc(m), `<mark>${esc(m)}</mark>`);
@@ -337,7 +383,7 @@ How I want you to work:
   function renderTimeline(c) {
     const f = c.forensics;
     const items = (f?.timeline || []).map(t => ({ ...t }));
-    items.push({ when: c.at.slice(0, 19), what: 'Case opened in Deduce', src: 'This investigation', trust: 'low' });
+    items.push({ when: c.at.slice(0, 19), what: 'Case opened in Scam Bunker', src: 'This investigation', trust: 'low' });
     items.sort((a, b) => a.when.localeCompare(b.when));
     panel('timeline').innerHTML = `${!f ? '<p class="empty">Add an image to rebuild its timeline from embedded timestamps.</p>' : !f.earliest ? '<div class="callout">The file has no surviving embedded timestamps, which is typical after social-media upload. To date it, run a reverse image search and use the earliest indexed copy (TinEye: sort by Oldest).</div>' : ''}
       <div class="tl">${items.map(t => `<div class="tl-item ${t.trust === 'low' ? 'low' : ''}"><time>${esc(t.when.replace('T', ' · '))}</time><p>${esc(t.what)}</p><small>${esc(t.src)} · trust ${esc(t.trust)}</small></div>`).join('')}</div>`;
@@ -364,12 +410,15 @@ How I want you to work:
 
   // ---------- History ----------
   function saveCase(c) {
-    const v = V(c); const list = store.get('deduce.cases', []);
-    list.unshift({ id: c.id, at: c.at, text: c.text.slice(0, 4000), url: c.url, platform: c.platform, verdict: v.verdict, risk: v.risk, headline: v.headline, final: c.final || null, local: c.local, heuristics: c.heuristics, agents: c.agents, forensics: c.forensics ? { ...DeduceForensics.summarize(c.forensics), elaUrl: null } : null });
-    store.set('deduce.cases', list.slice(0, 40));
+    const v = V(c); const list = store.get('scambunker.cases', []);
+    list.unshift({ id: c.id, at: c.at, indicators: c.indicators || [], text: c.text.slice(0, 4000), url: c.url, platform: c.platform, verdict: v.verdict, risk: v.risk, headline: v.headline, final: c.final || null, local: c.local, heuristics: c.heuristics, agents: c.agents, forensics: c.forensics ? { ...DeduceForensics.summarize(c.forensics), elaUrl: null } : null });
+    store.set('scambunker.cases', list.slice(0, 200));
   }
   $('#btn-history').addEventListener('click', () => {
-    const list = store.get('deduce.cases', []);
+    const list = store.get('scambunker.cases', []);
+    const idx = {}; list.forEach(x => (x.indicators || []).forEach(i => { (idx[i.key] = idx[i.key] || { ...i, n: 0 }).n++; }));
+    const repeat = Object.values(idx).filter(i => i.n > 1).sort((a, b) => b.n - a.n);
+    $('#offender-index').innerHTML = repeat.length ? `<h4>Repeat offenders across your cases</h4><ul class="list red">${repeat.slice(0, 12).map(i => `<li><b>${esc(i.label)}</b> · ${esc(i.type)} · in ${i.n} cases</li>`).join('')}</ul>` : '';
     $('#history-list').innerHTML = list.length ? list.map(x => `<div class="hist" data-id="${x.id}"><span class="d" style="background:${VERDICT_COLOR[x.verdict] || 'var(--muted)'}"></span><div class="t"><b>${esc(x.verdict)} · ${x.risk}</b><span>${esc(x.text || x.url || 'Image case')}</span></div><small class="muted">${new Date(x.at).toLocaleDateString()}</small></div>`).join('') : '<p class="empty">No saved cases yet.</p>';
     $$('#history-list .hist').forEach(el => el.addEventListener('click', () => {
       const x = list.find(i => i.id === el.dataset.id); if (!x) return;
@@ -379,11 +428,11 @@ How I want you to work:
     }));
     $('#dlg-history').showModal();
   });
-  $('#history-clear').addEventListener('click', () => { store.set('deduce.cases', []); $('#history-list').innerHTML = '<p class="empty">No saved cases yet.</p>'; });
+  $('#history-clear').addEventListener('click', () => { store.set('scambunker.cases', []); $('#history-list').innerHTML = '<p class="empty">No saved cases yet.</p>'; });
 
   // ---------- Persona ----------
   $('#btn-persona').addEventListener('click', () => $('#dlg-persona').showModal());
-  $('#persona-save').addEventListener('click', () => { store.set('deduce.persona', $('#persona').value); toast('Profile saved. Agents will follow it on the next case'); });
+  $('#persona-save').addEventListener('click', () => { store.set('scambunker.persona', $('#persona').value); toast('Profile saved. Agents will follow it on the next case'); });
   $('#persona-reset').addEventListener('click', () => { $('#persona').value = DEFAULT_PERSONA; });
 
   // ---------- Export ----------
@@ -395,8 +444,8 @@ How I want you to work:
   }
   $('#btn-copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(summaryText(current)); toast('Summary copied'); } catch { toast('Clipboard blocked'); } });
   $('#btn-export').addEventListener('click', () => {
-    const c = current; const blob = new Blob([`<!doctype html><meta charset="utf-8"><title>Deduce case ${c.id}</title><style>body{font:15px/1.6 Georgia,serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1b1d22}pre{white-space:pre-wrap;font:14px/1.6 Georgia,serif}</style><pre>${esc(summaryText(c))}</pre>`], { type: 'text/html' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `deduce-case-${c.id}.html`; a.click();
+    const c = current; const blob = new Blob([`<!doctype html><meta charset="utf-8"><title>Scam Bunker case ${c.id}</title><style>body{font:15px/1.6 Georgia,serif;max-width:760px;margin:40px auto;padding:0 20px;color:#1b1d22}pre{white-space:pre-wrap;font:14px/1.6 Georgia,serif}</style><pre>${esc(summaryText(c))}</pre>`], { type: 'text/html' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `scam-bunker-case-${c.id}.html`; a.click();
   });
 
   function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); }

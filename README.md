@@ -1,10 +1,10 @@
-# Deduce
+# Scam Bunker
 
-**An open-source investigation lab for debunking scams, disinformation and manipulated images.**
+**An open-source lab for identifying scams, profiling repeat offenders, and debunking disinformation and manipulated images.**
 
-Drop in an image, a post, a DM or a link. Deduce dates the image, checks whether AI generated it, pulls out the information hidden in the file, takes the links apart, and classifies the scheme. With an API key it also hands the evidence to a team of AI specialists. A lead investigator, modelled on Sherlock Holmes's method, cross-examines their reports and delivers the verdict.
+Drop in an image, a post, a DM or a link. Scam Bunker dates the image, checks whether AI generated it, pulls out the information hidden in the file, takes the links apart, and classifies the scheme. With an API key it also hands the evidence to a team of AI specialists. A lead investigator, modelled on Sherlock Holmes's method, cross-examines their reports and delivers the verdict.
 
-![Deduce agents room](docs/screenshot.png)
+![Scam Bunker agents room](docs/screenshot.png)
 
 ## What it does
 
@@ -18,6 +18,7 @@ Drop in an image, a post, a DM or a link. Deduce dates the image, checks whether
 | **Classifies scams** | Phishing, investment/crypto, romance/pig-butchering, job/task, giveaway, advance-fee, impersonation, tech support, recovery scams, marketplace fraud |
 | **Detects coordination** | Copy-paste comment rings, hashtag stuffing, mass-tagging, "my advisor" testimonial networks |
 | **Dissects links** | Typosquats, punycode homographs, brand-in-subdomain tricks, `@` tricks, shorteners, high-abuse TLDs, redirect chains, tracking parameters |
+| **Profiles repeat offenders** | Every case adds the scammer's wallets, handles, phone numbers, emails, domains, image hashes and camera serials to a local offender index. New cases are matched against it automatically, and reuse is flagged as strong evidence |
 | **Extracts entities** | Crypto wallets (with block-explorer links), phone numbers, handles, emails, money amounts |
 | **Agent team** | Image Forensics (vision), Fraud Analyst, OSINT & Platform Analyst and Fact Checker run in parallel. The Lead Investigator then reconciles their reports and returns a structured verdict |
 
@@ -28,8 +29,8 @@ Every finding is labelled **proof**, **strong** or **weak**. Missing metadata is
 Requires Node.js 22 or later. There are no dependencies to install.
 
 ```bash
-git clone https://github.com/<you>/deduce.git
-cd deduce
+git clone https://github.com/mevan101/scam_bunker.git
+cd scam_bunker
 cp .env.example .env    # optional — works with no keys at all
 npm start               # → http://localhost:4400
 ```
@@ -39,7 +40,7 @@ npm start               # → http://localhost:4400
 | Mode | Setup | Cost |
 |---|---|---|
 | **Investigate with Claude** | None. The button packs the case and all five agent roles into one prompt and opens claude.ai | Your existing Claude plan |
-| **Ollama (local)** | Install [Ollama](https://ollama.com), then run `ollama pull gemma3`. Deduce detects it on start | Free, offline, private |
+| **Ollama (local)** | Install [Ollama](https://ollama.com), then run `ollama pull gemma3`. Scam Bunker detects it on start | Free, offline, private |
 | **OpenAI-compatible API** | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` (Groq, OpenRouter, LM Studio and others) | Free tiers available |
 | **Anthropic API** | `ANTHROPIC_API_KEY` | Pay per use |
 
@@ -65,8 +66,8 @@ test/run.js           npm test
 
 ## Limitations
 
-- Metadata can be forged or stripped. Deduce reports what the file says and how far to trust it.
-- Statistical AI detection is unreliable on its own. Deduce treats it as a weak signal by design.
+- Metadata can be forged or stripped. Scam Bunker reports what the file says and how far to trust it.
+- Statistical AI detection is unreliable on its own. Scam Bunker treats it as a weak signal by design.
 - Facebook, Instagram and LinkedIn block anonymous page fetches. Paste the post text instead.
 - This is an aid to judgement and does not replace it. Verify before you accuse anyone publicly.
 
