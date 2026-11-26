@@ -67,6 +67,13 @@ function swScope(src, { origin = 'https://example.test', scope = '/scam_bunker/'
     assert.ok(!assets.some(a => /404\.html|sw\.js|docs\/|\.nojekyll/.test(a)), 'no 404, sw.js, screenshots or .nojekyll');
   });
 
+  await test('build refuses output dirs that would wipe the repo or its sources', () => {
+    const repo = path.join(__dirname, '..');
+    for (const d of [repo, path.join(repo, 'public'), path.join(repo, 'public/shared'), path.join(repo, 'test'), path.dirname(repo)])
+      assert.throws(() => build(d), /refusing to wipe/, d);
+    assert.ok(fs.existsSync(path.join(PUB, 'index.html')) && fs.existsSync(path.join(__dirname, 'pwa.test.js')), 'sources untouched');
+  });
+
   await test('cache version is deterministic and changes when any file changes', () => {
     const copy = path.join(tmp, 'copy'); fs.cpSync(PUB, copy, { recursive: true });
     const v1 = buildVersion(copy);
@@ -152,24 +159,40 @@ function swScope(src, { origin = 'https://example.test', scope = '/scam_bunker/'
   });
 
   // pwa.js under vm with a stubbed browser
-  function runPwa({ dataStatic = false, secure = true, readyStatic = null } = {}) {
-    const registered = [], listeners = {};
-    const reg = { waiting: null, addEventListener() {}, update: async () => {} };
+  function runPwa({ dataStatic = false, secure = true, readyStatic = null, waiting = null } = {}) {
+    const registered = [], listeners = {}, swListeners = {}, buttons = {}, state = { reloads: 0, appended: 0 };
+    const reg = { waiting, addEventListener() {}, update: async () => {} };
+    const el = () => ({ setAttribute() {}, remove() {}, querySelector: (sel) => (buttons[sel] = buttons[sel] || { addEventListener: (t, fn) => { buttons[sel].click = fn; } }) });
     const ctx = {
       window: { isSecureContext: secure }, console,
-      navigator: { serviceWorker: { controller: null, addEventListener() {}, register: (u) => { registered.push(u); return Promise.resolve(reg); } } },
-      document: { documentElement: { hasAttribute: (a) => a === 'data-static' && dataStatic }, addEventListener: (t, fn) => { listeners[t] = fn; } },
-      location: { reload() {} },
+      navigator: { serviceWorker: { controller: waiting ? {} : null, addEventListener: (t, fn) => { swListeners[t] = fn; }, register: (u) => { registered.push(u); return Promise.resolve(reg); } } },
+      document: { documentElement: { hasAttribute: (a) => a === 'data-static' && dataStatic }, addEventListener: (t, fn) => { listeners[t] = fn; }, createElement: el, body: { appendChild: () => state.appended++ } },
+      location: { reload: () => state.reloads++ },
     };
     vm.createContext(ctx); vm.runInContext(fs.readFileSync(path.join(PUB, 'pwa.js'), 'utf8'), ctx);
     if (readyStatic !== null && listeners['sb:ready']) listeners['sb:ready']({ detail: { static: readyStatic } });
-    return registered;
+    return Object.assign(registered, { state, buttons, swListeners });
   }
   await test('pwa.js registers sw.js only in static mode on a secure origin (never for npm start / npm run dev)', () => {
-    assert.deepStrictEqual(runPwa({ readyStatic: false }), [], 'server mode: no service worker');
-    assert.deepStrictEqual(runPwa({ readyStatic: true }), ['sw.js'], 'static mode via sb:ready');
-    assert.deepStrictEqual(runPwa({ dataStatic: true }), ['sw.js'], 'static mode already detected');
-    assert.deepStrictEqual(runPwa({ readyStatic: true, secure: false }), [], 'insecure origin: no service worker');
+    assert.deepStrictEqual([...runPwa({ readyStatic: false })], [], 'server mode: no service worker');
+    assert.deepStrictEqual([...runPwa({ readyStatic: true })], ['sw.js'], 'static mode via sb:ready');
+    assert.deepStrictEqual([...runPwa({ dataStatic: true })], ['sw.js'], 'static mode already detected');
+    assert.deepStrictEqual([...runPwa({ readyStatic: true, secure: false })], [], 'insecure origin: no service worker');
+  });
+
+  await test('pwa.js reloads only the tab whose user clicked Reload', async () => {
+    const posted = [];
+    const other = runPwa({ dataStatic: true, waiting: { postMessage: (m) => posted.push(m) } });
+    await new Promise(r => setImmediate(r));
+    assert.strictEqual(other.state.appended, 1, 'update prompt shown');
+    other.swListeners.controllerchange();
+    assert.strictEqual(other.state.reloads, 0, 'Reload clicked in another tab (or first install) does not reload this tab');
+    const me = runPwa({ dataStatic: true, waiting: { postMessage: (m) => posted.push(m) } });
+    await new Promise(r => setImmediate(r));
+    me.buttons['.pwa-reload'].click();
+    assert.strictEqual(posted.at(-1).type, 'SKIP_WAITING');
+    me.swListeners.controllerchange(); me.swListeners.controllerchange();
+    assert.strictEqual(me.state.reloads, 1, 'accepted tab reloads exactly once');
   });
 
   fs.rmSync(tmp, { recursive: true, force: true });
