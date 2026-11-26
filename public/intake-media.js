@@ -627,9 +627,12 @@
   }
   document.addEventListener('sb:case', e => {
     const c = e.detail, r = last;
-    if (!c || !r || c._intakeMediaObs || !(r.qr.length || (r.ocr && r.ocr.text))) return;
+    if (!c || !r || c._intakeMediaObs) return;
     // Simple mode reads the file again for every check; the Investigator form reuses one reading per attached image.
     if (r.via === 'adapter' ? r.consumed : !(c.imagePreview && c.imagePreview === r.previewSrc)) return;
+    // A screenshot or QR image is readable private content: keep its pixels out of the AI agents' case (imageData).
+    if (c.forensics && c.forensics.visionData && ((r.screenshot && r.screenshot.isScreenshot) || r.qr.length)) delete c.forensics.visionData;
+    if (!(r.qr.length || (r.ocr && r.ocr.text))) return;
     r.consumed = true;
     try { applyToCase(c, r); } catch (err) { console.debug('intake-media: could not add reasons', err); }
   });
