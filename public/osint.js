@@ -431,10 +431,11 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
     const results = await Promise.all(doms.map(d => lookupDomain({ domain: d }).then(r => [d, r]).catch(e => [d, { error: e.message }])));
     c.domainAges = Object.fromEntries(results.map(([d, r]) => [d, r.error ? { error: r.error } : { registeredAt: r.registeredAt || null, ageDays: r.ageDays ?? null, registrar: r.registrar || null, young: !!r.young, registered: r.registered !== false }]));
     const young = results.filter(([, r]) => r.young && r.ageDays != null);
-    const reg = ([d, r]) => r.queried || d;
+    // One plain warning per registration: subdomains that fell back to the same parent share it.
+    const byReg = new Map(); young.forEach(([d, r]) => { const k = r.queried || d; if (!byReg.has(k)) byReg.set(k, [d, r]); });
     const plain = {
-      reasons: young.map(([d, r]) => ({ text: `The website ${reg([d, r])} was created only ${plural(r.ageDays, 'day')} ago (${fmtDate(r.registeredAt)}). Scam websites are usually brand new. Real banks, shops and employers have had theirs for years.`, weight: r.ageDays < 30 ? 'strong' : 'moderate', quote: d, source: 'Public domain registration records (RDAP)' })),
-      actions: young.map(e => ({ text: `Check for yourself when ${reg(e)} was created`, href: `https://lookup.icann.org/en/lookup?name=${encodeURIComponent(reg(e))}` }))
+      reasons: [...byReg].map(([k, [d, r]]) => ({ text: `The website ${k} was registered on ${fmtDate(r.registeredAt)}, only ${plural(r.ageDays, 'day')} before this check. Scam websites are usually brand new. Real banks, shops and employers have had theirs for years.`, weight: r.ageDays < 30 ? 'strong' : 'moderate', quote: d, source: 'Public domain registration records (RDAP)' })),
+      actions: [...byReg.keys()].map(k => ({ text: `Check for yourself when ${k} was created`, href: `https://lookup.icann.org/en/lookup?name=${encodeURIComponent(k)}` }))
     };
     c._osintPlain = plain;
     addReasons(c, plain.reasons);
