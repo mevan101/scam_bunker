@@ -558,7 +558,6 @@
 
   function frameCard(c, fr, i) {
     const u = (frameUrls.get(c.id) || [])[fr.idx];
-    const name = `video-frame-${fr.t.toFixed(2)}s`;
     const srv = SB.server() || {};
     const vis = (c.video.vision || {})[i];
     return `<figure class="vid-frame" aria-label="Keyframe at ${esc(fmtT(fr.t))}">
@@ -567,7 +566,7 @@
         <div class="vid-top"><time>${esc(fmtT(fr.t))}</time><span class="tag">${fr.kind === 'scene' ? `scene change Δ${esc(fr.diff)}` : 'interval'}</span>${fr.dupOf != null ? `<span class="tag">same shot as ${esc(fmtT(c.video.frames[fr.dupOf].t))}</span>` : ''}</div>
         ${fr.hash ? `<code title="Perceptual hashes (dHash · pHash)">d ${esc(fr.hash.d)} · p ${esc(fr.hash.p)}</code>` : ''}
         ${(fr.weak || []).length ? fr.weak.map(w => `<span>${W('weak')} ${esc(w)}</span>`).join('') : `<span class="muted">No pixel-level AI hints${fr.noise != null ? ` · noise ${esc(fr.noise)}` : ''}</span>`}
-        ${u ? `<div class="vid-acts"><a href="${esc(u.url)}" download="${esc(name)}.jpg">Download frame</a><a href="${esc(u.mirrorUrl)}" download="${esc(name)}-mirrored.jpg">Mirrored</a><button type="button" class="link" data-vid-copy="${i}">Copy</button></div>
+        ${u ? `<div class="vid-acts"><button type="button" class="link" data-vid-dl="${i}">Download frame</button><button type="button" class="link" data-vid-dl="${i}" data-mirror>Mirrored</button><button type="button" class="link" data-vid-copy="${i}">Copy</button></div>
         <div class="vid-acts" aria-label="Reverse search this frame">${ENGINES.map(([n, href]) => `<a href="${href}" target="_blank" rel="noopener" data-vid-search="${i}" aria-label="${esc(n)}: reverse-search the frame at ${esc(fmtT(fr.t))} (copies the frame first)">${esc(n)} ↗</a>`).join('')}</div>
         ${srv.ai && fr.vision ? `<div class="vid-acts"><button type="button" class="link" data-vid-vision="${i}">${vis ? 'Ask the vision agent again' : 'Send this frame to the vision agent'}</button></div>` : ''}` : ''}
         ${vis ? `<div class="vid-vision" role="status">${esc(vis)}</div>` : ''}
@@ -636,6 +635,12 @@
   document.addEventListener('click', e => {
     if (e.target.closest('#history-list .hist')) { setTimeout(() => { const c = SB.current; if (c && c.video) c.video.frameStatus = (frameUrls.get(c.id) ? c.video.frameStatus : 'saved'); render(c); }, 0); return; }
     const c = SB.current; if (!c || !c.video) return;
+    const dl = e.target.closest('[data-vid-dl]');
+    if (dl) { // created on demand so the page only ever renders http(s) links
+      const fr = c.video.frames[+dl.dataset.vidDl], u = fr && (frameUrls.get(c.id) || [])[fr.idx]; if (!u) return;
+      const a = document.createElement('a'); a.href = dl.hasAttribute('data-mirror') ? u.mirrorUrl : u.url; a.download = `video-frame-${fr.t.toFixed(2)}s${dl.hasAttribute('data-mirror') ? '-mirrored' : ''}.jpg`;
+      document.body.appendChild(a); a.click(); a.remove(); return;
+    }
     const cp = e.target.closest('[data-vid-copy]');
     if (cp) { copyFrame(c, +cp.dataset.vidCopy).then(ok => SB.toast(ok ? 'Frame copied. Paste it into any reverse image search' : 'Clipboard blocked. Use “Download frame” instead')); return; }
     const se = e.target.closest('[data-vid-search]');
