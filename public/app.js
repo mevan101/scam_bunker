@@ -302,14 +302,14 @@ How I want you to work:
     $('#v-title').textContent = v.verdict || 'Analysing…';
     $('#v-headline').textContent = v.headline || '';
     $('#v-source').textContent = c.final ? `Final verdict · lead investigator after ${Object.keys(c.agents).length - 1} reports` : server.ai ? 'Preliminary · local engines, agents deliberating…' : 'Local engines · press “Investigate with Claude” for the agent team';
-    const tags = [v.category, v.confidence != null && `confidence ${v.confidence}%`, c.platform, c.forensics && `AI: ${(v.ai_involvement || {}).assessment || c.forensics.ai.verdict}`].filter(Boolean);
+    const tags = [v.estimative, v.category, v.confidence != null && `confidence ${v.confidence}%`, c.platform, c.forensics && `AI: ${(v.ai_involvement || {}).assessment || c.forensics.ai.verdict}`].filter(Boolean);
     $('#v-tags').innerHTML = tags.map(t => `<span class="tag">${esc(t)}</span>`).join('');
     const risk = +v.risk || 0; $('#g-val').textContent = risk; $('#g-fg').style.strokeDashoffset = 314 - 314 * risk / 100;
   }
 
   function renderDeduction(c) {
     const v = V(c);
-    const obs = (v.observations || []).map(o => `<div class="ob"><div><span class="k">Observation</span><p>${esc(o.fact)}</p></div><div><span class="k">Inference</span><p>${esc(o.inference)}</p></div><span class="w ${esc(o.weight)}">${esc(o.weight)}</span></div>`).join('');
+    const obs = (v.observations || []).map(o => `<div class="ob"><div><span class="k">Observation</span><p>${esc(o.fact)}</p></div><div><span class="k">Inference</span><p>${esc(o.inference)}</p></div><span>${o.grade ? `<span class="tag" title="Admiralty grade: ${esc(o.gradeMeaning || '')}"><span class="sr-only">Grade </span>${esc(o.grade)}</span> ` : ''}<span class="w ${esc(o.weight)}">${esc(o.weight)}</span></span></div>`).join('');
     const boxes = [];
     if (v.image_dating) boxes.push(`<div class="box"><div class="k">Image dates back to</div><div class="big">${esc(v.image_dating.earliest || 'Unknown from file')}</div><p>${esc(v.image_dating.basis)}</p></div>`);
     if (v.ai_involvement) boxes.push(`<div class="box"><div class="k">AI involvement</div><div class="big">${esc(v.ai_involvement.assessment)}</div><p>${esc(v.ai_involvement.basis)}</p></div>`);
@@ -442,9 +442,9 @@ How I want you to work:
   // ---------- Export ----------
   function summaryText(c) {
     const v = V(c);
-    return [`DEDUCE CASE REPORT · ${new Date(c.at).toLocaleString()}`, `Verdict: ${v.verdict} (${v.category}) · risk ${v.risk}/100 · confidence ${v.confidence}%`, c.platform && `Platform: ${c.platform}`, c.url && `URL: ${c.url}`, '', v.headline, '', 'DEDUCTION', v.deduction, '', 'EVIDENCE', ...(v.observations || []).map(o => `- [${o.weight}] ${o.fact} → ${o.inference}`),
+    return [`DEDUCE CASE REPORT · ${new Date(c.at).toLocaleString()}`, `Verdict: ${v.verdict} (${v.category}) · risk ${v.risk}/100 · confidence ${v.confidence}%`, v.estimative && `Assessment: ${v.estimative}`, c.platform && `Platform: ${c.platform}`, c.url && `URL: ${c.url}`, '', v.headline, '', 'DEDUCTION', v.deduction, '', 'EVIDENCE', ...(v.observations || []).map(o => `- [${o.weight}${o.grade ? ' · ' + o.grade : ''}] ${o.fact} → ${o.inference}`),
       v.image_dating && `\nIMAGE DATING: ${v.image_dating.earliest || 'unknown'}, ${v.image_dating.basis}`, v.ai_involvement && `AI INVOLVEMENT: ${v.ai_involvement.assessment}, ${v.ai_involvement.basis}`,
-      (v.hidden_info || []).length && '\nHIDDEN INFO\n' + v.hidden_info.map(x => '- ' + x).join('\n'), ...(c.provenance?.reportLines || []), '\nNEXT STEPS', ...(v.next_steps || []).map(x => '- ' + x), '\nADVICE', v.advice].filter(x => x !== null && x !== undefined && x !== false).join('\n');
+      (v.hidden_info || []).length && '\nHIDDEN INFO\n' + v.hidden_info.map(x => '- ' + x).join('\n'), ...(c.provenance?.reportLines || []), ...(c.grading?.reportLines || []), '\nNEXT STEPS', ...(v.next_steps || []).map(x => '- ' + x), '\nADVICE', v.advice].filter(x => x !== null && x !== undefined && x !== false).join('\n');
   }
   $('#btn-copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(summaryText(current)); toast('Summary copied'); } catch { toast('Clipboard blocked'); } });
   $('#btn-export').addEventListener('click', () => {
