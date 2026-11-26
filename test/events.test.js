@@ -289,3 +289,19 @@ test('fetch hardening: gzip bodies are decoded, credential URLs refused, odd pat
   assert.equal(r.fields.geo, undefined);
   assert.ok(core.venueMatch({ venueName: 'Hall A', venueAddress: '1 Main St', geo: { lat: 0, lon: 0 } }, { venueName: 'Hall A', venueAddress: '1 Main St', geo: { lat: 23.7, lon: 90.4 } }).score >= 0.85);
 });
+
+test('fetch: hostile Content-Encoding names are ignored rather than crashing', async () => {
+  for (const enc of ['constructor', '__proto__', 'toString']) {
+    const srv = require('http').createServer((q, s) => { s.writeHead(200, { 'content-type': 'text/html', 'content-encoding': enc }); s.end('<h1>ok</h1>'); });
+    await new Promise(r => srv.listen(0, '127.0.0.1', r));
+    try { assert.equal((await ev.fetchFollow(`http://127.0.0.1:${srv.address().port}/`, { guard: async () => {} })).body, '<h1>ok</h1>'); }
+    finally { srv.close(); }
+  }
+});
+
+test('ledger: a program inferred from the URL is credited to the URL, not to the fetched page', () => {
+  const l = core.normalizeListing({ id: 'L1', title: 'T', start: '2025-11-02T10:00:00+06:00', url: 'https://developer.microsoft.com/en-us/reactor/events/12345/', programs: ['Northwind Dev Circle'], sources: { programs: 'jsonld · fetched from https://example.org/e/1' } });
+  assert.deepEqual(l.programs, ['Northwind Dev Circle', 'Microsoft Reactor']);
+  assert.equal(l.sources.programs, 'jsonld · fetched from https://example.org/e/1 + url (Microsoft Reactor)');
+  assert.equal(core.normalizeListing({ id: 'L2', title: 'T', start: '2025-11-02T10:00:00+06:00', url: 'https://mlh.io/e/1', programs: ['MLH'], sources: { programs: 'jsonld' } }).sources.programs, 'jsonld');
+});

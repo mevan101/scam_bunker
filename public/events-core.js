@@ -184,6 +184,10 @@
     const plat = platformOf(l.finalUrl || l.url);
     l.platform = l.platform || plat.platform || (l.manual ? 'manual entry' : null);
     l.programs = uniqCI([...(l.programs || []), plat.program]);
+    if (plat.program && !(raw.programs || []).some(x => String(x).toLowerCase() === plat.program.toLowerCase())) {
+      const prior = (raw.sources || {}).programs;
+      l.sources = { ...(raw.sources || {}), programs: [prior, `url (${plat.program})`].filter(Boolean).join(' + ') };
+    }
     l.organizers = uniqCI(l.organizers);
     l.zone = l.tz ? { tz: l.tz } : s && s.offsetMin != null && !s.interpreted ? { offsetMin: s.offsetMin } : null;
     l.startUtc = s ? s.utcMs : null;
