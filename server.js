@@ -79,12 +79,16 @@ Respond with ONLY a JSON object, no prose outside it:
  "risk": integer 0-100,
  "headline": one sentence a non-expert understands,
  "deduction": 3-6 sentence chain of reasoning in your voice, citing specific evidence,
- "observations": [ { "fact": string, "inference": string, "weight": "strong"|"moderate"|"weak" } ],
+ "likelihood": one of ["Almost no chance","Very unlikely","Unlikely","Roughly even chance","Likely","Very likely","Almost certain"] (ICD 203 term for the verdict),
+ "analytic_confidence": "low"|"moderate"|"high" (quality of the evidence base, separate from likelihood),
+ "observations": [ { "fact": string, "inference": string, "weight": "strong"|"moderate"|"weak", "source": short name of where the fact comes from, "grade": Admiralty pair such as "C3" (source reliability A-F, information credibility 1-6; F6 if unknown; judge the two separately) } ],
  "disagreements": [string],
  "image_dating": { "earliest": string or null, "basis": string },
  "ai_involvement": { "assessment": "none detected"|"possible"|"likely"|"confirmed", "basis": string },
  "hidden_info": [string],
  "next_steps": [string],
+ "limitations": [string] (what this analysis could not check),
+ "would_change_if": [string] (specific findings that would change the verdict),
  "advice": string (what the person should do now)
 }`;
 
