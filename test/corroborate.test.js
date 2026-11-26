@@ -121,6 +121,8 @@ const fixture = f => fs.readFileSync(path.join(__dirname, 'fixtures', f));
     await S.weather({ lat: 23.811, lon: 90.409, date: '2024-07-15' }); assert.strictEqual(calls.length, 1, 'cached by rounded grid');
     const shifted = await S.weather({ lat: 23.81, lon: 90.41, date: '2024-07-15', hour: 15, offsetMin: 360 });
     assert.strictEqual(shifted.hourly.time, '2024-07-15T09:00', '15:00 at +06:00 is 09:00 in the GMT answer');
+    const outside = S.summarizeWeather({ daily: { time: ['2024-07-15'], weather_code: [0] }, hourly: { time: [] } }, null, '2024-07-17');
+    assert.strictEqual(S.checkClaim(outside, 'clear').result, 'unverifiable', 'a day missing from the response is not graded from another day');
     await assert.rejects(S.weather({ lat: 1, lon: 1, date: '2024-01-01', hour: 1, offsetMin: 5000 }), e => e.status === 400);
     await assert.rejects(S.weather({ lat: 123, lon: 0, date: '2024-07-15' }), e => e.status === 400);
     await assert.rejects(S.weather({ lat: 1, lon: 1, date: '2999-01-01' }), e => e.status === 400);

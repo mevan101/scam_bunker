@@ -124,10 +124,10 @@ function summarizeWeather(j, hour = null, date = null, offsetMin = null) {
   const hourKey = hour == null ? null : offsetMin == null ? `${date}T${String(hour).padStart(2, '0')}`
     : new Date(Date.parse(`${date}T${String(hour).padStart(2, '0')}:00:00Z`) + ((j.utc_offset_seconds || 0) - offsetMin * 60) * 1000).toISOString().slice(0, 13);
   const localDate = hourKey ? hourKey.slice(0, 10) : date;
-  const d = j.daily, i = Math.max(0, d.time.indexOf(localDate)), pick = k => (d[k] ? d[k][i] : null), h = j.hourly || {};
-  const sameDay = (h.time || []).map((t, k) => (String(t).slice(0, 10) === d.time[i] ? h.snow_depth?.[k] : null)).filter(v => v != null);
+  const d = j.daily, i = d.time.indexOf(localDate), pick = k => (i >= 0 && d[k] ? d[k][i] ?? null : null), h = j.hourly || {};
+  const sameDay = (h.time || []).map((t, k) => (String(t).slice(0, 10) === localDate ? h.snow_depth?.[k] : null)).filter(v => v != null);
   const daily = {
-    date: d.time[i], code: pick('weather_code'), text: wmoText(pick('weather_code')),
+    date: localDate, code: pick('weather_code'), text: wmoText(pick('weather_code')),
     tmax: pick('temperature_2m_max'), tmin: pick('temperature_2m_min'), precip: pick('precipitation_sum'), snow: pick('snowfall_sum'),
     cloud: pick('cloud_cover_mean'), sunrise: pick('sunrise'), sunset: pick('sunset'),
     snowDepth: sameDay.length ? Math.max(...sameDay) : null,
