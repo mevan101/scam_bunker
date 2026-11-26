@@ -54,9 +54,16 @@
 
   function clearMarks() { marked.forEach(el => el.classList.remove('tour-target')); marked = []; }
 
+  // Never overwrite what the visitor has already entered: an example replaces the text and link but keeps attachments.
+  function hasDraft() {
+    const filled = [...document.querySelectorAll('#text, #url, [data-tour="input"] textarea, [data-tour="input"] input:not([type=file])')].some(el => el.value && el.value.trim());
+    const file = document.getElementById('drop-full');
+    return filled || !!(file && !file.hidden);
+  }
+
   function loadExample() {
     const chip = document.querySelector('[data-tour="examples"] button, [data-tour="examples"] [data-sample], .samples [data-sample]');
-    if (!chip || hasCase()) return Promise.resolve();
+    if (!chip || hasCase() || hasDraft()) return Promise.resolve();
     loading = true;
     return new Promise(resolve => {
       let done = false;
@@ -75,7 +82,7 @@
     marked.forEach(el => el.classList.add('tour-target'));
     if (marked[0]) marked[0].scrollIntoView({ block: 'start', behavior: reduce() ? 'auto' : 'smooth' });
     const prev = nextIndex(STEPS, i, -1, exists), next = nextIndex(STEPS, i, 1, exists);
-    const nextNeedsLoad = s.loads && !hasCase();
+    const nextNeedsLoad = s.loads && !hasCase() && !hasDraft();
     const last = next < 0 && !nextNeedsLoad;
     const plan = planned(), pos = Math.max(1, plan.filter(j => j <= i).length), total = Math.max(pos, plan.length);
     card.innerHTML = `<p class="tour-step">Tour · step ${pos} of ${total}</p><h2 id="tour-h" tabindex="-1">${s.title}</h2><p id="tour-p">${s.body}</p>`
@@ -85,7 +92,7 @@
   }
 
   async function go(dir) {
-    if (dir > 0 && STEPS[step].loads && !hasCase()) {
+    if (dir > 0 && STEPS[step].loads && !hasCase() && !hasDraft()) {
       card.querySelector('[data-tour-act="next"]').disabled = true;
       await loadExample();
       if (!card) return;
