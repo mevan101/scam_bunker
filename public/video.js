@@ -352,7 +352,7 @@
 
     // AI signals: declared metadata first, statistics only as weak hints.
     const hay = [raw.xmp || '', JSON.stringify(raw.udta || {}), JSON.stringify(raw.keys || {}), JSON.stringify(raw.tags || {}), v.encoder, v.software, v.title, raw.writingApp || '', raw.muxingApp || ''].join('\n');
-    if (/trainedAlgorithmicMedia/i.test(hay) || /c2pa\.ai_generat|"ai_generated"\s*:\s*(true|"true"|"yes"|1)\b/i.test(hay)) v.ai.signals.push({ label: 'Metadata declares AI generation (IPTC trainedAlgorithmicMedia / C2PA assertion)', strength: 'proof' });
+    if (/trainedAlgorithmicMedia/i.test(hay) || /c2pa\.ai_generat|"ai_generated"\s*:\s*(true\b|"(true|yes)"|1\b)/i.test(hay)) v.ai.signals.push({ label: 'Metadata declares AI generation (IPTC trainedAlgorithmicMedia / C2PA assertion)', strength: 'proof' });
     for (const g of VIDEO_GENERATORS) if (g.re.test(hay)) { v.ai.signals.push({ label: `${g.gen} named in the metadata`, strength: 'strong' }); v.ai.generators.push(g.gen); }
     if (v.c2pa) v.notes.push('Content Credentials (C2PA) marker present but not validated. Check it at contentcredentials.org/verify');
     if (v.duration && v.duration <= 10.5 && !v.hasAudio && !v.make && !v.model) v.ai.weak.push(`Short (${v.duration.toFixed(1)} s), silent clip with no device metadata: typical of AI video generators, but also of GIF conversions and edited clips`);
