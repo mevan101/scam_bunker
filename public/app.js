@@ -75,7 +75,7 @@ How I want you to work:
   // ---------- Tabs ----------
   $$('#tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
   $('#tabs').addEventListener('keydown', e => {
-    const tabs = $$('#tabs button'), i = tabs.indexOf(document.activeElement); if (i < 0) return;
+    const tabs = $$('#tabs button').filter(b => !b.hidden), i = tabs.indexOf(document.activeElement); if (i < 0) return;
     const j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key]; if (j === undefined) return;
     e.preventDefault(); const n = tabs[(j + tabs.length) % tabs.length]; n.focus(); showTab(n.dataset.tab);
   });
@@ -413,7 +413,7 @@ How I want you to work:
   // ---------- History ----------
   function saveCase(c) {
     const v = V(c); const list = store.get('scambunker.cases', []);
-    list.unshift({ id: c.id, at: c.at, indicators: c.indicators || [], text: c.text.slice(0, 4000), url: c.url, platform: c.platform, verdict: v.verdict, risk: v.risk, headline: v.headline, final: c.final || null, local: c.local, heuristics: c.heuristics, agents: c.agents, forensics: c.forensics ? { ...DeduceForensics.summarize(c.forensics), elaUrl: null } : null });
+    list.unshift({ id: c.id, at: c.at, indicators: c.indicators || [], text: c.text.slice(0, 4000), url: c.url, platform: c.platform, verdict: v.verdict, risk: v.risk, headline: v.headline, final: c.final || null, local: c.local, heuristics: c.heuristics, agents: c.agents, provenance: c.provenance || null, forensics: c.forensics ? { ...DeduceForensics.summarize(c.forensics), elaUrl: null } : null });
     store.set('scambunker.cases', list.slice(0, 200));
   }
   $('#btn-history').addEventListener('click', () => {
@@ -442,7 +442,7 @@ How I want you to work:
     const v = V(c);
     return [`DEDUCE CASE REPORT · ${new Date(c.at).toLocaleString()}`, `Verdict: ${v.verdict} (${v.category}) · risk ${v.risk}/100 · confidence ${v.confidence}%`, c.platform && `Platform: ${c.platform}`, c.url && `URL: ${c.url}`, '', v.headline, '', 'DEDUCTION', v.deduction, '', 'EVIDENCE', ...(v.observations || []).map(o => `- [${o.weight}] ${o.fact} → ${o.inference}`),
       v.image_dating && `\nIMAGE DATING: ${v.image_dating.earliest || 'unknown'}, ${v.image_dating.basis}`, v.ai_involvement && `AI INVOLVEMENT: ${v.ai_involvement.assessment}, ${v.ai_involvement.basis}`,
-      (v.hidden_info || []).length && '\nHIDDEN INFO\n' + v.hidden_info.map(x => '- ' + x).join('\n'), '\nNEXT STEPS', ...(v.next_steps || []).map(x => '- ' + x), '\nADVICE', v.advice].filter(x => x !== null && x !== undefined && x !== false).join('\n');
+      (v.hidden_info || []).length && '\nHIDDEN INFO\n' + v.hidden_info.map(x => '- ' + x).join('\n'), ...(c.provenance?.reportLines || []), '\nNEXT STEPS', ...(v.next_steps || []).map(x => '- ' + x), '\nADVICE', v.advice].filter(x => x !== null && x !== undefined && x !== false).join('\n');
   }
   $('#btn-copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(summaryText(current)); toast('Summary copied'); } catch { toast('Clipboard blocked'); } });
   $('#btn-export').addEventListener('click', () => {
