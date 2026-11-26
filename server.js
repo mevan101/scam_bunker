@@ -8,6 +8,7 @@ const path = require('path');
 const { assertPublicUrl } = require('./server/net-guard');
 const provenance = require('./server/provenance');
 const factcheck = require('./server/factcheck');
+const corroborate = require('./server/corroborate');
 
 const PORT = process.env.PORT || 4400;
 const HOST = process.env.HOST || '127.0.0.1'; // localhost only by default, so others on your network can't spend your API key
@@ -262,6 +263,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && u.pathname === '/api/search') return await handleSearch(req, res);
     if (req.method === 'POST' && factcheck.routes[u.pathname]) return send(res, 200, await factcheck.routes[u.pathname](await readBody(req)));
     if (req.method === 'POST' && provenance.routes[u.pathname]) return send(res, 200, await provenance.routes[u.pathname](await readBody(req)));
+    if (req.method === 'POST' && corroborate.routes[u.pathname]) return send(res, 200, await corroborate.routes[u.pathname](await readBody(req)));
     let p = path.normalize(path.join(PUB, u.pathname === '/' ? 'index.html' : u.pathname));
     if (p !== PUB && !p.startsWith(PUB + path.sep)) return send(res, 403, 'forbidden', 'text/plain');
     fs.readFile(p, (err, data) => {
