@@ -27,6 +27,15 @@
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
   async function postJson(path, body) { return SB.post(path, body); }
+  // Static mode (GitHub Pages): RDAP, mempool.space and TronGrid straight from the browser, same code as the server.
+  const direct = window.ScamBunkerDirect;
+  // Simple mode (default) vs Investigator mode: ScamBunker.mode() lands with the Simple-mode shell, so call it defensively.
+  const isSimple = () => typeof SB.mode === 'function' && SB.mode() === 'simple';
+  const addReasons = (c, r) => { if (typeof SB.addReasons === 'function' && r.length) SB.addReasons(c, r); };
+  const addActions = (c, a) => { if (typeof SB.addActions === 'function' && a.length) SB.addActions(c, a); };
+  const canLookup = () => SB.server().online || (SB.isStatic() && !!direct);
+  const lookupDomain = body => SB.isStatic() ? direct.domain(body) : postJson('/api/osint/domain', body);
+  const lookupWallet = body => SB.isStatic() ? direct.wallet(body) : postJson('/api/osint/wallet', body);
 
   // ---------- Dialog & tabs ----------
   const dlg = $('#dlg-subjects');
@@ -80,14 +89,18 @@
         ${(s?.caseIds || []).length ? `<div class="muted">${plural(s.caseIds.length, 'case')} linked by hand.</div>` : ''}
         <div class="os-bar">
           <button type="submit" class="primary sm">Save subject</button>
-          <button type="button" class="ghost" id="os-run" ${SB.server().online ? '' : 'disabled title="The Scam Bunker server is not reachable"'}>Save &amp; run public checks</button>
+          <button type="button" class="ghost" id="os-run" ${canLookup() ? '' : 'disabled title="The Scam Bunker server is not reachable"'}>Save &amp; run public checks</button>
           ${s ? `<button type="button" class="ghost" id="os-dossier">View dossier</button><button type="button" class="ghost" id="os-delete">Delete subject</button>` : ''}
         </div>
+        <p class="muted os-sends" id="os-sends" aria-live="polite"></p>
       </form>
       <div id="os-results" class="os-section" style="margin-top:18px">${s ? findingsHtml(s) : ''}</div>`;
     $('#os-subject', p).addEventListener('change', e => { state.subjectId = e.target.value || null; renderInvestigate(); });
     $('#os-form', p).addEventListener('submit', e => { e.preventDefault(); const saved = saveForm(); if (saved) toast(`Saved subject “${saved.name}”`); });
     $('#os-run', p).addEventListener('click', () => { const saved = saveForm(); if (saved) runChecks(saved.id); });
+    const form = $('#os-form', p), showSends = () => { $('#os-sends', p).textContent = subjectSendsNote(new FormData(form)); };
+    $('#os-run', p).setAttribute('aria-describedby', 'os-sends');
+    form.addEventListener('input', showSends); showSends();
     $('#os-dossier', p)?.addEventListener('click', () => { state.cluster = 's:' + state.subjectId; showOsTab('dossiers'); });
     $('#os-delete', p)?.addEventListener('click', () => {
       if (!confirm(`Delete the subject file “${s.name}”? Linked cases are kept.`)) return;
@@ -96,22 +109,26 @@
     bindHideToggles(p);
   }
 
+  // The form's valid, de-duplicated indicators, in field order (what saveForm stores and runChecks looks up).
+  function formIndicators(fd) {
+    const inds = [], rejected = [];
+    for (const [name, type] of FIELD_TYPES) {
+      for (const raw of splitList(fd.get(name))) {
+        const ind = D.indicatorFor(type, raw);
+        if (!ind) { rejected.push(raw); continue; }
+        if (!inds.some(x => x.key === ind.key)) inds.push(ind);
+      }
+    }
+    return { inds, rejected };
+  }
   function saveForm() {
     const f = $('#os-form'); const fd = new FormData(f);
     const s = (state.subjectId && getSubject(state.subjectId)) || newSubject();
     const before = new Map((s.indicators || []).map(i => [i.key, i]));
     const now = new Date().toISOString();
-    const rejected = [];
+    const { inds: typed, rejected } = formIndicators(fd);
     const inds = (s.indicators || []).filter(i => !FIELD_TYPES.some(t => t[1] === i.type)); // keep image/camera links from cases
-    for (const [name, type] of FIELD_TYPES) {
-      for (const raw of splitList(fd.get(name))) {
-        const ind = D.indicatorFor(type, raw);
-        if (!ind) { rejected.push(raw); continue; }
-        if (inds.some(x => x.key === ind.key)) continue;
-        const old = before.get(ind.key);
-        inds.push({ ...ind, addedAt: old?.addedAt || now, source: old?.source || 'manual' });
-      }
-    }
+    for (const ind of typed) { const old = before.get(ind.key); inds.push({ ...ind, addedAt: old?.addedAt || now, source: old?.source || 'manual' }); }
     s.name = String(fd.get('name') || '').trim() || inds.find(i => i.type === 'handle')?.label || 'Unnamed subject';
     s.aliases = splitList(fd.get('aliases'));
     s.notes = String(fd.get('notes') || '').slice(0, 4000);
@@ -123,6 +140,23 @@
   }
 
   // ---------- Public checks ----------
+  // What "Save & run public checks" sends, and to whom (same limits as runChecks).
+  const via = () => SB.isStatic() ? null : 'Your Scam Bunker server';
+  // Every name RDAP may be asked for: a subdomain with no record of its own falls back to its parent domains.
+  const rdapNames = doms => [...new Set(doms.flatMap(d => window.ScamBunkerOsintCore?.domainCandidates(d) || [d]))];
+  function subjectSendsNote(fd) {
+    const { inds } = formIndicators(fd), vals = (type, max) => inds.filter(i => i.type === type).map(i => i.key.slice(7)).slice(0, max);
+    const RE = window.ScamBunkerOsintCore?.WALLET_RE || {}, wallets = vals('wallet', MAX_LOOKUPS), chain = c => wallets.filter(w => RE[c]?.test(w));
+    const st = SB.isStatic();
+    const note = direct.sendsNote([
+      { what: 'username', values: st ? [] : vals('handle', MAX_USERNAMES), to: 'about 60 public platforms' },
+      { what: 'domain', values: rdapNames(vals('domain', MAX_LOOKUPS)), to: 'rdap.org' },
+      { what: 'BTC wallet', values: chain('btc'), to: 'mempool.space' },
+      { what: 'TRON wallet', values: chain('tron'), to: st ? 'api.trongrid.io' : 'api.trongrid.io (or Tronscan, if a key is set)' },
+      { what: 'ETH wallet', values: st ? [] : chain('eth'), to: 'Etherscan, if a key is set' }
+    ], { via: via() });
+    return note ? `${note} Nothing is sent until you click.` : '';
+  }
   async function runChecks(id) {
     if (state.running) return;
     const s = getSubject(id); if (!s) return;
@@ -137,8 +171,8 @@
     try {
       await Promise.all([
         (async () => { for (const u of handles.slice(0, MAX_USERNAMES)) await sweep(id, u, out); })(),
-        ...domains.map(d => lookup(id, 'domains', d, () => postJson('/api/osint/domain', { domain: d }))),
-        ...wallets.map(w => lookup(id, 'wallets', w.key.slice(7), () => postJson('/api/osint/wallet', { chain: w.chain || D.walletChain(w.key.slice(7)), address: w.key.slice(7) }))),
+        ...domains.map(d => lookup(id, 'domains', d, () => lookupDomain({ domain: d }))),
+        ...wallets.map(w => lookup(id, 'wallets', w.key.slice(7), () => lookupWallet({ chain: w.chain || D.walletChain(w.key.slice(7)), address: w.key.slice(7) }))),
       ]);
       if (handles.length > MAX_USERNAMES) toast(`Checked the first ${MAX_USERNAMES} usernames only, to stay polite to the platforms`);
     } finally {
@@ -182,6 +216,7 @@
   async function sweep(id, username, out) {
     let sec = $(`section[data-user="${CSS.escape(username)}"]`, out);
     if (!sec) { sec = document.createElement('section'); sec.className = 'os-section'; sec.dataset.user = username; out.prepend(sec); }
+    if (SB.isStatic()) { sec.innerHTML = `<h4>Username <code>${esc(username)}</code></h4>${localSweepHtml()}`; return; }
     sec.innerHTML = `<h4>Username <code>${esc(username)}</code></h4><p class="os-sum" role="status">Starting…</p>`;
     const results = [];
     try {
@@ -214,6 +249,9 @@
     }
   }
 
+  // Platforms send no CORS headers, so a browser page cannot read their answers: the sweep needs the local server.
+  const localSweepHtml = () => direct ? direct.localAppHtml(esc, 'Username sweep', 'Checking a username across ~60 platforms needs the Scam Bunker server, because the platforms do not let other websites read their pages. Domain and wallet checks still run here.')
+    : '<p class="os-sum">The username sweep needs the local app.</p>';
   const summaryLine = (sum, total) => `${total} platforms · ${sum.found || 0} found · ${sum.not_found || 0} not found · ${sum.unknown || 0} unknown · ${sum.blocked || 0} blocked`;
   function usernameSectionHtml(username, results, at, live) {
     const sum = results.reduce((a, x) => (a[x.status] = (a[x.status] || 0) + 1, a), {});
@@ -273,6 +311,8 @@
   function findingsHtml(s) {
     const f = s.findings || {}; const parts = [];
     Object.entries(f.usernames || {}).forEach(([u, x]) => parts.push(`<section class="os-section" data-user="${esc(u)}">${usernameSectionHtml(u, x.results || [], x.at, false)}</section>`));
+    if (SB.isStatic()) (s.indicators || []).filter(i => i.type === 'handle').map(i => i.key.slice(7)).filter(u => !Object.hasOwn(f.usernames || {}, u)).slice(0, MAX_USERNAMES)
+      .forEach(u => parts.push(`<section class="os-section" data-user="${esc(u)}"><h4>Username <code>${esc(u)}</code></h4>${localSweepHtml()}</section>`));
     const ds = Object.values(f.domains || {}), ws = Object.values(f.wallets || {});
     if (ds.length) parts.push(`<section class="os-section" id="os-domains"><h4>Domains (RDAP)</h4>${ds.map(domainCard).join('')}</section>`);
     if (ws.length) parts.push(`<section class="os-section" id="os-wallets"><h4>Wallets (public ledgers)</h4>${ws.map(walletCard).join('')}</section>`);
@@ -373,7 +413,7 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
   const linksPanel = SB.panel('links');
   function injectAttach() {
     const c = SB.current;
-    if (!c || !linksPanel || $('.os-attach', linksPanel)) return;
+    if (!c || !linksPanel || isSimple() || $('.os-attach', linksPanel)) return;
     const inds = (c.indicators || []).filter(i => D.STRONG_TYPES.includes(i.type));
     const subjects = loadSubjects();
     const keys = new Set(inds.map(i => i.key));
@@ -407,31 +447,100 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
   // ---------- Current case: domain age via RDAP ----------
   const domainObs = (d, r) => ({ fact: `${d} was registered ${plural(r.ageDays, 'day')} ago (${fmtDate(r.registeredAt)}${r.registrar ? ', ' + r.registrar : ''})`, inference: 'Newly registered domain. Phishing and fake-investment sites are usually days or weeks old when they are used; established businesses rarely are.', weight: r.ageDays < 30 ? 'strong' : 'moderate', source: 'rdap' });
   function addObs(v, ob) { if (v && Array.isArray(v.observations) && !v.observations.some(o => o.fact === ob.fact)) v.observations.unshift(ob); }
-  async function checkCaseDomains(c) {
-    if (!c || c._osintDomains || !SB.server().online) return;
-    c._osintDomains = true;
+  function caseDomains(c) {
     const risk = new Map((c.heuristics?.links || []).filter(l => l.host).map(l => [l.host.replace(/^www\./, ''), l.risk || 0]));
-    const doms = (c.indicators || []).filter(i => i.type === 'domain').map(i => i.key.slice(7)).sort((a, b) => (risk.get(b) || 0) - (risk.get(a) || 0)).slice(0, 3);
+    return (c.indicators || []).filter(i => i.type === 'domain').map(i => i.key.slice(7)).sort((a, b) => (risk.get(b) || 0) - (risk.get(a) || 0)).slice(0, 3);
+  }
+  // Private by default: a case's domains are only sent to RDAP when the user clicks, after a note saying what goes where.
+  async function checkCaseDomains(c) {
+    if (!c || c._osintDomains || !canLookup()) return;
+    const doms = caseDomains(c);
     if (!doms.length) return;
-    const results = await Promise.all(doms.map(d => postJson('/api/osint/domain', { domain: d }).then(r => [d, r]).catch(e => [d, { error: e.message }])));
-    c.domainAges = Object.fromEntries(results.map(([d, r]) => [d, r.error ? { error: r.error } : { registeredAt: r.registeredAt || null, ageDays: r.ageDays ?? null, registrar: r.registrar || null, young: !!r.young, registered: r.registered !== false }]));
-    const obs = results.filter(([, r]) => r.young && r.ageDays != null).map(([d, r]) => domainObs(d, r));
-    if (!obs.length) return;
-    c._osintObs = obs;
-    obs.forEach(ob => { addObs(c.local, ob); addObs(c.final, ob); });
-    if (SB.current === c) SB.renderAll();
+    c._osintDomains = true; c._osintAge = 'run'; refreshAgeCards();
+    try { await checkDomains(c, doms); c._osintAge = 'done'; }
+    catch (e) { c._osintAge = 'error'; c._osintAgeError = e.message; c._osintDomains = false; }
+    finally { refreshAgeCards(); }
+  }
+  async function checkDomains(c, doms) {
+    const results = await Promise.all(doms.map(d => lookupDomain({ domain: d }).then(r => [d, r]).catch(e => [d, { error: e.message }])));
+    c.domainAges = Object.fromEntries(results.map(([d, r]) => [d, r.error ? { error: r.error } : { registeredAt: r.registeredAt || null, ageDays: r.ageDays ?? null, registrar: r.registrar || null, young: !!r.young, registered: r.registered !== false, ...(r.queried && r.queried !== d ? { queried: r.queried } : {}) }]));
+    const young = results.filter(([, r]) => r.young && r.ageDays != null);
+    // One plain warning per registration: subdomains that fell back to the same parent share it.
+    const byReg = new Map(); young.forEach(([d, r]) => { const k = r.queried || d; if (!byReg.has(k)) byReg.set(k, [d, r]); });
+    const plain = {
+      reasons: [...byReg].map(([k, [d, r]]) => ({ text: `The website ${k} was registered on ${fmtDate(r.registeredAt)}, only ${plural(r.ageDays, 'day')} before this check. Scam websites are usually brand new. Real banks, shops and employers have had theirs for years.`, weight: r.ageDays < 30 ? 'strong' : 'moderate', quote: d, source: 'Public domain registration records (RDAP)' })),
+      actions: [...byReg.keys()].map(k => ({ text: `Check for yourself when ${k} was created`, href: `https://lookup.icann.org/en/lookup?name=${encodeURIComponent(k)}` }))
+    };
+    c._osintPlain = plain;
+    addReasons(c, plain.reasons);
+    addActions(c, plain.actions);
+    const obs = young.map(([d, r]) => domainObs(d, r));
+    if (obs.length) {
+      c._osintObs = obs;
+      obs.forEach(ob => { addObs(c.local, ob); addObs(c.final, ob); });
+      if (SB.current === c) SB.renderAll();
+    }
     patchSavedCase(c);
   }
   function patchSavedCase(c) {
     const list = store.get('scambunker.cases', []); const x = list.find(i => i.id === c.id); if (!x) return;
     (c._osintObs || []).forEach(ob => { addObs(x.local, ob); addObs(x.final, ob); });
     x.domainAges = c.domainAges;
+    // Saved cases keep the plain-language findings, whether the lookup finished before or after the save.
+    const keep = (have, add) => [...(have || []), ...add.filter(a => !(have || []).some(h => h.text === a.text))];
+    if (c._osintPlain) { x.simpleReasons = keep(x.simpleReasons, c._osintPlain.reasons); x.simpleActions = keep(x.simpleActions, c._osintPlain.actions); }
     store.set('scambunker.cases', list);
   }
-  document.addEventListener('sb:case', e => { checkCaseDomains(e.detail).catch(err => console.debug('domain age check skipped:', err)); });
+  function syncMode() {
+    const btn = document.getElementById('btn-subjects'); if (btn) btn.hidden = isSimple();
+    if (isSimple()) $$('.os-attach').forEach(x => x.remove()); else injectAttach();
+  }
+  document.addEventListener('sb:mode', syncMode);
+  document.addEventListener('sb:ready', syncMode);
+  // Domain-age card: in the Simple result and in the Investigator deduction panel. Both are re-rendered by their owners,
+  // so the card is re-attached after each render.
+  function ageCardHtml(c, simple) {
+    const doms = c && canLookup() ? caseDomains(c) : [];
+    if (!doms.length) return '';
+    const ages = c.domainAges || {}, done = doms.filter(d => ages[d]);
+    let body;
+    if (c._osintAge === 'run') body = `<p class="muted" role="status">Checking the public registration records…</p>`;
+    else if (done.length) body = `<ul class="list">${done.map(d => `<li>${ageLine(d, ages[d])}</li>`).join('')}</ul>${simple && !done.some(d => ages[d].young) ? '<p class="muted">An older website is not proof it is safe: scammers also use hacked or look-alike sites.</p>' : ''}`;
+    else body = `${c._osintAge === 'error' ? `<p class="muted" role="status">The check did not work: ${esc(c._osintAgeError || 'unknown error')}. You can try again.</p>` : ''}
+      <button type="button" class="ghost ${simple ? 's-btn' : 'sm'}" data-os-age aria-describedby="os-age-note-${simple ? 's' : 'i'}">${simple ? 'Check how old the website is' : 'Check domain age (RDAP)'}</button>
+      <p class="muted os-sends" id="os-age-note-${simple ? 's' : 'i'}">${esc(direct.sendsNote([{ what: 'domain', values: rdapNames(doms), to: 'rdap.org' }], { via: via() }))}</p>`;
+    return simple
+      ? `<section class="s-card s-sec os-age-check" aria-labelledby="os-age-h"><h3 id="os-age-h">How old is the website?</h3><p class="s-sec-lede">Scam websites are often only days or weeks old. The public registration record shows when a website was created.</p>${body}</section>`
+      : `<section class="callout os-age-check" aria-labelledby="os-age-hi"><div><b id="os-age-hi">Domain age</b>${body}</div></section>`;
+  }
+  function ageLine(d, a) {
+    if (a.error) return `${esc(d)}: the record could not be read (${esc(a.error)})`;
+    if (a.registered === false) return `${esc(d)}: no public registration record was found`;
+    const who = a.queried ? `${esc(d)} is part of ${esc(a.queried)}, which` : esc(d);
+    if (!a.registeredAt) return `${who} has a public registration record, but it does not give a creation date`;
+    return `${who} was registered on ${esc(fmtDate(a.registeredAt))}${a.ageDays != null ? ` (${plural(a.ageDays, 'day')} before this check)` : ''}`;
+  }
+  function mountAgeCard(box, simple) {
+    if (!box) return;
+    const old = $(':scope > .os-age-check', box), html = ageCardHtml(SB.current, simple);
+    if (old && old.dataset.html === html) return;
+    const hadFocus = old && old.contains(document.activeElement);
+    old?.remove();
+    if (!html || box.hidden && simple) return;
+    const t = document.createElement('template'); t.innerHTML = html.trim(); const el = t.content.firstChild; el.dataset.html = html;
+    const before = simple ? $(':scope > [data-tour="actions"]', box) : null;
+    box.insertBefore(el, before || null);
+    if (hadFocus) ($('[data-os-age]', el) || $('h3, b', el))?.focus?.();
+  }
+  const simpleBox = () => document.getElementById('s-result'), dedBox = () => document.querySelector('[data-panel="deduction"]');
+  function refreshAgeCards() { mountAgeCard(simpleBox(), true); mountAgeCard(dedBox(), false); }
+  const watch = box => box && new MutationObserver(() => mountAgeCard(box, box === simpleBox())).observe(box, { childList: true });
+  watch(simpleBox()); watch(dedBox());
+  document.addEventListener('sb:case', refreshAgeCards);
+  document.addEventListener('click', e => { if (e.target.closest('[data-os-age]')) checkCaseDomains(SB.current); });
   document.addEventListener('sb:case-complete', e => {
-    const c = e.detail; if (!c?._osintObs) return;
-    c._osintObs.forEach(ob => { addObs(c.local, ob); addObs(c.final, ob); });
+    const c = e.detail; if (!c?.domainAges) return;
+    (c._osintObs || []).forEach(ob => { addObs(c.local, ob); addObs(c.final, ob); });
     patchSavedCase(c);
     if (SB.current === c) SB.renderAll();
   });

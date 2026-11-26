@@ -1,0 +1,275 @@
+{
+ "domain: young, from a full URL": {
+  "out": {
+   "code": 200,
+   "body": {
+    "domain": "coinbase-pro-wallet.xyz",
+    "registered": true,
+    "registeredAt": "2026-11-12T08:15:30.000Z",
+    "ageDays": 14,
+    "expiresAt": "2027-11-12T23:59:59.000Z",
+    "updatedAt": "2026-11-13T10:02:11.000Z",
+    "registrar": "Example Registrar, LLC",
+    "registrarIanaId": "1068",
+    "registrarAbuseEmail": "abuse@registrar.example",
+    "status": [
+     "client transfer prohibited",
+     "server hold"
+    ],
+    "nameservers": [
+     "ada.ns.cloudflare.com",
+     "bob.ns.cloudflare.com"
+    ],
+    "young": true,
+    "queried": "coinbase-pro-wallet.xyz",
+    "source": "rdap.org",
+    "input": "coinbase-pro-wallet.xyz",
+    "lookup": "https://lookup.icann.org/en/lookup?name=coinbase-pro-wallet.xyz"
+   }
+  },
+  "urls": [
+   "https://rdap.org/domain/coinbase-pro-wallet.xyz"
+  ]
+ },
+ "domain: subdomain falls back to the parent": {
+  "out": {
+   "code": 200,
+   "body": {
+    "domain": "example.com",
+    "registered": true,
+    "registeredAt": "1995-08-14T04:00:00.000Z",
+    "ageDays": 11427,
+    "expiresAt": "2027-08-13T04:00:00.000Z",
+    "updatedAt": "2026-08-14T07:01:39.000Z",
+    "registrar": "RESERVED-Internet Assigned Numbers Authority",
+    "registrarIanaId": "376",
+    "registrarAbuseEmail": null,
+    "status": [
+     "client delete prohibited",
+     "client transfer prohibited",
+     "client update prohibited"
+    ],
+    "nameservers": [
+     "a.iana-servers.net",
+     "b.iana-servers.net"
+    ],
+    "young": false,
+    "queried": "example.com",
+    "source": "rdap.org",
+    "input": "login.example.com",
+    "lookup": "https://lookup.icann.org/en/lookup?name=login.example.com"
+   }
+  },
+  "urls": [
+   "https://rdap.org/domain/login.example.com",
+   "https://rdap.org/domain/example.com"
+  ]
+ },
+ "domain: no RDAP record": {
+  "out": {
+   "code": 200,
+   "body": {
+    "domain": "nothing-here.example",
+    "registered": false,
+    "source": "rdap.org",
+    "note": "No RDAP record. The domain may be unregistered, or its registry may not publish RDAP. Check a WHOIS service by hand.",
+    "input": "nothing-here.example",
+    "lookup": "https://lookup.icann.org/en/lookup?name=nothing-here.example"
+   }
+  },
+  "urls": [
+   "https://rdap.org/domain/nothing-here.example"
+  ]
+ },
+ "domain: rate limited": {
+  "out": {
+   "status": 503,
+   "error": "RDAP rate limit reached. Try again in a minute"
+  },
+  "urls": [
+   "https://rdap.org/domain/busy.example"
+  ]
+ },
+ "domain: registry error": {
+  "out": {
+   "status": 502,
+   "error": "RDAP lookup failed (HTTP 500)"
+  },
+  "urls": [
+   "https://rdap.org/domain/broken.example"
+  ]
+ },
+ "domain: invalid": {
+  "out": {
+   "status": 400,
+   "error": "Not a valid domain name"
+  },
+  "urls": []
+ },
+ "wallet: BTC": {
+  "out": {
+   "code": 200,
+   "body": {
+    "available": true,
+    "chain": "BTC",
+    "address": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+    "txCount": 5,
+    "unconfirmedTxCount": 1,
+    "fundedTxo": 3,
+    "spentTxo": 1,
+    "totalReceivedSats": 152000000,
+    "totalSentSats": 100000000,
+    "balanceSats": 52500000,
+    "totalReceivedBtc": 1.52,
+    "balanceBtc": 0.525,
+    "source": "mempool.space",
+    "firstSeen": "2024-11-11T04:40:00.000Z",
+    "lastSeen": "2024-11-19T07:06:40.000Z",
+    "firstSeenExact": true,
+    "explorer": "https://mempool.space/address/bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+   }
+  },
+  "urls": [
+   "https://mempool.space/api/address/bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+   "https://mempool.space/api/address/bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh/txs"
+  ]
+ },
+ "wallet: BTC lookup fails": {
+  "out": {
+   "status": 502,
+   "error": "mempool.space lookup failed (HTTP 404)"
+  },
+  "urls": [
+   "https://mempool.space/api/address/1BoatSLRHtKNngkdXEeobR76b53LETtpyT"
+  ]
+ },
+ "wallet: TRON with USDT transfers": {
+  "out": {
+   "code": 200,
+   "body": {
+    "available": true,
+    "chain": "TRON",
+    "address": "TJYeasTPa6gpEEfYqCP9sMBc7NJqKPDJvT",
+    "activated": true,
+    "balanceTrx": 12.5,
+    "usdtBalance": 48210.5,
+    "firstSeen": "2024-10-15T13:46:40.000Z",
+    "firstSeenExact": true,
+    "lastSeen": "2024-11-25T02:00:00.000Z",
+    "trc20Contracts": 2,
+    "source": "trongrid",
+    "usdtTransfersIn": 3,
+    "usdtTransfersOut": 1,
+    "usdtReceived": 2250,
+    "uniqueSenders": 2,
+    "usdtFirstTransfer": "2024-10-16T17:33:20.000Z",
+    "usdtLastTransfer": "2024-11-23T22:13:20.000Z",
+    "usdtPageComplete": true,
+    "explorer": "https://tronscan.org/#/address/TJYeasTPa6gpEEfYqCP9sMBc7NJqKPDJvT"
+   }
+  },
+  "urls": [
+   "https://api.trongrid.io/v1/accounts/TJYeasTPa6gpEEfYqCP9sMBc7NJqKPDJvT",
+   "https://api.trongrid.io/v1/accounts/TJYeasTPa6gpEEfYqCP9sMBc7NJqKPDJvT/transactions/trc20?limit=200&contract_address=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
+  ]
+ },
+ "wallet: TRON never activated": {
+  "out": {
+   "code": 200,
+   "body": {
+    "available": true,
+    "chain": "TRON",
+    "address": "TXexampNeverUsed111111111111111111",
+    "activated": false,
+    "txCount": null,
+    "firstSeen": null,
+    "lastSeen": null,
+    "balanceTrx": 0,
+    "usdtBalance": 0,
+    "tokens": [],
+    "source": "trongrid",
+    "explorer": "https://tronscan.org/#/address/TXexampNeverUsed111111111111111111"
+   }
+  },
+  "urls": [
+   "https://api.trongrid.io/v1/accounts/TXexampNeverUsed111111111111111111"
+  ]
+ },
+ "wallet: TRON TronGrid down": {
+  "out": {
+   "status": 502,
+   "error": "TronGrid lookup failed (HTTP 404)"
+  },
+  "urls": [
+   "https://api.trongrid.io/v1/accounts/TXexampTronGridDown111111111111111"
+  ]
+ },
+ "wallet: ETH without a key": {
+  "out": {
+   "code": 200,
+   "body": {
+    "available": false,
+    "chain": "ETH",
+    "address": "0xabababababababababababababababababababab",
+    "note": "Set ETHERSCAN_API_KEY on the server for Ethereum lookups. Open the explorer link instead.",
+    "explorer": "https://etherscan.io/address/0xabababababababababababababababababababab"
+   }
+  },
+  "urls": []
+ },
+ "wallet: unknown chain": {
+  "out": {
+   "status": 400,
+   "error": "Unknown chain. Use btc, tron or eth"
+  },
+  "urls": []
+ },
+ "wallet: bad address": {
+  "out": {
+   "status": 400,
+   "error": "Not a valid BTC address"
+  },
+  "urls": []
+ },
+ "wayback: captures": {
+  "out": {
+   "ok": true,
+   "url": "https://www.example.com/photos/flood.jpg",
+   "captures": 3,
+   "capturesCapped": false,
+   "firstSeen": "2019-03-16T10:15:00Z",
+   "firstTimestamp": "20190316101500",
+   "firstStatus": "200",
+   "firstMime": "image/jpeg",
+   "firstSnapshot": "https://web.archive.org/web/20190316101500/https://www.example.com/photos/flood.jpg",
+   "firstRaw": "https://web.archive.org/web/20190316101500im_/https://www.example.com/photos/flood.jpg",
+   "firstDigest": "JQ4TB3A5Y2G2S6ZK6V3D7Q4N6W5Y2C3D",
+   "firstAnyCapture": "2019-03-14T08:30:12Z",
+   "lastSeen": "2026-03-10T12:00:00Z",
+   "lastSnapshot": "https://web.archive.org/web/20260310120000/https://www.example.com/photos/flood.jpg",
+   "distinctDigests": 2,
+   "mimetypes": [
+    "text/html",
+    "image/jpeg"
+   ]
+  }
+ },
+ "wayback: not archived": {
+  "out": {
+   "ok": true,
+   "url": "https://new.example/",
+   "captures": 0,
+   "firstSeen": null,
+   "lastSeen": null,
+   "saveUrl": "https://web.archive.org/save/https://new.example/",
+   "note": "Not in the Wayback Machine"
+  }
+ },
+ "wayback: excluded": {
+  "out": {
+   "ok": false,
+   "url": "https://excluded.example/",
+   "error": "Wayback CDX answered HTTP 403 (site excluded from the archive)"
+  }
+ }
+}
