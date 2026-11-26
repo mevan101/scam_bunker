@@ -285,7 +285,14 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
     return { html, manifest: m, report };
   }
 
-  const api = { GENESIS, FORMAT, BENIGN, canonicalJSON, sha256Hex, textDigest, normText, utf8Length, entryHash, makeEntry, appendEntry, outputDigest, verifyChain, evidenceRecord, correctionInput, effectiveFindings, ruleStats, bytesToB64, b64ToBytes, verifyManifest, parsePackage, verifyPackage, summarizeEntry, renderReport, buildPackage, embeddedVerifier };
+  // The case a custody action concerns: the one the panel shows, never whatever case happens to be current.
+  function caseForPanel(panelCaseId, current, saved) {
+    if (!panelCaseId) return null;
+    if (current && current.id === panelCaseId) return current;
+    return (Array.isArray(saved) ? saved : []).find(x => x && x.id === panelCaseId) || null;
+  }
+
+  const api = { GENESIS, FORMAT, BENIGN, canonicalJSON, sha256Hex, textDigest, normText, utf8Length, entryHash, makeEntry, appendEntry, outputDigest, verifyChain, evidenceRecord, correctionInput, effectiveFindings, ruleStats, bytesToB64, b64ToBytes, verifyManifest, parsePackage, verifyPackage, summarizeEntry, renderReport, buildPackage, embeddedVerifier, caseForPanel };
   if (typeof window !== 'undefined') window.ScamBunkerCustody = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof document === 'undefined' || typeof window === 'undefined' || !window.ScamBunker) return;
@@ -649,13 +656,15 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
   // ---------- Events ----------
   document.addEventListener('sb:case', e => { const c = e.detail; caseTask(c.id, () => intake(c)).then(() => SB.current === c && render(c)); });
   document.addEventListener('sb:case-complete', e => { const c = e.detail; caseTask(c.id, () => complete(c)).then(() => SB.current === c && render(c)); });
+  document.addEventListener('sb:case-open', () => render(SB.current));
   // The clearing tab already emptied shared storage; other tabs only drop their tab-local copies.
   window.addEventListener('storage', e => { if (e.key === LS + 'cleared') { Store.forgetLocal(); render(SB.current); } });
   document.addEventListener('click', e => {
     if (e.target.closest('#history-list .hist')) { setTimeout(() => render(SB.current), 0); return; }
     if (e.target.closest('#btn-history')) { setTimeout(annotateHistory, 0); return; }
     if (e.target.closest('#history-clear')) { Store.clear().then(() => render(SB.current)); return; }
-    const c = SB.current; if (!c) return;
+    if (!e.target.closest('[id^="cust-"]')) return;
+    const c = caseForPanel(SB.panel('custody')?.dataset.caseId, SB.current, SB.store.get('scambunker.cases', [])); if (!c) return;
     if (e.target.closest('#cust-start')) { caseTask(c.id, () => startLate(c)).then(() => render(SB.current)); return; }
     if (e.target.closest('#cust-export')) { exportPackage(c); return; }
     if (e.target.closest('#cust-recheck')) { recheck(c); return; }

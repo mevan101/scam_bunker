@@ -450,6 +450,7 @@ How I want you to work:
     current = { ...x, imagePreview: null, forensics: x.forensics ? { ...x.forensics, reverse: [], timeline: x.forensics.timeline || [], ai: x.forensics.ai, elaUrl: '' } : null };
     $('#text').value = x.text; $('#url').value = x.url || '';
     $('#placeholder').hidden = true; $('#report').hidden = false; renderAll(current); showTab('deduction');
+    document.dispatchEvent(new CustomEvent('sb:case-open', { detail: current }));
     return true;
   }
   $('#history-clear').addEventListener('click', () => { store.set('scambunker.cases', []); $('#history-list').innerHTML = '<p class="empty">No saved cases yet.</p>'; });

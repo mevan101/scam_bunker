@@ -222,6 +222,18 @@ async function sampleLog() {
     assert.ok(!rb.ok); assert.ok(kinds(rb).includes('report')); assert.ok(rb.problems.length > 1, 'chain problems are still reported');
   });
 
+  await test('custody actions target the case the panel shows, not whatever case is current', async () => {
+    const a = { id: 'case-demo-a', verdict: 'Scam' }, b = { id: 'case-demo-b', verdict: 'Suspicious' };
+    const saved = [{ id: 'case-demo-a', verdict: 'Scam' }, { id: 'case-demo-b', verdict: 'Suspicious' }];
+    assert.strictEqual(C.caseForPanel('case-demo-a', a, saved), a);
+    // B was opened (current) but the panel still shows A: the action is recorded against A.
+    assert.strictEqual(C.caseForPanel('case-demo-a', b, saved).id, 'case-demo-a');
+    assert.strictEqual(C.caseForPanel('case-demo-b', b, saved), b);
+    assert.strictEqual(C.caseForPanel(undefined, b, saved), null, 'no panel case → no action');
+    assert.strictEqual(C.caseForPanel('case-gone', b, saved), null, 'deleted case → no action');
+    assert.strictEqual(C.caseForPanel('case-demo-a', null, null), null);
+  });
+
   await test('report escapes user content', async () => {
     const log = [];
     await C.appendEntry(log, { caseId: '<x>', ts: ts(0), action: 'case-created', input: { platform: '<img src=x onerror=alert(1)>' } });
