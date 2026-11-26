@@ -578,7 +578,9 @@
           v.advice = scam ? 'Don’t pay, reply or open links from it. Check with the company or person through a number or app you already trust.' : 'Look for the original source before you believe or share it.';
         }
       }
-      const q = list.find(a => a.quishing === 'strong') || list.find(a => a.quishing);
+      // A risky destination counts even when the image gives no reason (pay, park, log in) for scanning.
+      const risky = list.find(a => a.kind === 'url' && a.reasons.some(x => x.weight === 'strong'));
+      const q = list.find(a => a.quishing === 'strong') || list.find(a => a.quishing) || (risky && { ...risky, quishing: 'suspicious' });
       if (q && c.local) {
         const v = c.local, low = ['No strong red flags', 'Insufficient evidence', 'Suspicious', 'Edited image'];
         if (q.quishing === 'strong') { v.risk = Math.max(+v.risk || 0, 62); if (low.includes(v.verdict)) { v.verdict = 'Likely scam'; v.category = 'QR code phishing (quishing)'; v.headline = 'The QR code leads somewhere it should not. Do not scan it, log in or pay through it.'; } }
