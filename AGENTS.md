@@ -9,7 +9,7 @@ Several agents (Claude Code, Devin) and humans work on this repo in parallel. Th
 - **One branch + one pull request per task.** Branch names: `<agent>/<short-topic>` (e.g. `devin/event-overlap`). Never push to `main` directly.
 - **Stay in your lane.** New features go in their own files (`public/<feature>.js`, `server/<feature>.js`) and hook in through the module API instead of editing shared code:
   - `window.ScamBunker` exposes `current`, `esc`, `post`, `toast`, `panel`, `showTab`, `store`, `renderAll`, `server`.
-  - `document` events: `sb:case` (after local analysis, `detail` = case) and `sb:case-complete`.
+  - `document` events: `sb:case` (after local analysis, `detail` = case), `sb:case-complete`, and `sb:case-open` (a saved case was reopened with `openCase`, `detail` = case).
   - **Static mode (GitHub Pages):** there is no `/api` there. `ScamBunker.isStatic()` is true and `sb:ready` fires with `{static:true}`. Every module that calls `/api/*` must check it and either use a browser-direct fallback (only CORS-enabled, no-key public APIs) or show a clear "needs the local app" state. Never throw or leave a spinner running.
   - Agent briefs and the handoff prompt live in `public/shared/prompt.js`, which both the server and the browser load. Edit them there.
   - Keep edits to `public/app.js`, `public/index.html`, `server.js` minimal (a script tag, a route line, a tab button).

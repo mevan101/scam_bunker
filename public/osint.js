@@ -286,7 +286,9 @@
     if (cl) return renderDossier(p, cl);
     state.cluster = null;
     p.innerHTML = `<p class="muted" style="margin-top:14px">Scam Bunker links your saved cases into actor clusters whenever they share a wallet, handle, phone, email, domain, image or camera serial, and merges in the subject files you create. Hashtags and other weak signals never link cases.</p>
+      ${window.ScamBunkerGraph?.open ? '<div class="os-bar"><button type="button" class="ghost" data-graph aria-haspopup="dialog">Link graph</button></div>' : ''}
       ${all.length ? `<div class="os-dossiers">${all.map(c => `<button type="button" class="os-dcard" data-cluster="${esc(c.id)}"><span class="os-risk ${c.riskLevel}" aria-label="Risk ${c.risk} of 100">${c.risk}</span><span class="t"><b>${esc(c.title)}</b><span>${esc([plural(c.cases.length, 'case'), plural(c.indicators.length, 'identifier'), c.subjects.length ? 'subject file' : 'auto-linked', c.platforms.slice(0, 4).join(', ')].filter(Boolean).join(' · '))}</span></span></button>`).join('')}</div>` : '<p class="empty">No dossiers yet. They appear when two cases share an identifier, or when you create a subject.</p>'}`;
+    $('[data-graph]', p)?.addEventListener('click', () => window.ScamBunkerGraph.open());
     $$('[data-cluster]', p).forEach(b => b.addEventListener('click', () => { state.cluster = b.dataset.cluster; renderDossiers(); $('#os-panel-dossiers h4, #os-panel-dossiers [data-back]')?.focus(); }));
   }
 
