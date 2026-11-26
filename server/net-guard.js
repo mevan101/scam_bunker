@@ -39,16 +39,20 @@ async function assertPublicUrl(u) {
 const { Transform } = require('stream');
 // HTTP "deflate" is meant to be zlib-wrapped, but many servers send raw deflate: pick by the first two bytes.
 function createDeflate() {
-  let inner = null;
+  let inner = null, head = Buffer.alloc(0);
+  const start = self => {
+    inner = head.length > 1 && (head[0] & 0x0f) === 8 && ((head[0] << 8) | head[1]) % 31 === 0 ? zlib.createInflate() : zlib.createInflateRaw();
+    inner.on('data', d => self.push(d)); inner.on('error', e => self.destroy(e));
+  };
   return new Transform({
     transform(chunk, _enc, cb) {
-      if (!inner) {
-        inner = chunk.length > 1 && (chunk[0] & 0x0f) === 8 && ((chunk[0] << 8) | chunk[1]) % 31 === 0 ? zlib.createInflate() : zlib.createInflateRaw();
-        inner.on('data', d => this.push(d)); inner.on('error', e => this.destroy(e));
-      }
+      if (!inner) { head = Buffer.concat([head, chunk]); if (head.length < 2) return cb(); start(this); chunk = head; }
       inner.write(chunk, () => cb());
     },
-    flush(cb) { if (!inner) return cb(); inner.once('end', () => cb()); inner.end(); },
+    flush(cb) {
+      if (!inner) { if (!head.length) return cb(); start(this); inner.write(head); }
+      inner.once('end', () => cb()); inner.end();
+    },
   });
 }
 const DECODERS = new Map([['gzip', zlib.createGunzip], ['x-gzip', zlib.createGunzip], ['deflate', createDeflate], ['br', zlib.createBrotliDecompress]]);
