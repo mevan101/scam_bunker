@@ -11,7 +11,7 @@
   let editing = null;
   const save = () => store.set(KEY, raw);
   const nextId = () => `L${raw.reduce((m, l) => Math.max(m, +String(l.id).slice(1) || 0), 0) + 1}`;
-  const safeHref = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } };
+  const safeHref = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) && !x.username && !x.password ? x.href : null; } catch { return null; } };
   const link = (u, label) => { const h = safeHref(u); return h ? `<a href="${esc(h)}" target="_blank" rel="noopener noreferrer">${esc(label || h)}</a>` : esc(label || u || ''); };
   const srcTag = (l, k) => { const s = (l.sources || {})[k] || (l.manual ? 'manual' : ''); return s ? ` <span class="ev-src" title="Source of this value">${esc(s)}</span>` : ''; };
   const zones = (() => { try { return Intl.supportedValuesOf('timeZone'); } catch { return ['UTC', 'Asia/Dhaka', 'Europe/London', 'America/New_York']; } })();
@@ -101,7 +101,7 @@
       }
       save(); render();
     }
-    bad.forEach(u => lines.push(`<li>${esc(u)}: skipped, only http(s) links are fetched</li>`));
+    bad.forEach(u => lines.push(`<li>${esc(u)}: skipped, only http(s) links without embedded credentials are fetched</li>`));
     st.innerHTML = `<ul class="ev-log">${lines.join('')}</ul>`;
     btn.disabled = false; btn.textContent = 'Fetch listings';
   }
@@ -142,7 +142,11 @@
     const changed = k => !editing || val(k) !== String(pre[k] ?? '');
     const set = (formKey, prop, value, srcKey = prop) => { if (changed(formKey)) { l[prop] = value; l.sources[srcKey] = 'manual'; } };
     for (const [fk, prop] of FORM_MAP) set(fk, prop, val(fk));
-    if (editing && changed('url')) { delete l.finalUrl; delete l.redirects; delete l.fetchedAt; } // redirect evidence belonged to the old URL
+    if (editing && changed('url') && l.finalUrl) { // values and redirect evidence came from the old URL: say so instead of attaching them to the new one
+      const from = ` · fetched from ${l.finalUrl}`;
+      for (const k of Object.keys(l.sources)) if (l.sources[k] !== 'manual' && !l.sources[k].includes(from)) l.sources[k] += from;
+      delete l.finalUrl; delete l.redirects; delete l.fetchedAt;
+    }
     const timeChanged = changed('start') || changed('end') || changed('tz');
     if (timeChanged) {
       l.tz = tz; l.sources.timeZone = 'manual';
