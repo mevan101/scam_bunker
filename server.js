@@ -4,6 +4,7 @@
 // Optional: FIRECRAWL_API_KEY (web fetch + corroboration search) · SERPAPI_API_KEY (automatic reverse image search)
 // · ETHERSCAN_API_KEY · TRONGRID_API_KEY / TRONSCAN_API_KEY (optional, wallet lookups in server/osint.js)
 const http = require('http');
+const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const { guardedRequest } = require('./server/net-guard');
@@ -194,11 +195,19 @@ const DEV_SNIPPET = `<script>(function(){var boot=null;function c(){var es=new E
 // Local API gate: a page on another site must not be able to drive the API. DNS rebinding makes a foreign name resolve to
 // 127.0.0.1, so the Host must be one of ours; cross-origin pages are refused by Origin; and every POST must be JSON so a
 // browser has to send a CORS preflight, which this server never approves.
-const ANY_HOST = process.env.HOST === '0.0.0.0'; // user chose to serve the LAN: the Host can be any address of this machine
+// HOST=0.0.0.0 (the user chose to serve the LAN): any IP address or a .local name on PORT is accepted, but still no
+// other DNS names, because a rebinding page always arrives under the attacker's own domain name.
+const ANY_HOST = process.env.HOST === '0.0.0.0';
+function lanHost(host) {
+  const m = /^(\[[0-9a-f:.]+\]|[^:\[\]]+)(?::(\d+))?$/.exec(host);
+  if (!m || (m[2] || '80') !== String(PORT)) return false;
+  const name = m[1].replace(/^\[|\]$/g, '');
+  return net.isIP(name) !== 0 || name === 'localhost' || /^[a-z0-9-]+\.local$/.test(name);
+}
 const OWN_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', HOST.includes(':') ? `[${HOST}]` : HOST].flatMap(h => [`${h}:${PORT}`, ...(+PORT === 80 ? [h] : [])]));
 function apiGate(req, u) {
   const host = String(req.headers.host || '').toLowerCase();
-  if (!host || (!ANY_HOST && !OWN_HOSTS.has(host))) return [403, 'Host not allowed: open Scam Bunker at http://localhost:' + PORT];
+  if (!host || !(OWN_HOSTS.has(host) || (ANY_HOST && lanHost(host)))) return [403, 'Host not allowed: open Scam Bunker at http://localhost:' + PORT];
   const origin = req.headers.origin;
   if (origin !== undefined && origin !== `http://${host}`) return [403, 'Cross-origin requests are not allowed'];
   if (req.method === 'POST' && u.pathname.startsWith('/api/') && String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase() !== 'application/json') return [415, 'Content-Type must be application/json'];
