@@ -33,16 +33,20 @@ function pinnedLookup(hostname, options, cb) {
     cb(null, addrs[0].address, addrs[0].family);
   });
 }
+const DECODERS = new Map([['gzip', zlib.createGunzip], ['x-gzip', zlib.createGunzip], ['deflate', zlib.createInflate], ['br', zlib.createBrotliDecompress]]);
+
 function guardedHop(url, { headers = {}, timeoutMs = 12000 } = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const req = (u.protocol === 'https:' ? https : http).get(u, { lookup: pinnedLookup, headers: { ...headers, 'Accept-Encoding': 'gzip, deflate, br' } }, res => {
       res.on('close', () => clearTimeout(timer));
+      try {
       const enc = String(res.headers['content-encoding'] || '').toLowerCase().trim();
-      const unzip = { gzip: zlib.createGunzip, 'x-gzip': zlib.createGunzip, deflate: zlib.createInflate, br: zlib.createBrotliDecompress }[enc];
+      const unzip = DECODERS.get(enc);
       const stream = unzip ? res.pipe(unzip()) : res;
       if (unzip) res.on('error', e => stream.destroy(e));
       resolve({ status: res.statusCode, headers: { get: k => { const v = res.headers[k.toLowerCase()]; return Array.isArray(v) ? v.join(', ') : v ?? null; } }, body: Readable.toWeb(stream) });
+      } catch (e) { res.destroy(); reject(httpError(502, `Could not read response: ${e.message}`, 'network')); }
     });
     const timer = setTimeout(() => req.destroy(httpError(504, 'Timed out', 'timeout')), timeoutMs);
     req.on('error', e => { clearTimeout(timer); reject(e.status ? e : httpError(502, `Could not fetch: ${e.code || e.message}`, 'network')); });
