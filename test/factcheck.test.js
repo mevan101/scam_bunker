@@ -50,6 +50,8 @@ const VIRAL = "BREAKING 🚨 SHARE BEFORE IT'S DELETED!! Doctors don't want you 
     const c = F.extractClaims('It is a hoax that: the Northvale reservoir was poisoned with 40 tonnes of chlorine in 2026.');
     assert.strictEqual(c.length, 1);
     assert(/^It is a hoax that/.test(c[0].text), c[0].text);
+    const s = F.extractClaims('Share the truth, not their lies: officials confirmed 40 tonnes of chlorine entered the Northvale reservoir in 2026.');
+    assert.strictEqual(s.length, 1); assert(/^officials confirmed/.test(s[0].text), s[0] && s[0].text);
     assert(F.sentences('Doctors don\'t want you to know this: a simple lemon drink cures cancer in 7 days').length === 2);
   });
   await test('claims: a claim and its negation are both kept', () => {

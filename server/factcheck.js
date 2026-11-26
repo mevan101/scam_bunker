@@ -30,9 +30,10 @@ function sentences(text) {
   const out = [];
   for (const line of String(text || '').split(/\n+/)) {
     for (const part of line.split(/(?<=[.!?…])\s+|(?<=[!?]{2})(?=\S)/)) {
-      // "Doctors don't want you to know this: <claim>" → keep the claim after the colon when it is substantial
+      // "Doctors don't want you to know this: <claim>" → keep the claim after the colon when it is substantial,
+      // unless the lead-in denies it ("It is a hoax that: …"); a call to action ("Share, not their lies: …") is still split off
       const i = part.indexOf(': ');
-      if (i > 0 && !DENIAL.test(part.slice(0, i)) && part.slice(i + 2).split(/\s+/).length >= 5) out.push(part.slice(0, i), part.slice(i + 2)); else out.push(part);
+      if (i > 0 && (CALL_TO_ACTION.test(clean(part.slice(0, i))) || !DENIAL.test(part.slice(0, i))) && part.slice(i + 2).split(/\s+/).length >= 5) out.push(part.slice(0, i), part.slice(i + 2)); else out.push(part);
     }
   }
   return out.map(clean).map(s => s.replace(/[.!…]+$/, '').trim()).filter(Boolean);
