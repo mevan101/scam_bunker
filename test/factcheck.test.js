@@ -102,6 +102,7 @@ const VIRAL = "BREAKING 🚨 SHARE BEFORE IT'S DELETED!! Doctors don't want you 
     const n = S.normalize('Send to TJYeasTPa6gpEEfYqCP9sMBc7NJqKPDJvT or 0x52908400098527886E0F7030069857D2E4169EE7, see https://x.example/a, DM @someone_demo, call +44 7700 900123, earn 30%');
     for (const t of ['wallettoken', 'urltoken', 'handletoken', 'phonetoken', 'numtoken']) assert(n.includes(t), `${t} in ${n}`);
     assert(!/tjyeas|0x5290|someone|7700/.test(n));
+    assert.strictEqual(S.normalize('pay TQiOaB1cDeFgHiJkLmNoPqRsTuVwXyZ123 now'), 'pay wallettoken now', 'Tron address with I/O');
   });
   await test('jaccard: same script with rotated wallet/handle/link ≥ 0.6; different script < 0.35', () => {
     const j = S.jaccard(S.shingles(SCRIPT_A), S.shingles(SCRIPT_B));

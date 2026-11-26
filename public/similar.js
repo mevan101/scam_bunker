@@ -15,7 +15,7 @@
       .replace(/https?:\/\/\S+|\bwww\.\S+/g, ' urltoken ')
       .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, ' emailtoken ')
       .replace(/@[\w.]{2,}/g, ' handletoken ')
-      .replace(/\b(?:0x[0-9a-f]{40}|t[1-9a-hj-np-z]{33}|(?:bc1|[13])[0-9a-z]{25,61})\b/g, ' wallettoken ')
+      .replace(/\b(?:0x[0-9a-f]{40}|t[1-9a-z]{33}|(?:bc1|[13])[0-9a-z]{25,61})\b/g, ' wallettoken ')
       .replace(/\+?\d[\d\s().-]{6,}\d/g, ' phonetoken ')
       .replace(/\d+(?:[.,]\d+)*/g, ' numtoken ')
       .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
