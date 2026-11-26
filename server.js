@@ -7,6 +7,9 @@ const fs = require('fs');
 const path = require('path');
 const { assertPublicUrl } = require('./server/net-guard');
 const provenance = require('./server/provenance');
+const factcheck = require('./server/factcheck');
+const corroborate = require('./server/corroborate');
+const events = require('./server/events');
 
 const PORT = process.env.PORT || 4400;
 const HOST = process.env.HOST || '127.0.0.1'; // localhost only by default, so others on your network can't spend your API key
@@ -65,7 +68,8 @@ List concrete pivots the investigator should run next (reverse image search, han
   },
   factcheck: {
     name: 'Fact Checker',
-    brief: `You are the fact-checker. Extract every checkable factual claim. For each, state whether it is supported, contradicted, unverifiable, or missing context, using the corroboration search results when provided and your own knowledge (state your knowledge may be out of date). Flag manipulation techniques: false attribution, out-of-context media, fabricated quotes, misleading statistics, emotional manipulation, appeals to urgency ("share before it's deleted").`,
+    brief: `You are the fact-checker. Extract every checkable factual claim. For each, state whether it is supported, contradicted, unverifiable, or missing context, using the corroboration search results when provided and your own knowledge (state your knowledge may be out of date). Flag manipulation techniques: false attribution, out-of-context media, fabricated quotes, misleading statistics, emotional manipulation, appeals to urgency ("share before it's deleted").
+When PRIOR FACT-CHECKS are listed, first say whether each published fact-check is about the same claim, then cite its publisher, rating and link. A search match about a different claim is not evidence.`,
   },
 };
 
@@ -79,12 +83,16 @@ Respond with ONLY a JSON object, no prose outside it:
  "risk": integer 0-100,
  "headline": one sentence a non-expert understands,
  "deduction": 3-6 sentence chain of reasoning in your voice, citing specific evidence,
- "observations": [ { "fact": string, "inference": string, "weight": "strong"|"moderate"|"weak" } ],
+ "likelihood": one of ["Almost no chance","Very unlikely","Unlikely","Roughly even chance","Likely","Very likely","Almost certain"] (ICD 203 term for the verdict),
+ "analytic_confidence": "low"|"moderate"|"high" (quality of the evidence base, separate from likelihood),
+ "observations": [ { "fact": string, "inference": string, "weight": "strong"|"moderate"|"weak", "source": short name of where the fact comes from, "grade": Admiralty pair such as "C3" (source reliability A-F, information credibility 1-6; F6 if unknown; judge the two separately) } ],
  "disagreements": [string],
  "image_dating": { "earliest": string or null, "basis": string },
  "ai_involvement": { "assessment": "none detected"|"possible"|"likely"|"confirmed", "basis": string },
  "hidden_info": [string],
  "next_steps": [string],
+ "limitations": [string] (what this analysis could not check),
+ "would_change_if": [string] (specific findings that would change the verdict),
  "advice": string (what the person should do now)
 }`;
 
@@ -147,6 +155,8 @@ function caseFileText(c) {
   if (c.page) parts.push(`FETCHED PAGE CONTENT (truncated):\n"""${String(c.page).slice(0, 8000)}"""`);
   if (c.heuristics) parts.push(`LOCAL HEURISTIC ENGINE RESULTS:\n${JSON.stringify(c.heuristics).slice(0, 6000)}`);
   if (c.forensics) parts.push(`IMAGE FORENSICS EXTRACTION:\n${JSON.stringify(c.forensics).slice(0, 9000)}`);
+  const extra = factcheck.caseFileSections(c); if (extra) parts.push(extra);
+  if (c.video) parts.push(`VIDEO CONTAINER METADATA AND KEYFRAMES:\n${JSON.stringify(c.video).slice(0, 7000)}`);
   if (c.corroboration) parts.push(`WEB CORROBORATION SEARCH RESULTS:\n${JSON.stringify(c.corroboration).slice(0, 5000)}`);
   return parts.join('\n\n');
 }
@@ -253,7 +263,10 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && u.pathname === '/api/prompt') return await handlePrompt(req, res);
     if (req.method === 'POST' && u.pathname === '/api/fetch') return await handleFetch(req, res);
     if (req.method === 'POST' && u.pathname === '/api/search') return await handleSearch(req, res);
+    if (req.method === 'POST' && factcheck.routes[u.pathname]) return send(res, 200, await factcheck.routes[u.pathname](await readBody(req)));
+    if (req.method === 'POST' && u.pathname === '/api/events/extract') return send(res, 200, await events.extractFromUrl((await readBody(req)).url));
     if (req.method === 'POST' && provenance.routes[u.pathname]) return send(res, 200, await provenance.routes[u.pathname](await readBody(req)));
+    if (req.method === 'POST' && corroborate.routes[u.pathname]) return send(res, 200, await corroborate.routes[u.pathname](await readBody(req)));
     let p = path.normalize(path.join(PUB, u.pathname === '/' ? 'index.html' : u.pathname));
     if (p !== PUB && !p.startsWith(PUB + path.sep)) return send(res, 403, 'forbidden', 'text/plain');
     fs.readFile(p, (err, data) => {

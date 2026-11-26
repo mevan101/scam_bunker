@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>try { var t = localStorage.getItem('scambunker.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) { }</script>
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="events.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%2316181d'/><circle cx='14' cy='14' r='6.5' fill='none' stroke='%23fff' stroke-width='2.6'/><path d='M19 19l6 6' stroke='%23fff' stroke-width='2.8' stroke-linecap='square'/></svg>">
 </head>
 <body>
@@ -41,11 +42,11 @@
     <p class="lede">Drop in an image, paste the post or message, add the link. The forensics run on your device. If you've turned the specialist agents on, they review the evidence and the lead investigator gives the verdict.</p>
 
     <label class="drop" id="drop">
-      <input type="file" id="file" accept="image/*" class="sr-only" aria-label="Choose an image to investigate">
+      <input type="file" id="file" accept="image/*,video/mp4,video/quicktime,video/webm,.mp4,.m4v,.mov,.webm,.mkv" class="sr-only" aria-label="Choose an image or video to investigate">
       <div class="drop-empty" id="drop-empty">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l4.6-4.6a2 2 0 012.8 0L16 16m-2-2l1.6-1.6a2 2 0 012.8 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <strong>Drop an image or click to choose</strong>
-        <span>JPEG, PNG, WebP, HEIC. Read on your device; nothing is uploaded unless agents are on.</span>
+        <strong>Drop an image or video, or click to choose</strong>
+        <span>JPEG, PNG, WebP, HEIC, or MP4, MOV, WebM video. Read on your device; nothing is uploaded unless agents are on.</span>
       </div>
       <div class="drop-full" id="drop-full" hidden>
         <img id="preview" alt="Evidence preview">
@@ -123,19 +124,31 @@
         <button role="tab" aria-selected="true" data-tab="deduction" id="tab-deduction" aria-controls="panel-deduction">Deduction</button>
         <button role="tab" data-tab="agents" id="tab-agents" aria-controls="panel-agents">Agents <span class="count" id="agents-count"></span></button>
         <button role="tab" data-tab="image" id="tab-image" aria-controls="panel-image">Image lab</button>
+        <button role="tab" data-tab="video" id="tab-video" aria-controls="panel-video" hidden>Video lab</button>
         <button role="tab" data-tab="links" id="tab-links" aria-controls="panel-links">Links &amp; entities</button>
         <button role="tab" data-tab="timeline" id="tab-timeline" aria-controls="panel-timeline">Timeline</button>
         <button role="tab" data-tab="provenance" id="tab-provenance" aria-controls="panel-provenance" hidden>Provenance</button>
+        <button role="tab" data-tab="checklist" id="tab-checklist" aria-controls="panel-checklist">Checklist</button>
+        <button role="tab" data-tab="claims" id="tab-claims" aria-controls="panel-claims">Claims &amp; matches <span class="count" id="claims-count"></span></button>
+        <button role="tab" data-tab="corroborate" id="tab-corroborate" aria-controls="panel-corroborate">Corroborate</button>
         <button role="tab" data-tab="next" id="tab-next" aria-controls="panel-next">Next moves</button>
+        <button role="tab" data-tab="custody" id="tab-custody" aria-controls="panel-custody">Custody log</button>
+        <button role="tab" data-tab="events" id="tab-events" aria-controls="panel-events">Events <span class="count"></span></button>
       </div>
 
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-deduction" aria-labelledby="tab-deduction" data-panel="deduction"></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-agents" aria-labelledby="tab-agents" data-panel="agents" hidden></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-image" aria-labelledby="tab-image" data-panel="image" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-video" aria-labelledby="tab-video" data-panel="video" hidden></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-links" aria-labelledby="tab-links" data-panel="links" hidden></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-timeline" aria-labelledby="tab-timeline" data-panel="timeline" hidden></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-provenance" aria-labelledby="tab-provenance" data-panel="provenance" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-checklist" aria-labelledby="tab-checklist" data-panel="checklist" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-claims" aria-labelledby="tab-claims" data-panel="claims" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-corroborate" aria-labelledby="tab-corroborate" data-panel="corroborate" hidden></div>
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-next" aria-labelledby="tab-next" data-panel="next" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-custody" aria-labelledby="tab-custody" data-panel="custody" hidden></div>
+      <div class="panel card" role="tabpanel" tabindex="0" id="panel-events" aria-labelledby="tab-events" data-panel="events" hidden></div>
 
     </div>
   </section>
@@ -180,5 +193,13 @@
 <script src="scam.js"></script>
 <script src="app.js"></script>
 <script src="provenance.js"></script>
+<script src="grading.js"></script>
+<script src="custody.js"></script>
+<script src="similar.js"></script>
+<script src="factcheck.js"></script>
+<script src="corroborate.js"></script>
+<script src="video.js"></script>
+<script src="events-core.js"></script>
+<script src="events.js"></script>
 </body>
 </html>
