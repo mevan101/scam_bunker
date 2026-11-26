@@ -532,11 +532,13 @@
   }
   function addObs(v, ob) { if (v && Array.isArray(v.observations) && !v.observations.some(o => o.fact === ob.fact)) v.observations.unshift(ob); }
   // The screenshot text is run through the same rule engine as a pasted message, here in the browser.
-  function ocrFindings(r) {
+  // It is scored together with any text the person typed, so clues split across the screenshot and a caption still add up.
+  function ocrFindings(r, c) {
     const H = window.DeduceHeuristics, S = window.ScamBunkerSimple || {};
     if (!(r.ocr && r.ocr.text) || !H || !H.analyze) return null;
-    const h = H.analyze({ text: r.ocr.text }), level = w => w >= 20 ? 'strong' : w >= 14 ? 'moderate' : 'weak';
-    const hits = h.hits.slice().sort((a, b) => b.weight - a.weight).slice(0, 6);
+    const h = H.analyze({ text: [c && c.text, r.ocr.text].filter(Boolean).join('\n\n') }), level = w => w >= 20 ? 'strong' : w >= 14 ? 'moderate' : 'weak';
+    const had = new Set(((c && c.heuristics && c.heuristics.hits) || []).map(x => x.id || x.label));
+    const hits = h.hits.filter(x => !had.has(x.id || x.label)).sort((a, b) => b.weight - a.weight).slice(0, 6);
     const obs = [], reasons = [], actions = [];
     hits.forEach(x => {
       obs.push({ fact: `Screenshot text: “${short(x.match, 60)}”`, inference: x.label, weight: level(x.weight), source: 'ocr', intakeMedia: true });
@@ -557,7 +559,7 @@
   }
   function applyToCase(c, r) {
     const context = [c.text, r.ocr && r.ocr.text].filter(Boolean).join('\n');
-    const H = window.DeduceHeuristics, ocr = ocrFindings(r);
+    const H = window.DeduceHeuristics, ocr = ocrFindings(r, c);
     const analyse = age => r.qr.map((q, i) => analyzeQr(q, { context, analyzeUrl: H && H.analyzeUrl, domainAge: age[i] }));
     const commit = list => {
       const obs = [];
@@ -569,7 +571,12 @@
       if (ocr && c.local && ocr.h.score > (+c.local.risk || 0)) {
         const v = c.local;
         v.risk = ocr.h.score;
-        if (['No strong red flags', 'Insufficient evidence', 'Edited image'].includes(v.verdict) || ['Scam', 'Likely scam'].includes(ocr.h.verdict)) { v.verdict = ocr.h.verdict; v.category = ocr.h.category; }
+        if (v.verdict !== ocr.h.verdict && (['No strong red flags', 'Insufficient evidence', 'Edited image'].includes(v.verdict) || ['Scam', 'Likely scam'].includes(ocr.h.verdict))) {
+          v.verdict = ocr.h.verdict; v.category = ocr.h.category;
+          const scam = ['Scam', 'Likely scam', 'Suspicious'].includes(v.verdict);
+          v.headline = scam ? 'The text in the screenshot follows a known scam pattern. Treat it as a scam until it is proven otherwise.' : 'The text in the screenshot uses known manipulation patterns.';
+          v.advice = scam ? 'Don’t pay, reply or open links from it. Check with the company or person through a number or app you already trust.' : 'Look for the original source before you believe or share it.';
+        }
       }
       const q = list.find(a => a.quishing === 'strong') || list.find(a => a.quishing);
       if (q && c.local) {
