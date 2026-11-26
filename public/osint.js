@@ -29,6 +29,10 @@
   async function postJson(path, body) { return SB.post(path, body); }
   // Static mode (GitHub Pages): RDAP, mempool.space and TronGrid straight from the browser, same code as the server.
   const direct = window.ScamBunkerDirect;
+  // Simple mode (default) vs Investigator mode: ScamBunker.mode() lands with the Simple-mode shell, so call it defensively.
+  const isSimple = () => typeof SB.mode === 'function' && SB.mode() === 'simple';
+  const addReasons = (c, r) => { if (typeof SB.addReasons === 'function' && r.length) SB.addReasons(c, r); };
+  const addActions = (c, a) => { if (typeof SB.addActions === 'function' && a.length) SB.addActions(c, a); };
   const canLookup = () => SB.server().online || (SB.isStatic() && !!direct);
   const lookupDomain = body => SB.isStatic() ? direct.domain(body) : postJson('/api/osint/domain', body);
   const lookupWallet = body => SB.isStatic() ? direct.wallet(body) : postJson('/api/osint/wallet', body);
@@ -282,7 +286,7 @@
   function findingsHtml(s) {
     const f = s.findings || {}; const parts = [];
     Object.entries(f.usernames || {}).forEach(([u, x]) => parts.push(`<section class="os-section" data-user="${esc(u)}">${usernameSectionHtml(u, x.results || [], x.at, false)}</section>`));
-    if (SB.isStatic()) (s.indicators || []).filter(i => i.type === 'handle').map(i => i.key.slice(7)).filter(u => !(f.usernames || {})[u]).slice(0, MAX_USERNAMES)
+    if (SB.isStatic()) (s.indicators || []).filter(i => i.type === 'handle').map(i => i.key.slice(7)).filter(u => !Object.hasOwn(f.usernames || {}, u)).slice(0, MAX_USERNAMES)
       .forEach(u => parts.push(`<section class="os-section" data-user="${esc(u)}"><h4>Username <code>${esc(u)}</code></h4>${localSweepHtml()}</section>`));
     const ds = Object.values(f.domains || {}), ws = Object.values(f.wallets || {});
     if (ds.length) parts.push(`<section class="os-section" id="os-domains"><h4>Domains (RDAP)</h4>${ds.map(domainCard).join('')}</section>`);
@@ -384,7 +388,7 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
   const linksPanel = SB.panel('links');
   function injectAttach() {
     const c = SB.current;
-    if (!c || !linksPanel || $('.os-attach', linksPanel)) return;
+    if (!c || !linksPanel || isSimple() || $('.os-attach', linksPanel)) return;
     const inds = (c.indicators || []).filter(i => D.STRONG_TYPES.includes(i.type));
     const subjects = loadSubjects();
     const keys = new Set(inds.map(i => i.key));
@@ -426,7 +430,10 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
     if (!doms.length) return;
     const results = await Promise.all(doms.map(d => lookupDomain({ domain: d }).then(r => [d, r]).catch(e => [d, { error: e.message }])));
     c.domainAges = Object.fromEntries(results.map(([d, r]) => [d, r.error ? { error: r.error } : { registeredAt: r.registeredAt || null, ageDays: r.ageDays ?? null, registrar: r.registrar || null, young: !!r.young, registered: r.registered !== false }]));
-    const obs = results.filter(([, r]) => r.young && r.ageDays != null).map(([d, r]) => domainObs(d, r));
+    const young = results.filter(([, r]) => r.young && r.ageDays != null);
+    addReasons(c, young.map(([d, r]) => ({ text: `The website ${d} was created only ${plural(r.ageDays, 'day')} ago (${fmtDate(r.registeredAt)}). Scam websites are usually brand new. Real banks, shops and employers have had theirs for years.`, weight: r.ageDays < 30 ? 'strong' : 'moderate', source: 'Public domain registration records (RDAP)' })));
+    addActions(c, results.filter(([, r]) => !r.error).map(([d]) => ({ text: `See when ${d} was created and who registered it`, href: `https://lookup.icann.org/en/lookup?name=${encodeURIComponent(d)}` })));
+    const obs = young.map(([d, r]) => domainObs(d, r));
     if (!obs.length) return;
     c._osintObs = obs;
     obs.forEach(ob => { addObs(c.local, ob); addObs(c.final, ob); });
@@ -439,7 +446,21 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
     x.domainAges = c.domainAges;
     store.set('scambunker.cases', list);
   }
-  document.addEventListener('sb:case', e => { checkCaseDomains(e.detail).catch(err => console.debug('domain age check skipped:', err)); });
+  // Plain-language to-dos for a crypto wallet in the case (Simple mode result). No lookup is needed for this.
+  function walletActions(c) {
+    if (!c || c._osintWalletActions) return;
+    c._osintWalletActions = true;
+    const core = window.ScamBunkerOsintCore;
+    const wallets = (c.indicators || []).filter(i => i.type === 'wallet').map(i => i.key.slice(7)).map(a => [a, D.walletChain(a)]).filter(([, ch]) => ch && core && core.EXPLORER[ch]).slice(0, 3);
+    addActions(c, wallets.map(([a, ch]) => ({ text: `Do not send money to the crypto wallet ${a.slice(0, 6)}…${a.slice(-4)}. Crypto payments cannot be reversed. You can see its public payment history here`, href: core.EXPLORER[ch](a) })));
+  }
+  function syncMode() {
+    const btn = document.getElementById('btn-subjects'); if (btn) btn.hidden = isSimple();
+    if (isSimple()) $$('.os-attach').forEach(x => x.remove()); else injectAttach();
+  }
+  document.addEventListener('sb:mode', syncMode);
+  document.addEventListener('sb:ready', syncMode);
+  document.addEventListener('sb:case', e => { walletActions(e.detail); checkCaseDomains(e.detail).catch(err => console.debug('domain age check skipped:', err)); });
   document.addEventListener('sb:case-complete', e => {
     const c = e.detail; if (!c?._osintObs) return;
     c._osintObs.forEach(ob => { addObs(c.local, ob); addObs(c.final, ob); });

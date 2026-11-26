@@ -114,6 +114,20 @@ const img = g => ({ gray: g, hash: P.hashGray(g), width: g.w, height: g.h });
     const lines = P.reportLines({ verdict: v, items: [cand] });
     assert(lines.includes('IMAGE PROVENANCE') && lines.some(l => /Recycled/.test(l)));
   });
+  await test('synthesize: static-mode Wayback dates (Availability API) are URL history, never a recycled-image finding', () => {
+    const cand = { id: 'c2', label: 'Copy 1 · cdn.example', width: 1080, height: 810, editors: [], platformMarks: 0, compare: sameRel, imageUrl: 'https://cdn.example/photo.jpg',
+      wayback: { image: { ok: true, approximate: true, captures: null, firstSeen: '2015-05-01T00:00:00Z', firstSnapshot: 'https://web.archive.org/web/20150501000000/https://cdn.example/photo.jpg' } } };
+    const v = P.synthesize([{ ...caseItem }, cand], { date: '2026-11-26', precision: 'day' });
+    assert(!v.contradictions.some(c => /^Recycled/.test(c.text)), JSON.stringify(v.contradictions));
+    assert.strictEqual(v.earliest, null);
+    assert(v.dates.some(d => d.trust === 'low' && /URL history/.test(d.source)));
+  });
+  await test('reportLines: a candidate the browser could not read still exports its Wayback URL history', () => {
+    const it = { id: 'c3', label: 'Copy 2 · news.example', imageUrl: 'https://news.example/story', localOnly: 'news.example does not allow other websites to load this file (no CORS headers)',
+      wayback: { image: { ok: true, approximate: true, firstSeen: '2019-01-20T14:25:10Z', firstSnapshot: 'https://web.archive.org/web/20190120142510/https://news.example/story', lastSeen: '2026-11-01T00:00:00Z', lastSnapshot: 'https://web.archive.org/web/20261101000000/https://news.example/story' } } };
+    const lines = P.reportLines({ verdict: P.synthesize([{ ...caseItem }], null), items: [it] }).join('\n');
+    assert(/not compared \(needs the local app\)/.test(lines) && /Wayback URL history \(image URL, not proof of this image\): first 2019-01-20 14:25:10 <https:\/\/web\.archive\.org\/web\/20190120142510\//.test(lines), lines);
+  });
   await test('synthesize: forged EXIF (capture after first archived) and modify-before-capture', () => {
     const cs = { ...caseItem, camera: 'Apple iPhone 15', exifCapture: '2026-01-02T12:00:00', exifModify: '2025-12-30T09:00:00' };
     const cand = { id: 'c1', label: 'Copy 1', width: 800, height: 600, compare: sameRel, wayback: { image: { ok: true, firstSeen: '2021-06-01T00:00:00Z' } } };

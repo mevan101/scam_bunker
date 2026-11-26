@@ -239,7 +239,8 @@
       if (it.lastModified) add(it.lastModified, 'existed', 'medium', 'HTTP Last-Modified of the copy (server-reported)', it);
       if (it.archiveOrigLastModified) add(it.archiveOrigLastModified, 'existed', 'medium', 'Last-Modified recorded by the Wayback Machine', it);
       const wi = it.wayback && it.wayback.image, wp = it.wayback && it.wayback.page;
-      if (wi && wi.firstSeen) add(wi.firstSeen, 'existed', 'high', 'Wayback Machine first capture of the image URL (independent archive)', it, wi.firstSnapshot);
+      // The Availability API (static mode) cannot tell file versions apart: its date is URL history, weak evidence only.
+      if (wi && wi.firstSeen) add(wi.firstSeen, 'existed', wi.approximate ? 'low' : 'high', wi.approximate ? 'Wayback Machine first capture of the image URL (URL history only: the archived file may be a different picture)' : 'Wayback Machine first capture of the image URL (independent archive)', it, wi.firstSnapshot);
       if (wp && wp.firstSeen) add(wp.firstSeen, 'page', 'medium', 'Wayback Machine first capture of the page (the image may have been added later)', it, wp.firstSnapshot);
       if (it.pageDate && it.pageDate.published) add(it.pageDate.published.iso, 'page', 'medium', `Page publish date (${it.pageDate.published.source}, set by the publisher)`, it);
     }
@@ -288,6 +289,8 @@
   }
 
   // Plain-text lines for the exported case report
+  const urlHistory = i => [['image URL', i.wayback && i.wayback.image], ['page', i.wayback && i.wayback.page]].filter(([, w]) => w && w.firstSeen)
+    .map(([k, w]) => `; Wayback URL history (${k}, not proof of this image): first ${fmtDate(w.firstSeen)} <${w.firstSnapshot}>${w.lastSeen && w.lastSeen !== w.firstSeen ? `, last ${fmtDate(w.lastSeen)} <${w.lastSnapshot}>` : ''}`).join('');
   function reportLines(p) {
     if (!p || !p.verdict) return [];
     const v = p.verdict, L = ['', 'IMAGE PROVENANCE', v.summary];
@@ -298,7 +301,7 @@
     if (v.dates.length) L.push('Dated evidence:', ...v.dates.map(d => `- ${fmtDate(d.date)} · ${d.source} · ${d.item} · trust ${d.trust}${d.note ? ' · ' + d.note : ''}`));
     if (v.contradictions.length) L.push('Contradictions:', ...v.contradictions.map(c => `- [${c.weight}] ${c.text}`));
     const cands = (p.items || []).filter(i => !i.isCase);
-    if (cands.length) L.push('Copies compared:', ...cands.map(i => `- ${i.label}: ${i.error ? 'error: ' + i.error : i.localOnly ? 'not compared (needs the local app): ' + i.localOnly : `${i.compare.label} (${i.compare.matchPct} % match, dHash ${i.compare.d}/64, pHash ${i.compare.p}/64), ${i.width}×${i.height}`} <${i.imageUrl}>${i.pageUrl ? ' on <' + i.pageUrl + '>' : ''}`));
+    if (cands.length) L.push('Copies compared:', ...cands.map(i => `- ${i.label}: ${i.error ? 'error: ' + i.error : i.localOnly ? 'not compared (needs the local app): ' + i.localOnly + urlHistory(i) : `${i.compare.label} (${i.compare.matchPct} % match, dHash ${i.compare.d}/64, pHash ${i.compare.p}/64), ${i.width}×${i.height}`} <${i.imageUrl}>${i.pageUrl ? ' on <' + i.pageUrl + '>' : ''}`));
     return L;
   }
 
@@ -350,6 +353,9 @@
   // from hosts that allow it. Page fetching and SerpApi need the local app (public/shared/direct.js).
   const direct = window.ScamBunkerDirect;
   const isStatic = () => !!(SB.isStatic && SB.isStatic());
+  const isSimple = () => typeof SB.mode === 'function' && SB.mode() === 'simple';
+  const addReasons = (c, r) => { if (typeof SB.addReasons === 'function' && r.length) SB.addReasons(c, r); };
+  const addActions = (c, a) => { if (typeof SB.addActions === 'function' && a.length) SB.addActions(c, a); };
   const localAppHtml = (what, detail) => direct ? direct.localAppHtml(esc, what, detail) : `<p class="muted">${esc(what)}: available in the local app.</p>`;
   const waybackLookup = url => isStatic() ? (direct ? direct.wayback(url) : Promise.resolve({ ok: false, url, error: 'Needs the local app' })) : postJson('/api/provenance/wayback', { url }).catch(e => ({ ok: false, url, error: e.message }));
   const wayback = url => { if (!url) return Promise.resolve(null); if (!waybackCache.has(url)) waybackCache.set(url, waybackLookup(url)); return waybackCache.get(url); };
@@ -369,7 +375,7 @@
   function sync(c) {
     const t = tab(); if (!t) return;
     const has = !!(c && c.forensics);
-    t.hidden = !has;
+    t.hidden = !has || isSimple();
     if (!has && t.getAttribute('aria-selected') === 'true') SB.showTab('deduction');
     render(c);
   }
@@ -625,7 +631,25 @@
   }
 
   // ---------- Events ----------
-  document.addEventListener('sb:case', e => sync(e.detail));
+  // Simple mode: teach how to check a picture by hand, and say it plainly when the trace found an old photo.
+  function simpleActions(c) {
+    if (!c || !c.forensics || c._provActions) return;
+    c._provActions = true;
+    addActions(c, [
+      { text: 'Search for this picture on Google Lens (upload it, then open "Exact matches"). If the same photo was online before the event, it is being reused', href: 'https://lens.google.com/' },
+      { text: 'Search for it on TinEye and sort by "Oldest" to see when it first appeared online', href: 'https://tineye.com/' }
+    ]);
+  }
+  function simpleReasons(c) {
+    const v = c.provenance && c.provenance.verdict, claimed = v && v.claimed;
+    const recycled = v && v.contradictions.find(x => /^Recycled/.test(x.text));
+    if (!recycled || !v.earliest || c._provReason === v.earliest.date) return;
+    c._provReason = v.earliest.date;
+    addReasons(c, [{ text: `This picture was already online on ${fmtDate(v.earliest.date).slice(0, 10)}, before the event the post says it shows (${claimed.date}). It is probably an old photo being reused.`, weight: recycled.weight, source: v.earliest.source }]);
+  }
+  document.addEventListener('sb:case', e => { simpleActions(e.detail); sync(e.detail); });
+  document.addEventListener('sb:mode', () => sync(SB.current));
+  document.addEventListener('sb:provenance', e => simpleReasons(e.detail));
   document.addEventListener('click', e => {
     if (e.target.closest('#history-list .hist')) { setTimeout(() => sync(SB.current), 0); return; }
     const c = SB.current; if (!c) return;
