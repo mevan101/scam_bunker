@@ -9,6 +9,12 @@ const SERVER_PORT = +(process.env.E2E_SERVER_PORT || 4410);
 const STATIC_PORT = +(process.env.E2E_STATIC_PORT || 4411);
 const CI = !!process.env.CI;
 
+// Blank every provider and integration key so the suite never makes billable calls and always tests the
+// no-provider path. Playwright merges this over the parent env, so each key must be overridden explicitly.
+const NO_PROVIDERS = Object.fromEntries(['ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'LLM_BASE_URL', 'LLM_API_KEY', 'LLM_MODEL', 'FIRECRAWL_API_KEY',
+  'GOOGLE_FACTCHECK_API_KEY', 'FACTCHECK_API_KEY', 'SERPAPI_API_KEY', 'ETHERSCAN_API_KEY', 'TRONGRID_API_KEY', 'TRONSCAN_API_KEY'].map(k => [k, '']));
+NO_PROVIDERS.OLLAMA_URL = 'http://127.0.0.1:9';
+
 module.exports = defineConfig({
   testDir: __dirname,
   testMatch: '*.spec.js',
@@ -29,7 +35,7 @@ module.exports = defineConfig({
       // Same as `npm start`, without loading a local .env, so no API keys change what the tests see.
       command: 'node server.js',
       cwd: ROOT,
-      env: { ...process.env, PORT: String(SERVER_PORT), HOST: '127.0.0.1', OLLAMA_URL: 'http://127.0.0.1:9' },
+      env: { ...process.env, ...NO_PROVIDERS, PORT: String(SERVER_PORT), HOST: '127.0.0.1' },
       url: `http://127.0.0.1:${SERVER_PORT}/api/status`,
       reuseExistingServer: !CI,
       timeout: 30_000,

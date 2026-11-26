@@ -133,6 +133,8 @@ async function openApp(page) {
   await page.goto('./');
   await page.waitForFunction(() => window.ScamBunker && document.querySelector('#pill-local.on'));
   await page.waitForFunction(() => document.documentElement.hasAttribute('data-static') || document.querySelector('#pill-web.on'));
+  // Guard against a reused local server that has a paid provider configured.
+  if (!(await page.evaluate(() => window.ScamBunker.isStatic()))) expect(await page.evaluate(() => window.ScamBunker.server().ai), 'test server must run without an AI provider').toBe(false);
 }
 // Runs `start` (a click that opens a case) and waits until the case has fully completed.
 async function completeCase(page, start) {
