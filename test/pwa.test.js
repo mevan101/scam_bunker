@@ -72,6 +72,10 @@ function swScope(src, { origin = 'https://example.test', scope = '/scam_bunker/'
     for (const d of [repo, path.join(repo, 'public'), path.join(repo, 'public/shared'), path.join(repo, 'test'), path.dirname(repo)])
       assert.throws(() => build(d), /refusing to wipe/, d);
     assert.throws(() => build('/'), /refusing to wipe/, 'filesystem root');
+    assert.throws(() => build(path.join(repo, '..notes')), /refusing to wipe/, 'in-repo dir named ..notes');
+    const outLink = path.join(repo, 'test', '.tmp-out-link'); fs.symlinkSync(fs.mkdtempSync(path.join(tmp, 'out-')), outLink);
+    try { assert.throws(() => build(outLink), /refusing to wipe/, 'in-repo symlink pointing outside'); assert.ok(fs.lstatSync(outLink).isSymbolicLink(), 'in-repo symlink kept'); }
+    finally { fs.rmSync(outLink, { force: true }); }
     const link = path.join(tmp, 'link-to-repo'); fs.symlinkSync(repo, link);
     for (const d of [link, path.join(link, 'public'), path.join(link, 'test', 'not-yet-there')]) assert.throws(() => build(d), /refusing to wipe/, 'via symlink ' + d);
     assert.doesNotThrow(() => build(path.join(link, '_site'))); fs.rmSync(path.join(repo, '_site'), { recursive: true, force: true });

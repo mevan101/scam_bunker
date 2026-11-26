@@ -33,16 +33,17 @@ function injectServiceWorker(out) {
 }
 
 // The output dir is wiped first: inside the repo only _site/ is allowed, and never the repo or one of its parents.
-// Compared as real paths (symlinks resolved) with path.relative, so `/` and symlinked parents are caught too.
+// Checked on both the given and the real path (symlinks resolved), so `/`, symlinked parents and in-repo symlinks are caught.
 const realish = (p) => { // realpath of the nearest existing ancestor + the not-yet-existing remainder
   let base = p, rest = [];
   while (!fs.existsSync(base) && path.dirname(base) !== base) { rest.unshift(path.basename(base)); base = path.dirname(base); }
   return path.join(fs.realpathSync(base), ...rest);
 };
-const within = (a, b) => { const r = path.relative(b, a); return r === '' || (!r.startsWith('..') && !path.isAbsolute(r)); };
+const within = (a, b) => { const r = path.relative(b, a); return r === '' || (r !== '..' && !r.startsWith('..' + path.sep) && !path.isAbsolute(r)); };
 function assertSafeOutDir(out) {
-  const repo = fs.realpathSync(root), o = realish(out);
-  if (within(repo, o) || (within(o, repo) && o !== path.join(repo, '_site'))) throw new Error(`build-pages: refusing to wipe ${out}; use _site/ or a directory outside the repo`);
+  for (const repo of [path.resolve(root), fs.realpathSync(root)]) for (const o of [out, realish(out)]) {
+    if (within(repo, o) || (within(o, repo) && o !== path.join(repo, '_site'))) throw new Error(`build-pages: refusing to wipe ${out}; use _site/ or a directory outside the repo`);
+  }
 }
 
 function build(out = path.join(root, '_site')) {
