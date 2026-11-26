@@ -209,6 +209,19 @@ async function sampleLog() {
     assert.ok(!(await sandbox.window.SBVerify(bad, {})).ok);
   });
 
+  await test('export package: zero-byte originals and malformed logs are handled', async () => {
+    const log = [], id = 'case-demo-empty', none = new Uint8Array(0), sha = await C.sha256Hex(none);
+    await C.appendEntry(log, { caseId: id, ts: ts(0), action: 'case-created', input: { platform: 'Other' } });
+    await C.appendEntry(log, { caseId: id, ts: ts(1), action: 'evidence-added', input: C.evidenceRecord({ kind: 'image', name: 'empty.png', size: 0, sha256: sha }) });
+    await C.appendEntry(log, { caseId: id, ts: ts(2), action: 'export', input: { evidence: 1, embeddedFiles: [sha] } });
+    const { html, manifest } = await C.buildPackage({ entries: log, outputs: {}, files: { [sha]: none } });
+    const r = await C.verifyPackage(html, { expectedHead: manifest.head });
+    assert.ok(r.ok, JSON.stringify(r.problems)); assert.strictEqual(r.evidence[0].status, 'match');
+    const bad = clone(manifest); bad.log.splice(1, 0, null);
+    const rb = await C.verifyPackage(html.replace(/(id="sb-manifest">)[\s\S]*?(<\/script>)/, (_, a, b) => a + JSON.stringify(bad) + b));
+    assert.ok(!rb.ok); assert.ok(kinds(rb).includes('report')); assert.ok(rb.problems.length > 1, 'chain problems are still reported');
+  });
+
   await test('report escapes user content', async () => {
     const log = [];
     await C.appendEntry(log, { caseId: '<x>', ts: ts(0), action: 'case-created', input: { platform: '<img src=x onerror=alert(1)>' } });

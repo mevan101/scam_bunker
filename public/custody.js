@@ -137,7 +137,7 @@
     const lastExport = [...m.log].reverse().find(e => e && e.action === 'export');
     const mustEmbed = (lastExport && lastExport.input && Array.isArray(lastExport.input.embeddedFiles)) ? lastExport.input.embeddedFiles : [];
     for (const ev of fromLog) {
-      if (!files[ev.sha256]) {
+      if (typeof files[ev.sha256] !== 'string') {
         const removed = mustEmbed.includes(ev.sha256);
         evidence.push({ name: ev.name, sha256: ev.sha256, status: removed ? 'missing' : 'not included' });
         if (removed) problems.push({ kind: 'file', message: `The log says the original of "${ev.name}" was embedded at export, but it has been removed from the package.` });
@@ -162,9 +162,12 @@
     // The readable report is a pure function of the checked manifest, so it is re-rendered and compared rather than trusted.
     let report = 'not checked';
     if (typeof opts.report === 'string' || typeof opts.sameReport === 'function') {
-      const expected = renderReport(m);
-      report = (typeof opts.sameReport === 'function' ? opts.sameReport(expected) : opts.report === expected) ? 'match' : 'mismatch';
-      if (report === 'mismatch') problems.push({ kind: 'report', message: 'The readable report was edited after export: it no longer matches the manifest.' });
+      let expected = null; try { expected = renderReport(m); } catch (e) { }
+      if (expected === null) { report = 'mismatch'; problems.push({ kind: 'report', message: 'The readable report could not be rebuilt from the manifest because its log is malformed.' }); }
+      else {
+        report = (typeof opts.sameReport === 'function' ? opts.sameReport(expected) : opts.report === expected) ? 'match' : 'mismatch';
+        if (report === 'mismatch') problems.push({ kind: 'report', message: 'The readable report was edited after export: it no longer matches the manifest.' });
+      }
     }
     return { ok: !problems.length, problems, notes, evidence, chain, checkedOutputs, report, head: chain.head };
   }
@@ -222,7 +225,7 @@ ${f.corrections.length ? `<p><b>Originally recorded:</b> ${esc(val(f.original.ve
 ${v && v.headline ? `<p>${esc(v.headline)}</p>` : ''}${v && v.deduction ? `<p>${esc(v.deduction)}</p>` : ''}
 ${v && (v.observations || []).length ? `<ul>${v.observations.map(o => `<li>[${esc(o.weight)}] ${esc(o.fact)} → ${esc(o.inference)}</li>`).join('')}</ul>` : ''}</section>
 <section><h2>Evidence (SHA256SUMS)</h2><table><thead><tr><th>#</th><th>Kind</th><th>Name</th><th>SHA-256</th><th>Bytes</th><th>Acquired (UTC)</th><th>Source</th><th>Original</th></tr></thead><tbody>
-${(m.evidence || []).map(x => row([x.seq, esc(x.kind), esc(x.name), `<code>${esc(x.sha256)}</code>`, esc(x.size), esc(x.acquiredAt), esc(x.sourceUrl || '—'), esc(m.files && m.files[x.sha256] ? 'embedded' : x.original)])).join('')}</tbody></table>
+${(m.evidence || []).map(x => row([x.seq, esc(x.kind), esc(x.name), `<code>${esc(x.sha256)}</code>`, esc(x.size), esc(x.acquiredAt), esc(x.sourceUrl || '—'), esc(m.files && typeof m.files[x.sha256] === 'string' ? 'embedded' : x.original)])).join('')}</tbody></table>
 <pre>${esc(m.sha256sums || '')}</pre></section>
 <section><h2>Corrections</h2>${f.corrections.length ? `<table><thead><tr><th>#</th><th>When (UTC)</th><th>Field</th><th>Was</th><th>Now</th><th>What changed</th><th>Why</th></tr></thead><tbody>${f.corrections.map(c => row([c.seq, esc(c.ts), esc(c.field), esc(val(c.previous)), esc(val(c.corrected)), esc(c.what || '—'), esc(c.reason)])).join('')}</tbody></table>` : '<p>No corrections.</p>'}</section>
 ${agents.length ? `<section><h2>Agent reports</h2>${agents.map(e => `<h3>${esc(AGENT_NAMES[e.input.agent] || e.input.agent)}</h3><pre>${esc(m.outputs[e.outputDigest])}</pre>`).join('')}</section>` : ''}
@@ -310,7 +313,7 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
     const lsIndex = () => SB.store.get(LS + 'index', []);
     return {
       mode: () => mode,
-      // A failed IndexedDB write falls back to localStorage, so the copy with the most entries is the newest.
+      // A failed IndexedDB write falls back to localStorage, then to memory, so the copy with the most entries is the newest.
       async getLog(id) {
         const db = await open();
         let idb = null;
@@ -318,12 +321,15 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
         const all = [idb, SB.store.get(LS + id, null), mem.get(id)].filter(r => r && Array.isArray(r.entries));
         return all.reduce((a, r) => (!a || r.entries.length > a.entries.length ? r : a), null);
       },
+      // Memory holds a log only when nothing persistent accepted it, so it cannot resurrect a log another tab cleared.
       async putLog(rec) {
-        mem.set(rec.caseId, rec);
         const db = await open();
-        if (db) try { await req(db, 'logs', 'put', rec); return; } catch { mode = 'browser storage (IndexedDB write failed)'; }
-        SB.store.set(LS + rec.caseId, rec);
-        const idx = lsIndex(); if (!idx.includes(rec.caseId)) SB.store.set(LS + 'index', [rec.caseId, ...idx].slice(0, 200));
+        if (db) try { await req(db, 'logs', 'put', rec); mem.delete(rec.caseId); return; } catch { mode = 'browser storage (IndexedDB write failed)'; }
+        try {
+          localStorage.setItem(LS + rec.caseId, JSON.stringify(rec));
+          const idx = lsIndex(); if (!idx.includes(rec.caseId)) localStorage.setItem(LS + 'index', JSON.stringify([rec.caseId, ...idx].slice(0, 200)));
+          mem.delete(rec.caseId);
+        } catch { mode = 'this tab only (browser storage unavailable)'; mem.set(rec.caseId, rec); }
       },
       async allLogs() {
         const out = new Map();
@@ -641,6 +647,7 @@ ${m.log.map(e => row([e.seq, esc(e.ts), esc(ACTION_LABEL[e.action] || e.action),
   // ---------- Events ----------
   document.addEventListener('sb:case', e => { const c = e.detail; caseTask(c.id, () => intake(c)).then(() => SB.current === c && render(c)); });
   document.addEventListener('sb:case-complete', e => { const c = e.detail; caseTask(c.id, () => complete(c)).then(() => SB.current === c && render(c)); });
+  window.addEventListener('storage', e => { if (e.key === 'scambunker.cases' && e.newValue === '[]') Store.clear().then(() => render(SB.current)); });
   document.addEventListener('click', e => {
     if (e.target.closest('#history-list .hist')) { setTimeout(() => render(SB.current), 0); return; }
     if (e.target.closest('#btn-history')) { setTimeout(annotateHistory, 0); return; }
