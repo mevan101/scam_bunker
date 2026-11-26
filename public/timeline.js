@@ -158,8 +158,9 @@
     }
 
     // Event listings (events.js comparison), if any
-    const caseLinks = new Set([c.url, ...((c.heuristics && c.heuristics.links) || []).map(x => x.url || x)].map(u => safeHref(u)).filter(Boolean).map(u => u.replace(/[?#].*$/, '').replace(/\/$/, '')));
-    const linked = l => [l.url, l.finalUrl].map(u => safeHref(u)).filter(Boolean).some(u => caseLinks.has(u.replace(/[?#].*$/, '').replace(/\/$/, '')));
+    const norm = u => { const h = safeHref(u); if (!h) return null; const x = new URL(h); x.hash = ''; [...x.searchParams.keys()].filter(k => /^(utm_|fbclid$|gclid$)/.test(k)).forEach(k => x.searchParams.delete(k)); return x.href.replace(/\/$/, ''); };
+    const caseLinks = new Set([c.url, ...((c.page && c.page.redirects) || []).map(r => r.url), ...((c.heuristics && c.heuristics.links) || []).map(x => x.url || x)].map(norm).filter(Boolean));
+    const linked = l => [l.url, l.finalUrl].map(norm).some(u => u && caseLinks.has(u));
     for (const l of opts.listings || []) {
       if (l.startUtc == null || !linked(l)) continue; // the Events comparison is shared; only listings this case links to
       const sl = l.startLocal, o = { kind: 'event', what: `Event listing starts: ${l.title || l.id}${l.city ? ' (' + l.city + ')' : ''}`, src: `${l.platform || 'Listing'} ${l.id}`, origin: 'Events', grade: l.manual ? 'D3' : 'C3', href: l.finalUrl || l.url, tab: 'events', precision: l.allDay ? 'day' : 'minute' };
@@ -183,13 +184,13 @@
     const existed = rows.filter(r => r.kind === 'existed');
     // 1. Capture after a copy was already seen (EXIF forged, re-dated, or the wrong camera clock)
     for (const cap of rows.filter(r => r.kind === 'capture')) {
-      const prior = existed.filter(e => span(cap)[0] > span(e)[1]).sort((a, b) => a.ms - b.ms)[0];
+      const before = existed.filter(e => span(cap)[0] > span(e)[1]).sort((a, b) => a.ms - b.ms), prior = before.find(e => e.grade[0] <= 'B') || before[0];
       if (prior) flag(cap, prior.grade[0] <= 'B' ? 'strong' : 'moderate', `Captured after a copy already existed (${prior.src}, ${fmt(prior)}). The capture date is forged or the clock was wrong.`, prior);
     }
     // 2. Claimed event date after a copy existed (recycled media)
     for (const cl of rows.filter(r => r.kind === 'claimed')) {
       const earlier = rows.filter(r => ['existed', 'page', 'capture'].includes(r.kind) && span(cl)[0] > span(r)[1]).sort((a, b) => a.ms - b.ms);
-      const best = earlier.find(r => r.kind === 'existed') || earlier[0];
+      const best = earlier.find(r => r.kind === 'existed' && r.grade[0] <= 'B') || earlier.find(r => r.kind === 'existed') || earlier[0];
       if (best) flag(cl, best.kind === 'existed' && best.grade[0] <= 'B' ? 'strong' : 'moderate', `The post claims ${fmtWhen(cl)}, but ${best.kind === 'capture' ? 'the media was captured' : best.kind === 'page' ? 'a page carrying a copy existed' : 'a matching copy existed'} by ${fmt(best)} (${best.src}). Possibly recycled media.`, best);
     }
     // 3. Modified before captured/created, within the same file (same clock, so no zone slack)

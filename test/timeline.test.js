@@ -167,5 +167,19 @@ test('review fixes: unlinked listings skipped, multi-date posts give no fallback
   assert.strictEqual(T.bounds(T.collect(pc, opts)).late.kind, 'case');
 });
 
+test('review fixes 2: archive evidence preferred over HTTP dates; event IDs in queries kept; redirect targets link listings', () => {
+  const pc = provCase(); pc.provenance.verdict.dates.unshift({ date: '2017-01-01T00:00:00', kind: 'existed', trust: 'medium', source: 'HTTP Last-Modified (server-reported)', item: 'Copy 1', itemId: 'c1', note: '' });
+  const rows = T.collect(pc, opts);
+  assert.strictEqual(rows.find(r => r.kind === 'claimed').flags[0].weight, 'strong');
+  assert(rows.find(r => r.kind === 'capture' && r.origin === 'Image file').flags.some(f => f.weight === 'strong' && /Wayback/.test(f.text)));
+  const L = [C.normalizeListing({ id: 'Q2', url: 'https://events.example.org/e?id=2', title: 'Other', start: '2025-01-05T18:00', tz: 'Asia/Dhaka' })];
+  const c = { at: '2026-11-26T10:00:00Z', text: '', url: 'https://events.example.org/e?id=1&utm_source=x' };
+  assert(!T.collect(c, { ...opts, listings: L }).some(r => r.kind === 'event'));
+  c.url = 'https://events.example.org/e?id=2&utm_source=x';
+  assert(T.collect(c, { ...opts, listings: L }).some(r => r.kind === 'event'));
+  const r = { at: '2026-11-26T10:00:00Z', text: '', url: 'https://short.example/x', page: { redirects: [{ url: 'https://short.example/x', status: 301 }, { url: 'https://events.example.org/e?id=2', status: 200 }] } };
+  assert(T.collect(r, { ...opts, listings: L }).some(x => x.kind === 'event'));
+});
+
 console.log(failed ? `✗ timeline: ${failed} failed` : 'timeline: all tests passed');
 process.exit(failed ? 1 : 0);
