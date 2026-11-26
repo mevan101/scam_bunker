@@ -186,12 +186,15 @@
     }
     (c.simpleReasons || []).forEach(r => out.push({ weight: r.weight || 'moderate', quote: r.quote || '', text: r.text, source: r.source || 'module' }));
     if (!out.length) out.push({ weight: 'ok', quote: '', text: 'None of the scam, manipulation or AI patterns we know matched.', source: 'rules' });
-    return out.sort((a, b) => (RANK[a.weight] ?? 9) - (RANK[b.weight] ?? 9)).slice(0, 5);
+    // One reason per distinct finding: the same sentence about the same quote (e.g. a link flag that also fired as a rule) shows once.
+    const uniq = [], keys = new Set();
+    out.sort((a, b) => (RANK[a.weight] ?? 9) - (RANK[b.weight] ?? 9)).forEach(r => { const k = `${r.text}|${r.quote}`; if (!keys.has(k)) { keys.add(k); uniq.push(r); } });
+    return uniq.slice(0, 5);
   }
 
   // What to do now, tailored to the verdict and scheme. Rule hits may carry an `advice` key (preferred when the map exists).
   function plainActions(c, v) {
-    const h = c.heuristics || { hits: [], links: [], entities: {} }, cat = v.category || h.category || '', where = c.platform ? `on ${c.platform}` : 'in the app it came from';
+    const h = c.heuristics || { hits: [], links: [], entities: {} }, cat = v.category || h.category || '', where = !c.platform ? 'in the app it came from' : /Email|SMS/i.test(c.platform) ? 'as spam or phishing (in your email app, or by forwarding a scam text to your mobile operator)' : `on ${c.platform}`;
     const acts = [], add = (text, href, label) => { if (!acts.some(a => a.text === text)) acts.push({ text, href, label }); };
     const ADV = root.DeduceHeuristics?.ADVICE;
     if (ADV) (h.hits || []).forEach(x => { const a = x.advice && ADV[x.advice]; if (a) typeof a === 'string' ? add(a) : add(a.text, a.href, a.label); });
