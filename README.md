@@ -129,7 +129,7 @@ npx playwright test --project=server              # npm start, with /api
 npx playwright test --project=static              # npm run build:pages, served under /scam_bunker/, no /api
 ```
 
-Every test runs in both modes. The suite covers the five samples, an AI-generated PNG and a geotagged JPEG (both generated at test time), every report section, keyboard navigation, the claude.ai handoff, repeat-offender linking, light and dark themes, a 390px layout and axe-core (WCAG 2.2 AA) in both themes. The browser can reach only the local app. All fixtures are invented. The `E2E` GitHub Actions workflow runs the suite on every push and pull request and uploads the HTML report.
+Every test runs in both modes. The suite covers the five samples, an AI-generated PNG and a geotagged JPEG (both generated at test time), every report section, keyboard navigation, the claude.ai handoff, repeat-offender linking, light and dark themes, a 390px layout and axe-core (WCAG 2.2 AA) in both themes. Report tests run in Investigator mode. A Simple-mode block checks every sample, the 390px layout and axe-core, and it skips itself until `ScamBunker.mode()` exists. The browser can reach only the local app. All fixtures are invented. The `E2E` GitHub Actions workflow runs the suite on every push and pull request and uploads the HTML report.
 
 ## Contributing
 

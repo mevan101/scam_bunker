@@ -129,13 +129,29 @@ const test = base.extend({
   },
 });
 
-async function openApp(page) {
+async function openApp(page, { mode = 'investigator' } = {}) {
   await page.goto('./');
   await page.waitForFunction(() => window.ScamBunker && document.querySelector('#pill-local.on'));
   await page.waitForFunction(() => document.documentElement.hasAttribute('data-static') || document.querySelector('#pill-web.on'));
   // Guard against a reused local server that has a paid provider configured.
   if (!(await page.evaluate(() => window.ScamBunker.isStatic()))) expect(await page.evaluate(() => window.ScamBunker.server().ai), 'test server must run without an AI provider').toBe(false);
+  await setMode(page, mode);
 }
+
+// Simple/Investigator modes (docs/PRODUCT.md) land in a parallel PR, so everything here is defensive:
+// before ScamBunker.mode exists the app has only the full report, which is what investigator tests need.
+const hasModes = page => page.evaluate(() => typeof window.ScamBunker?.mode === 'function');
+async function setMode(page, mode) {
+  if (!(await hasModes(page)) || (await page.evaluate(() => window.ScamBunker.mode())) === mode) return;
+  const viaApi = await page.evaluate(m => { const f = window.ScamBunker.setMode; if (typeof f !== 'function') return false; f(m); return true; }, mode);
+  if (!viaApi) {
+    const label = mode === 'investigator' ? /investigator/i : /simple/i;
+    const toggle = page.locator(`[data-mode-set="${mode}"], [data-mode="${mode}"]`).or(page.getByRole('button', { name: label })).or(page.getByRole('switch', { name: /investigator|mode/i })).first();
+    await toggle.click();
+  }
+  await page.waitForFunction(m => window.ScamBunker.mode() === m, mode, { timeout: 5000 });
+}
+
 // Runs `start` (a click that opens a case) and waits until the case has fully completed.
 async function completeCase(page, start) {
   const before = await page.evaluate(() => window.__sbComplete);
@@ -157,4 +173,4 @@ async function runImage(page, file, text = '') {
 }
 const visibleTabs = page => page.locator('#tabs [role=tab]:not([hidden])');
 
-module.exports = { test, expect, INVENTED_WALLET, INVENTED_PHOTO, SAMPLE_VERDICTS, aiPng, gpsJpeg, exifApp1, openApp, completeCase, runSample, runText, runImage, visibleTabs };
+module.exports = { test, expect, hasModes, setMode, INVENTED_WALLET, INVENTED_PHOTO, SAMPLE_VERDICTS, aiPng, gpsJpeg, exifApp1, openApp, completeCase, runSample, runText, runImage, visibleTabs };

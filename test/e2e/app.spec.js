@@ -2,7 +2,7 @@
 // `static` (the GitHub Pages build under /scam_bunker/, where there is no /api).
 const path = require('path');
 const { AxeBuilder } = require('@axe-core/playwright');
-const { test, expect, INVENTED_WALLET, INVENTED_PHOTO, SAMPLE_VERDICTS, aiPng, gpsJpeg, openApp, runSample, runText, runImage, visibleTabs } = require('./fixtures');
+const { test, expect, INVENTED_WALLET, INVENTED_PHOTO, SAMPLE_VERDICTS, hasModes, setMode, aiPng, gpsJpeg, openApp, runSample, runText, runImage, visibleTabs } = require('./fixtures');
 const { AGENTS } = require(path.resolve(__dirname, '../../public/shared/prompt.js'));
 
 test.beforeEach(async ({ page }) => { await openApp(page); });
@@ -221,6 +221,37 @@ test.describe('accessibility (axe-core)', () => {
         await tabs.nth(i).click();
         await scan(`section ${await tabs.nth(i).getAttribute('id')}`);
       }
+    });
+  }
+});
+
+// Simple mode is the default for ordinary visitors (docs/PRODUCT.md). Selector-free checks, so they hold
+// whatever the shell's markup ends up being; skipped until ScamBunker.mode() exists.
+test.describe('simple mode', () => {
+  test.beforeEach(async ({ page }) => {
+    test.skip(!(await hasModes(page)), 'ScamBunker.mode() not on main yet');
+    const fired = page.evaluate(() => new Promise(r => { document.addEventListener('sb:mode', e => r(e.detail ?? true), { once: true }); setTimeout(() => r(false), 5000); }));
+    await setMode(page, 'simple');
+    expect(await fired, 'sb:mode fires when the mode changes').toBeTruthy();
+  });
+  test('every sample completes without errors', async ({ page }) => {
+    for (const key of Object.keys(SAMPLE_VERDICTS)) await runSample(page, key);
+  });
+  test('mode is remembered across reloads', async ({ page }) => {
+    await page.reload(); await openApp(page, { mode: 'simple' });
+    await page.reload(); await page.waitForFunction(() => window.ScamBunker?.mode?.() === 'simple');
+  });
+  test('no horizontal scroll at 390px', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await runSample(page, 'phish');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  });
+  for (const theme of ['light', 'dark']) {
+    test(`axe-core zero violations, ${theme} theme`, async ({ page }) => {
+      await page.click(`[data-theme-set="${theme}"]`);
+      await runSample(page, 'job');
+      const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+      expect(violations.map(v => `${v.id}: ${v.nodes.slice(0, 5).map(n => n.target.join(' ')).join(', ')}`)).toEqual([]);
     });
   }
 });
