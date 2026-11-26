@@ -48,6 +48,7 @@ const sig = [
   ['i18n-hi-mum', 'Coucou maman, j\'ai perdu mon téléphone, voici mon nouveau numéro. Tu peux me faire un virement de 400 € ?'],
   ['account-recovery-help', 'Hey, I sent a code to your phone by mistake, can you forward it to me?'],
   ['loan-harassment', 'Repay today or we will send your morphed photos to all your contacts'],
+  ['bn-loan-harassment', 'লোনের টাকা আজকে না দিলে আপনার ছবি এডিট করে সব কন্টাক্টে পাঠিয়ে দিব'],
   ['bn-customs', 'আপনার নামে একটি গিফট পার্সেল এসেছে, এয়ারপোর্টে কাস্টমস ফি ১৫০০০ টাকা বিকাশ করুন'],
   ['double-crypto', 'Send 0.1 BTC to the address and you will get double back'],
   ['marketplace-code', 'Before I buy I need to make sure you are real. I will send you a code, tell me what it says'],
