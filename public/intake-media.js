@@ -513,7 +513,8 @@
   // The shell picks one adapter per input, so either adapter returns both the QR and the OCR findings. The image itself
   // stays in `attachments`, so the normal image forensics still run on it.
   function toExtraction(r, file) {
-    r.via = 'adapter';
+    // Each check is a new case: a cached reading of the same file must count for it too.
+    r.via = 'adapter'; r.consumed = false;
     return extractionOf(r, file);
   }
 
