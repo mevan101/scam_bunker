@@ -153,12 +153,10 @@
     const msgIdDomain = lc((msgId.match(/@([^>\s]+)>?/) || [])[1] || '');
     const arRaw = all(hs, 'authentication-results');
     const ar = arRaw.length ? parseAuthResults(arRaw[0]) : null; // the top one was added by your own provider; lower ones can be forged
-    const spfHdr = first(hs, 'received-spf');
-    const spfHdrResult = spfHdr ? lc((spfHdr.match(/^\s*([a-z]+)/i) || [])[1] || '') : '';
     const dkimSig = all(hs, 'dkim-signature').map(v => lc((v.match(/\bd=([^;\s]+)/i) || [])[1] || '')).filter(Boolean);
     const hops = all(hs, 'received').map(parseReceived).reverse(); // oldest (origin) first
     const res = { from, replyTo, sender, returnPath, subject: decodeWords(first(hs, 'subject') || ''), date: first(hs, 'date') || '', to: decodeWords(first(hs, 'to') || ''), messageIdDomain: msgIdDomain,
-      auth: { spf: ar?.spf?.result || spfHdrResult || 'missing', spfDomain: ar?.spf?.domain || '', dkim: ar ? (ar.dkim.find(d => d.result === 'pass') || ar.dkim[0] || { result: 'missing' }).result : 'missing', dkimDomains: ar ? ar.dkim.map(d => d.domain).filter(Boolean) : [], dmarc: ar?.dmarc?.result || 'missing', server: ar?.server || '', present: !!ar, count: arRaw.length },
+      auth: { spf: ar?.spf?.result || 'missing', spfDomain: ar?.spf?.domain || '', dkim: ar ? (ar.dkim.find(d => d.result === 'pass') || ar.dkim[0] || { result: 'missing' }).result : 'missing', dkimDomains: ar ? ar.dkim.map(d => d.domain).filter(Boolean) : [], dmarc: ar?.dmarc?.result || 'missing', server: ar?.server || '', present: !!ar, count: arRaw.length },
       dkimSigned: dkimSig, hops, body, signals: [], headerCount: hs.length };
     const S = res.signals, fd = from?.domain || '', freg = regDomain(fd);
 
@@ -187,19 +185,21 @@
     if (from && sender && regDomain(sender.domain) !== freg) S.push(signal('weak', `A "Sender" line says it was sent on behalf of ${from.address} by ${sender.address}.`));
     // --- Authentication ---
     const a = res.auth;
+    if (a.count > 1) S.push(signal('weak', `There are ${a.count} Authentication-Results lines. We only read the top one, which your own email provider adds; lower ones can be written by the sender.`));
     if (!a.present) S.push(signal('weak', 'The headers have no "Authentication-Results" line, so we cannot see whether your email provider verified the sender.', 'Copy the full original headers from your email app (see "How to get the headers").'));
     else {
-      if (a.dmarc === 'fail') S.push(signal('strong', `Your email provider checked the sender's anti-spoofing policy (DMARC) and this email failed it.`, `The ${fd || 'sender'} domain says it never sends email like this. Treat it as a fake.`));
+      // Header lines can be written by the sender; only the topmost result, added by your own provider, is trustworthy, so these stay at most moderate.
+      if (a.dmarc === 'fail') S.push(signal('moderate', `The top sender-check line says this email failed the sender's anti-spoofing policy (DMARC).`, `If you copied the full headers, that line was added by your own email provider and means the ${fd || 'sender'} domain does not vouch for this email.`));
       if (['fail'].includes(a.spf)) S.push(signal('moderate', 'The sending server is not on the sender domain\'s list of allowed servers (SPF failed).'));
       else if (a.spf === 'softfail') S.push(signal('weak', 'The sending server is probably not allowed to send for this domain (SPF soft-fail).'));
       if (a.dkim === 'fail') S.push(signal('moderate', 'The digital signature on this email is broken (DKIM failed): it may have been changed or forged.'));
       if (a.dkim === 'missing' && a.spf === 'missing' && a.dmarc === 'missing') S.push(signal('weak', 'No sender checks are reported at all.'));
       else if (['none', 'missing'].includes(a.dmarc) && a.dmarc !== 'fail' && fd) S.push(signal('weak', `The sender domain ${fd} has no anti-spoofing policy (DMARC) reported, so anyone could pretend to send from it.`));
-      if (a.dkim === 'pass' && fd && a.dkimDomains.length && !a.dkimDomains.some(d => regDomain(d) === freg)) S.push(signal('weak', `The email was signed by ${a.dkimDomains.join(', ')}, not by ${freg}.`, 'Usually a mailing service; it only proves that service sent it.'));
+      if (a.dkim === 'pass' && fd && a.dkimDomains.length && !a.dkimDomains.some(d => regDomain(d) === freg)) S.push(signal('weak', `The email was signed by ${a.dkimDomains.join(', ')}, not by ${freg}.`, 'Usually a mailing service; it only shows that service sent it.'));
     }
     // --- Message-ID and hops ---
     if (fd && msgIdDomain && regDomain(msgIdDomain) !== freg && !isFree(msgIdDomain) && !/(google|outlook|prod\.outlook|amazonses|sendgrid|mailgun|mailchimp|mcsv|sparkpost|mandrill|postmark|zoho|yahoo|apple|icloud|protonmail)/i.test(msgIdDomain))
-      S.push(signal('weak', `The message ID was created by ${msgIdDomain}, not by ${fd}.`, 'Mailing services do this too; on its own it proves nothing.'));
+      S.push(signal('weak', `The message ID was created by ${msgIdDomain}, not by ${fd}.`, 'Mailing services do this too; on its own it means nothing.'));
     for (let i = 1; i < hops.length; i++) if (hops[i].time != null && hops[i - 1].time != null && hops[i].time < hops[i - 1].time - 5 * 60e3) { S.push(signal('weak', 'The delivery hops have timestamps out of order; the lowest hops may have been faked or a server clock is wrong.')); break; }
     if (a.present && a.spf === 'pass' && a.dkim === 'pass' && a.dmarc === 'pass') res.passed = true;
     S.sort((x, y) => WEIGHT[y.strength] - WEIGHT[x.strength]);
@@ -366,9 +366,10 @@
   const onlyPhone = t => { const s = String(t || '').trim(); return s.length <= 24 && /^[+(\d][\d\s().-]{6,}\d$/.test(s) && !!parsePhone(s); };
   const onlyEmail = t => /^\s*(?:"?[^"<>]*"?\s*<)?[\w.+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+>?\s*$/i.test(String(t || ''));
   const notes = list => list.slice(0, 5).map(x => x.text);
+  let lastRaw = null; // raw text read by an adapter, picked up by the next sb:case
   const ADAPTERS = [
     { id: 'email-headers', label: 'Email headers', detect: input => headerScore(input && input.text),
-      async extract(input) { const r = scan(input.text); const h = r.headers; return { text: [h && h.subject, h && h.body].filter(Boolean).join('\n\n') || input.text, notes: notes(r.reasons), contact: r }; } },
+      async extract(input) { const r = scan(input.text); const h = r.headers; lastRaw = String(input.text || ''); return { text: [h && h.subject, h && h.body].filter(Boolean).join('\n\n') || input.text, notes: notes(r.reasons), contact: r }; } },
     { id: 'phone-number', label: 'Phone number', detect: input => onlyPhone(input && input.text) ? 0.9 : 0,
       async extract(input) { const r = scan(input.text); return { text: input.text, notes: notes(r.reasons), contact: r }; } },
     { id: 'email-address', label: 'Email address', detect: input => onlyEmail(input && input.text) ? 0.9 : 0,
@@ -391,7 +392,7 @@
   const register = () => { if (registered || typeof SB.registerIntake !== 'function') return; ADAPTERS.forEach(a => SB.registerIntake(a)); registered = true; };
   register(); document.addEventListener('sb:ready', register); document.addEventListener('sb:intake-ready', register);
 
-  const addReasons = (c, r) => { if (!r.length) return; if (typeof SB.addReasons === 'function') SB.addReasons(c, r); else c.reasons = [...(c.reasons || []), ...r]; };
+  const addReasons = (c, r) => { if (!r.length) return; if (typeof SB.addReasons === 'function') SB.addReasons(c, r.map(x => ({ text: x.text, weight: x.strength, source: 'sender check: ' + x.source }))); else c.reasons = [...(c.reasons || []), ...r]; };
   const addActions = (c, a) => { if (!a.length) return; if (typeof SB.addActions === 'function') SB.addActions(c, a); else c.actions = [...(c.actions || []), ...a]; };
 
   const OBS_W = { strong: 'strong', moderate: 'moderate', weak: 'weak', proof: 'strong' };
@@ -419,7 +420,8 @@
   }
   function apply(c, fresh) {
     if (!c) return;
-    c.contact = (!fresh && !extraDisposable && saved(c.id)) || scan([c.text, c.url && !/^https?:/i.test(c.url) ? c.url : ''].filter(Boolean).join('\n'), { disposable: extraDisposable });
+    const raw = fresh && lastRaw && String(c.text || '').includes(lastRaw.trim()) ? lastRaw : null; lastRaw = null;
+    c.contact = (!fresh && !extraDisposable && saved(c.id)) || scan(raw || [c.text, c.url && !/^https?:/i.test(c.url) ? c.url : ''].filter(Boolean).join('\n'), { disposable: extraDisposable });
     if (fresh) save(c);
     c.caseExtras = { ...(c.caseExtras || {}), contact: c.contact.found ? { reasons: c.contact.reasons.slice(0, 8).map(r => `[${r.strength}] ${r.text}`), auth: c.contact.headers && c.contact.headers.auth, phones: c.contact.phones.map(p => ({ number: p.display, country: p.country, operator: p.operator })), emails: c.contact.emails.map(e => ({ address: e.address, kind: e.kind })) } : undefined };
     if (fresh && !c._contactShared) { addReasons(c, c.contact.reasons.slice(0, 5)); addActions(c, c.contact.actions); c._contactShared = true; }
@@ -442,14 +444,14 @@
   function headersHtml(h) {
     const who = [['Claims to be from', h.from ? `${h.from.name ? esc(h.from.name) + ' ' : ''}<code>${esc(h.from.address)}</code>` : 'Not shown'], ['Replies go to', h.replyTo ? `<code>${esc(h.replyTo.address)}</code>` : 'Same as above'], ['Bounces go to (Return-Path)', h.returnPath ? `<code>${esc(h.returnPath.address)}</code>` : 'Not shown'], h.subject && ['Subject', esc(h.subject)], h.date && ['Date', esc(h.date)], h.messageIdDomain && ['Message ID made by', `<code>${esc(h.messageIdDomain)}</code>`]].filter(Boolean);
     const a = h.auth;
-    const hops = h.hops.length ? `<ol class="list">${h.hops.map((x, i) => `<li><b>${i === 0 ? 'Started at' : i === h.hops.length - 1 ? 'Delivered by' : 'Passed through'}</b> <code>${esc(x.by || x.from || 'unknown server')}</code>${x.from && x.by ? ` <span class="muted">from</span> <code>${esc(x.from)}</code>` : ''}${x.ip ? ` <span class="muted">IP</span> <code>${esc(x.ip)}</code>` : ''}${x.date ? `<br><span class="muted">${esc(x.date)}</span>` : ''}</li>`).join('')}</ol><p class="muted">Read from the top: the first line is where the email started. Only the last few lines, added by your own provider, can be fully trusted; earlier lines can be faked by the sender.</p>` : '<p class="empty">No delivery hops (Received lines) were pasted.</p>';
+    const hops = h.hops.length ? `<ol class="list">${h.hops.map((x, i) => `<li><b>${i === 0 ? 'Started at' : i === h.hops.length - 1 ? 'Delivered by' : 'Passed through'}</b> <code>${esc(x.by || x.from || 'unknown server')}</code>${x.from && x.by ? ` <span class="muted">from</span> <code>${esc(x.from)}</code>` : ''}${x.ip ? ` <span class="muted">IP</span> <code>${esc(x.ip)}</code>` : ''}${x.date ? `<br><span class="muted">${esc(x.date)}</span>` : ''}</li>`).join('')}</ol><p class="muted">Read from the top: the first line is where the email started. Only the last lines, added by your own email provider, can be trusted; earlier lines can be faked by the sender.</p>` : '<p class="empty">No delivery hops (Received lines) were pasted.</p>';
     return `<section aria-labelledby="ct-h-hdr"><h3 id="ct-h-hdr">Email headers</h3>
       <div class="linkcard"><div class="top"><b>Who sent it</b><span class="tag">${h.headerCount} header lines</span></div>${sigList(h.signals.filter(s => s.strength !== 'weak'))}</div>
       <div class="kv">${who.map(([k, v]) => `<div>${esc(k)}</div><div>${v}</div>`).join('')}</div>
     </section>
-    <section aria-labelledby="ct-h-auth"><h3 id="ct-h-auth">Sender checks by your email provider</h3>
+    <section aria-labelledby="ct-h-auth"><h3 id="ct-h-auth">Sender checks (as reported in the headers)</h3>
       ${a.present ? `<div class="kv"><div>Server allowed to send (SPF)</div><div>${authCell(a.spf)}${a.spfDomain ? ` · <code>${esc(a.spfDomain)}</code>` : ''}</div><div>Digital signature (DKIM)</div><div>${authCell(a.dkim)}${a.dkimDomains.length ? ` · <code>${esc(a.dkimDomains.join(', '))}</code>` : ''}</div><div>Anti-spoofing policy (DMARC)</div><div>${authCell(a.dmarc)}</div>${a.server ? `<div>Checked by</div><div><code>${esc(a.server)}</code></div>` : ''}</div>
-      <p class="muted">We read the top Authentication-Results line, which your own provider adds when you copy the full headers; a sender can fake lines lower down. A pass means the email came from the domain shown, nothing more. Scammers can register a lookalike domain and pass every check.</p>` : '<p class="empty">No Authentication-Results line was pasted, so we cannot see the checks.</p>'}
+      <p class="muted">These results are not proof. Only the topmost results, added by your own email provider, can be trusted, so we read only the first Authentication-Results line; the sender can write fake ones lower down. Even a real pass only means the email came from the domain shown: scammers register lookalike domains that pass every check.</p>` : '<p class="empty">No Authentication-Results line was pasted, so we cannot see the checks.</p>'}
       ${h.signals.some(s => s.strength === 'weak') ? `<details><summary>Minor notes (${h.signals.filter(s => s.strength === 'weak').length})</summary>${sigList(h.signals.filter(s => s.strength === 'weak'))}</details>` : ''}
     </section>
     <section aria-labelledby="ct-h-hops"><h3 id="ct-h-hops">Delivery route (${h.hops.length} hop${h.hops.length === 1 ? '' : 's'})</h3>${hops}</section>`;

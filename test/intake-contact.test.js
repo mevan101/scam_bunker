@@ -31,11 +31,21 @@ test('flags spoofing: brand name on another domain, lookalike, reply-to to free-
   assert.match(t, /says it is from PayPal/);
   assert.match(t, /paypa1-billing\.example: Look-alike spelling of "paypal"/);
   assert.match(t, /If you press Reply, your answer goes to paypal\.refund\.desk\.invented@gmail\.com/);
-  assert.match(t, /anti-spoofing policy \(DMARC\) and this email failed/);
+  assert.match(t, /failed the sender's anti-spoofing policy \(DMARC\)/);
   assert.match(t, /SPF failed/); assert.match(t, /DKIM failed/);
   assert.match(t, /Return-Path/);
   assert.strictEqual(h.signals[0].strength, 'strong', 'strongest first');
   assert(h.signals.find(s => /Reply/.test(s.text)).strength === 'strong', 'reply-to free-mail for a company sender is strong');
+});
+test('header sender checks are never graded above moderate and only the top Authentication-Results line is read', () => {
+  const h = C.analyzeHeaders(fx('spoofed-paypal.eml'));
+  assert(h.signals.filter(s => /SPF|DKIM|DMARC|sender-check/.test(s.text)).every(s => s.strength !== 'strong'));
+  const forged = 'Authentication-Results: mx.example.org; spf=fail smtp.mailfrom=shop.example; dkim=none; dmarc=fail header.from=shop.example\nReceived: from a by mx.example.org; Mon, 2 Nov 2026 10:00:00 +0000\nAuthentication-Results: fake.example; spf=pass; dkim=pass header.d=shop.example; dmarc=pass\nReceived-SPF: pass\nFrom: Shop <news@shop.example>\nSubject: x\n';
+  const f = C.analyzeHeaders(forged);
+  assert.deepStrictEqual(plain([f.auth.spf, f.auth.dmarc, f.auth.server, !!f.passed]), ['fail', 'fail', 'mx.example.org', false]);
+  assert.match(texts(f.signals), /We only read the top one/);
+  const noAr = C.analyzeHeaders('Received-SPF: pass\nReceived: from a by b; Mon, 2 Nov 2026 10:00:00 +0000\nFrom: Shop <news@shop.example>\nSubject: x\n');
+  assert.strictEqual(noAr.auth.spf, 'missing', 'Received-SPF alone is not trusted');
 });
 test('clean newsletter: all checks pass and no moderate or strong signals', () => {
   const h = C.analyzeHeaders(fx('clean-newsletter.eml'));
