@@ -23,13 +23,16 @@ const HYPE = /^(breaking|urgent|share|shared|deleted|before|true|100%|amen|wow|o
 
 const clean = s => String(s || '').replace(/https?:\/\/\S+/g, ' ').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, ' ').replace(/[#@][\w.]+/g, ' ').replace(/\s+/g, ' ').trim();
 
+const DENIAL = /\b(not|no|never|false|fake|myth|hoax|debunked|untrue|lies?|isn't|wasn't|aren't)\b/i;
+const NEGATION = /\b(not|no|never|cannot)\b|n't\b/i;
+
 function sentences(text) {
   const out = [];
   for (const line of String(text || '').split(/\n+/)) {
     for (const part of line.split(/(?<=[.!?…])\s+|(?<=[!?]{2})(?=\S)/)) {
       // "Doctors don't want you to know this: <claim>" → keep the claim after the colon when it is substantial
       const i = part.indexOf(': ');
-      if (i > 0 && part.slice(i + 2).split(/\s+/).length >= 5) out.push(part.slice(0, i), part.slice(i + 2)); else out.push(part);
+      if (i > 0 && !DENIAL.test(part.slice(0, i)) && part.slice(i + 2).split(/\s+/).length >= 5) out.push(part.slice(0, i), part.slice(i + 2)); else out.push(part);
     }
   }
   return out.map(clean).map(s => s.replace(/[.!…]+$/, '').trim()).filter(Boolean);
@@ -64,7 +67,7 @@ function extractClaims(text, max = 3) {
     .map((s, i) => ({ text: s.slice(0, 240), i, ...scoreSentence(s) }))
     .filter(c => c.score >= 3)
     .sort((a, b) => b.score - a.score || a.i - b.i)
-    .filter(c => { const q = toQuery(c.text); if (!q || seen.has(q)) return false; seen.add(q); c.query = q; return true; })
+    .filter(c => { const q = toQuery(c.text), key = q + (NEGATION.test(c.text) ? '|neg' : ''); if (!q || seen.has(key)) return false; seen.add(key); c.query = q; return true; })
     .slice(0, max)
     .map(c => ({ text: c.text, query: c.query, why: c.why, explorerUrl: EXPLORER + encodeURIComponent(c.query) }));
 }

@@ -46,6 +46,17 @@ const VIRAL = "BREAKING 🚨 SHARE BEFORE IT'S DELETED!! Doctors don't want you 
     assert(!/https?:|#|@/.test(c[0].text), c[0].text);
   });
 
+  await test('claims: a denial before a colon stays attached to the claim', () => {
+    const c = F.extractClaims('It is a hoax that: the Northvale reservoir was poisoned with 40 tonnes of chlorine in 2026.');
+    assert.strictEqual(c.length, 1);
+    assert(/^It is a hoax that/.test(c[0].text), c[0].text);
+    assert(F.sentences('Doctors don\'t want you to know this: a simple lemon drink cures cancer in 7 days').length === 2);
+  });
+  await test('claims: a claim and its negation are both kept', () => {
+    const c = F.extractClaims('Officials confirmed the Eastbrook bridge is safe after the 2026 inspection. Officials confirmed the Eastbrook bridge is not safe after the 2026 inspection.');
+    assert.strictEqual(c.length, 2);
+  });
+
   // ---------- API response parser ----------
   await test('parser: recorded claims:search sample → publisher, rating, review date, link', () => {
     const r = F.parseClaimSearch(fixture('factcheck-claims-search.json'));
