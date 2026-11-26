@@ -94,6 +94,15 @@ async function t(name, fn) { try { await fn(); results.push(['✓', name]); } ca
     assert.ok(/PRIOR FACT-CHECKS \(claims extracted locally, not searched/.test(browser) && browser.includes('reservoir was closed in 2019'));
     assert.strictEqual(browser, require('../public/shared/prompt.js').buildHandoffPrompt(body, F.caseFileSections));
   });
+  await t('claims never end in half a surrogate pair, so a short handoff URL can be encoded', () => {
+    const P = require('../public/shared/prompt.js');
+    const s = 'Invented: the Example Bank refund of 500 dollars was confirmed on 3 May 2024 ' + 'x'.repeat(239 - 77) + '\u{1D400} and more.';
+    const claim = X.extractClaims(s)[0]; assert.ok(claim, 'claim extracted');
+    assert.ok(!/[\ud800-\udbff]$/.test(claim.text) && claim.text.length <= 240);
+    const prompt = P.buildHandoffPrompt({ case: { text: 'short', factchecks: { available: false, claims: [{ text: s }] } } }, X.caseFileSections);
+    assert.doesNotThrow(() => encodeURIComponent(prompt));
+    assert.strictEqual(X.cut('ab\u{1D400}', 3), 'ab'); assert.strictEqual(X.cut('abc', 3), 'abc');
+  });
   await t('shared corroborate core loads as a plain browser script', () => {
     const ctx = { window: {}, URL, URLSearchParams }; vm.createContext(ctx);
     vm.runInContext(fs.readFileSync(path.join(root, 'public/shared/corroborate-core.js'), 'utf8'), ctx);

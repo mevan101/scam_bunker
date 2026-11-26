@@ -36,12 +36,27 @@
   }
 
   const isStatic = () => !!(SB.isStatic && SB.isStatic());
+  // Plain-language reasons/actions for Simple mode (ScamBunker.addReasons/addActions land in a parallel PR).
+  const contributed = new WeakMap();
+  function contribute(c) {
+    const fc = c && c.factcheck; if (!fc || fc.status || !(fc.claims || []).length) return;
+    const key = JSON.stringify(fc.claims.map(cl => [cl.text, (cl.matches || []).length]));
+    if (contributed.get(c) === key) return; contributed.set(c, key);
+    const short = t => (t.length > 90 ? window.ScamBunkerClaims.cut(t, 87).trimEnd() + '…' : t);
+    try {
+      if (typeof SB.addActions === 'function') SB.addActions(c, fc.claims.slice(0, 2).filter(cl => cl.explorerUrl).map(cl => ({ text: `See what fact-checkers have said about “${short(cl.text)}”`, href: cl.explorerUrl })));
+      if (typeof SB.addReasons === 'function' && fc.available) {
+        const rs = fc.claims.map(cl => { const m = (cl.matches || [])[0], r = m && m.reviews[0]; return r ? { text: `Fact-checkers have already looked at a claim like “${short(cl.text)}”: ${r.publisher} rated it “${r.rating}”. Open it to make sure it is the same claim.`, weight: 'weak', source: 'factcheck' } : null; }).filter(Boolean);
+        if (rs.length) SB.addReasons(c, rs);
+      }
+    } catch { }
+  }
   function local(c) {
     const X = window.ScamBunkerClaims;
     if (!X) { render(c); return; }
     c.factcheck = { available: false, local: true, service: 'Google Fact Check Explorer (manual)', claims: X.extractClaims(String(c.text).slice(0, 12000)) };
     c.caseExtras = { ...(c.caseExtras || {}), factchecks: forAgents(c.factcheck) };
-    observations(c); persist(c); render(c);
+    observations(c); persist(c); contribute(c); render(c);
   }
   async function lookup(c) {
     if (!c || !c.text) { render(c); return; }
@@ -52,7 +67,7 @@
       .catch(e => { c.factcheck = { error: e.message, claims: [] }; })
       .then(() => {
         c.caseExtras = { ...(c.caseExtras || {}), factchecks: forAgents(c.factcheck) };
-        observations(c); persist(c);
+        observations(c); persist(c); contribute(c);
         if (SB.current === c) { SB.renderAll(); render(c); }
       });
     (c.pending = c.pending || []).push(p); // app.js waits for module lookups before the agents run

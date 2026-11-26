@@ -371,6 +371,25 @@
   }
 
   document.addEventListener('sb:case', e => render(e.detail));
+  // Simple mode (parallel shell PR; call defensively): the tool tab is Investigator-only, but anyone with a link in their
+  // case gets a plain "report this website" step.
+  const corTab = document.querySelector('#tab-corroborate');
+  function applyUiMode() {
+    if (!corTab) return;
+    const simple = typeof SB.mode === 'function' && SB.mode() === 'simple';
+    corTab.hidden = simple;
+    if (simple && corTab.getAttribute('aria-selected') === 'true') SB.showTab('deduction');
+  }
+  document.addEventListener('sb:mode', applyUiMode);
+  document.addEventListener('sb:ready', applyUiMode);
+  applyUiMode();
+  const contributed = new WeakSet();
+  document.addEventListener('sb:case', e => {
+    const c = e.detail; if (!c || contributed.has(c) || typeof SB.addActions !== 'function' || !caseDefaults(c).domains.length) return;
+    contributed.add(c);
+    try { SB.addActions(c, [{ text: 'If the link looks fake, report it to Google so browsers warn other people.', href: 'https://safebrowsing.google.com/safebrowsing/report_phish/' }]); } catch { }
+  });
+
   document.addEventListener('click', e => {
     if (e.target.closest('#history-list .hist')) { setTimeout(() => render(SB.current), 0); return; }
     const c = SB.current, btn = e.target.closest('[data-panel="corroborate"] button[id^="cor-"]'); if (!c || !btn) return;

@@ -32,6 +32,15 @@
     }
     showTab('events'); tabBtn.focus();
   }
+  // Simple mode (parallel shell PR; ScamBunker.mode may not exist yet): the event-overlap tool is Investigator-only.
+  function applyUiMode() {
+    const simple = typeof SB.mode === 'function' && SB.mode() === 'simple';
+    tabBtn.hidden = simple; const b = $('#btn-events'); if (b) b.hidden = simple;
+    if (simple && tabBtn.getAttribute('aria-selected') === 'true') showTab('deduction');
+  }
+  document.addEventListener('sb:mode', applyUiMode);
+  document.addEventListener('sb:ready', applyUiMode);
+  applyUiMode();
   document.addEventListener('sb:case', () => { $('#verdict').hidden = false; const ra = $('#report .report-actions'); if (ra) ra.hidden = false; });
 
   const field = (id, label, type = 'text', extra = '') => `<label class="field"><span>${label}</span><input id="ev-f-${id}" type="${type}" ${extra}></label>`;

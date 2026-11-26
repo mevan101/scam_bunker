@@ -56,10 +56,13 @@ function toQuery(claim) {
   return kept.slice(0, 10).join(' ').toLowerCase();
 }
 
+// Cuts at n UTF-16 units without leaving half of a surrogate pair (which encodeURIComponent rejects).
+function cut(s, n) { s = String(s); if (s.length <= n) return s; const c = s.charCodeAt(n - 1); return s.slice(0, c >= 0xd800 && c <= 0xdbff ? n - 1 : n); }
+
 function extractClaims(text, max = 3) {
   const seen = new Set();
   return sentences(text)
-    .map((s, i) => ({ text: s.slice(0, 240), i, ...scoreSentence(s) }))
+    .map((s, i) => ({ text: cut(s, 240), i, ...scoreSentence(s) }))
     .filter(c => c.score >= 3)
     .sort((a, b) => b.score - a.score || a.i - b.i)
     .filter(c => { const q = toQuery(c.text), key = q + (NEGATION.test(c.text) ? '|neg' : ''); if (!q || seen.has(key)) return false; seen.add(key); c.query = q; return true; })
@@ -68,7 +71,7 @@ function extractClaims(text, max = 3) {
 }
 
 // Case-file sections for the agents and the Claude handoff (server prompt and browser prompt use the same text).
-const str = (v, n = 300) => (v == null ? '' : String(v).slice(0, n));
+const str = (v, n = 300) => (v == null ? '' : cut(v, n));
 function caseFileSections(c = {}) {
   const parts = [];
   const fc = c.factchecks;
@@ -89,7 +92,7 @@ function caseFileSections(c = {}) {
   return parts.join('\n\n');
 }
 
-const api = { EXPLORER, extractClaims, toQuery, sentences, scoreSentence, caseFileSections };
+const api = { EXPLORER, extractClaims, toQuery, sentences, scoreSentence, caseFileSections, cut };
 if (typeof module === 'object' && module.exports) module.exports = api;
 else root.ScamBunkerClaims = api;
 })(typeof window !== 'undefined' ? window : globalThis);
