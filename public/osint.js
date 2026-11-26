@@ -32,6 +32,7 @@
   // Simple mode (default) vs Investigator mode: ScamBunker.mode() lands with the Simple-mode shell, so call it defensively.
   const isSimple = () => typeof SB.mode === 'function' && SB.mode() === 'simple';
   const addReasons = (c, r) => { if (typeof SB.addReasons === 'function' && r.length) SB.addReasons(c, r); };
+  const addActions = (c, a) => { if (typeof SB.addActions === 'function' && a.length) SB.addActions(c, a); };
   const canLookup = () => SB.server().online || (SB.isStatic() && !!direct);
   const lookupDomain = body => SB.isStatic() ? direct.domain(body) : postJson('/api/osint/domain', body);
   const lookupWallet = body => SB.isStatic() ? direct.wallet(body) : postJson('/api/osint/wallet', body);
@@ -431,6 +432,7 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
     c.domainAges = Object.fromEntries(results.map(([d, r]) => [d, r.error ? { error: r.error } : { registeredAt: r.registeredAt || null, ageDays: r.ageDays ?? null, registrar: r.registrar || null, young: !!r.young, registered: r.registered !== false }]));
     const young = results.filter(([, r]) => r.young && r.ageDays != null);
     addReasons(c, young.map(([d, r]) => ({ text: `The website ${d} was created only ${plural(r.ageDays, 'day')} ago (${fmtDate(r.registeredAt)}). Scam websites are usually brand new. Real banks, shops and employers have had theirs for years.`, weight: r.ageDays < 30 ? 'strong' : 'moderate', quote: d, source: 'Public domain registration records (RDAP)' })));
+    addActions(c, young.map(([d]) => ({ text: `Check for yourself when ${d} was created`, href: `https://lookup.icann.org/en/lookup?name=${encodeURIComponent(d)}` })));
     const obs = young.map(([d, r]) => domainObs(d, r));
     if (!obs.length) return;
     c._osintObs = obs;
