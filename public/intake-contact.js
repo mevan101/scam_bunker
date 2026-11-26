@@ -310,8 +310,10 @@
     rest = rest.replace(/[০-৯]/g, d => String(d.charCodeAt(0) - 0x09E6));
     for (const m of rest.matchAll(PHONE_RE)) {
       if (out.phones.length >= 10) break;
-      const h = H(); if (h && h.normalizePhone && !h.normalizePhone(m[0], rest.slice(Math.max(0, m.index - 25), m.index))) continue;
-      const p = analyzePhone(m[0], { context: rest, home }); if (!p || seenP.has(p.display)) continue;
+      const h = H(), ok = v => !(h && h.normalizePhone) || h.normalizePhone(v, rest.slice(Math.max(0, m.index - 25), m.index));
+      const marker = m[0].replace(/^\d{1,2}[.)]\s+(?=[+(\d])/, ''); // "1. 01900-000123" list item
+      const cand = ok(m[0]) ? m[0] : marker !== m[0] && ok(marker) ? marker : null; if (!cand) continue;
+      const p = analyzePhone(cand, { context: rest, home }); if (!p || seenP.has(p.display)) continue;
       seenP.add(p.display); out.phones.push(p);
     }
     out.found = !!(out.headers || out.phones.length || out.emails.length);
@@ -491,5 +493,9 @@
   document.addEventListener('sb:case', e => apply(e.detail, true));
   document.addEventListener('sb:case-complete', e => { if (e.detail && e.detail.contact) { observations(e.detail); SB.renderAll(); render(e.detail); } });
   document.addEventListener('click', e => { if (e.target.closest('#history-list .hist')) setTimeout(() => apply(SB.current, false), 0); });
+  // Keep stored sender details in step with the case list: drop orphans on load and everything on "Clear all".
+  { const ids = new Set((SB.store.get('scambunker.cases', []) || []).map(x => x.id)), all = SB.store.get(SAVE_KEY, {}) || {};
+    SB.store.set(SAVE_KEY, Object.fromEntries(Object.entries(all).filter(([k]) => ids.has(k)))); }
+  document.addEventListener('click', e => { if (e.target.closest('#history-clear')) SB.store.set(SAVE_KEY, {}); });
   if (typeof SB.openCase === 'function') { const open = SB.openCase; SB.openCase = id => { const ok = open(id); if (ok) apply(SB.current, false); return ok; }; }
 })();

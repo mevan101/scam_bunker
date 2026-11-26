@@ -173,6 +173,7 @@ test('scan of headers uses the header addresses and the body, not Received lines
 test('Bangla numerals are converted before phone matching', () => {
   const r = C.scan('আমি বিকাশ অফিস থেকে বলছি, ০১৯০০-০০০১২৩ নম্বরে পিন পাঠান', { home: 'BD' });
   assert.strictEqual(r.phones.length, 1); assert.strictEqual(r.phones[0].e164, '+8801900000123');
+  for (const t of ['১. ০১৯০০-০০০১২৩ এ কল করুন', '1. 01900-000123 call', '2) 01900-000123']) assert.deepStrictEqual(plain(C.scan(t, { home: 'BD' }).phones.map(p => p.e164)), ['+8801900000123'], t);
 });
 test('a benign message produces nothing', () => {
   const r = C.scan('Hey, are we still on for lunch on Thursday at the usual place?', { home: 'GB' });
