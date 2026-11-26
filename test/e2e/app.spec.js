@@ -119,7 +119,7 @@ test('"Investigate with Claude" builds a prompt with every agent role', async ({
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await runSample(page, 'crypto');
   const popupP = context.waitForEvent('page');
-  await page.locator('[data-handoff]').first().click();
+  await page.locator('[data-handoff]:visible').first().click();
   const popup = await popupP;
   const url = new URL(popup.url());
   expect(url.origin + url.pathname).toBe('https://claude.ai/new');

@@ -9,6 +9,6 @@ test('report, dark theme, mobile', async ({ page, browser }, info) => {
   await page.click('[data-theme-set="dark"]'); await runImage(page, { name: 'invented-ai.png', mimeType: 'image/png', buffer: aiPng() }, '');
   await page.click('#tab-image'); await page.screenshot({ path: out('png-image-lab-dark', info) });
   const m = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, baseURL: info.project.use.baseURL });
-  await m.goto('./'); await m.waitForFunction(() => document.querySelector('#pill-local.on')); await m.click('[data-sample="viral"]');
+  await m.goto('./'); await m.waitForFunction(() => document.querySelector('#pill-local.on')); await m.click('[data-sample="viral"]:visible');
   await m.waitForSelector('#v-title:not(:empty)'); await m.waitForTimeout(800); await m.screenshot({ path: out('viral-390', info) });
 });

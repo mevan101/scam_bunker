@@ -157,10 +157,13 @@ async function completeCase(page, start) {
   const before = await page.evaluate(() => window.__sbComplete);
   await start();
   await page.waitForFunction(n => window.__sbComplete > n, before, { timeout: 45_000 });
-  await expect(page.locator('#report')).toBeVisible();
-  await expect(page.locator('#go')).toBeEnabled();
+  // Simple mode shows the plain answer card; Investigator mode shows the full report.
+  const simple = await page.evaluate(() => typeof window.ScamBunker?.mode === 'function' && window.ScamBunker.mode() === 'simple');
+  if (simple) await expect(page.locator('[data-tour=verdict]')).toBeVisible();
+  else { await expect(page.locator('#report')).toBeVisible(); await expect(page.locator('#go')).toBeEnabled(); }
 }
-const runSample = (page, key) => completeCase(page, () => page.click(`[data-sample="${key}"]`));
+// Simple mode has its own example chips with the same data-sample keys; click whichever is visible in the current mode.
+const runSample = (page, key) => completeCase(page, () => page.click(`[data-sample="${key}"]:visible`));
 async function runText(page, text) {
   await page.fill('#text', text); await page.fill('#url', '');
   await completeCase(page, () => page.click('#go'));
