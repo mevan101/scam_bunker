@@ -44,6 +44,7 @@ test('verdict families drive case shape; unknown verdicts are not guessed', () =
   assert.deepStrictEqual(fam, { a: 'scam', b: 'scam', c: 'suspect', e: 'synthetic', f: 'synthetic' });
   assert.strictEqual(G.verdictFamily('Insufficient evidence'), 'unknown');
   assert.strictEqual(G.verdictFamily(undefined), 'unknown');
+  for (const v of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) assert.strictEqual(G.verdictFamily(v), 'unknown', v);
   for (const f of Object.values(G.FAMILIES)) assert.match(G.shapePath(f.shape, 10), /^M.*Z$/);
 });
 

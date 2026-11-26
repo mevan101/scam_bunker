@@ -29,7 +29,7 @@
     unknown: { label: 'No verdict / insufficient evidence', shape: 'circle' },
   };
   const FAMILY_OF = { 'Scam': 'scam', 'Likely scam': 'scam', 'Suspicious': 'suspect', 'Misleading / manipulated': 'suspect', 'Edited image': 'suspect', 'Coordinated / inauthentic': 'synthetic', 'AI-generated content': 'synthetic', 'Likely legitimate': 'benign', 'No strong red flags': 'benign' };
-  const verdictFamily = v => FAMILY_OF[v] || 'unknown';
+  const verdictFamily = v => (typeof v === 'string' && Object.hasOwn(FAMILY_OF, v) ? FAMILY_OF[v] : 'unknown');
   const EDGE_LABEL = 'appears in';
   const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -83,7 +83,7 @@
       caseNode.set(ci, nodes.length);
       // A correction recorded in the custody log supersedes the original verdict and risk.
       const fix = c.correction && typeof c.correction === 'object' ? c.correction : {};
-      const verdict = fix.verdict || c.verdict || null, risk = fix.risk ?? c.risk;
+      const verdict = String(fix.verdict || c.verdict || '') || null, risk = fix.risk ?? c.risk;
       nodes.push({ id: 'c:' + c.id, kind: 'case', caseId: String(c.id), ref, verdict, family: verdictFamily(verdict), risk: Number.isFinite(+risk) && risk !== null && risk !== '' ? +risk : null, at: c.at || null, platform: c.platform || null, excerpt: String(c.text || c.url || (c.forensics ? 'Image case' : '')).slice(0, 160), label: `${ref} · ${verdict || 'No verdict'}`, cluster: null });
     });
     const edges = [];
