@@ -183,6 +183,12 @@ test('duplicate observations get distinct keys, so an override or attachment tou
   assert.strictEqual(o.items[0].by, 'default'); assert.strictEqual(o.items[1].grade, 'E5');
   assert.strictEqual(o.checklist.find(p => p.id === 'source').attached[0], o.items[1]);
 });
+test('an observation whose text already ends in #1 does not collide with a suffixed duplicate', () => {
+  const o = (fact, inference) => ({ fact, inference, weight: 'strong' });
+  const c = mkCase({ extra: [o('a', 'b'), o('a', 'b'), o('a', 'b#1')] });
+  const keys = G.apply(c).items.map(i => i.key);
+  assert.strictEqual(new Set(keys).size, keys.length);
+});
 test('AI involvement is only confirmed by AI-related items, not by unrelated well-graded evidence', () => {
   const c = mkCase({ verdict: 'Scam', category: 'Phishing', extra: [agentObs('Generator tag in XMP', 'image file', 'B2'), agentObs('Domain registered 2 days ago', 'domain registry', 'A2')] });
   c.local.ai_involvement = { assessment: 'confirmed', basis: 'XMP tag' };

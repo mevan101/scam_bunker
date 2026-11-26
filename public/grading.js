@@ -65,10 +65,11 @@
   // Grade every observation. Order of precedence: analyst override > agent-supplied grade > default for the engine label.
   // Statistical detectors used alone are capped at C3 (METHODOLOGY 3.4), whoever graded them.
   function gradeItems(obs, c, overrides = {}) {
-    const seen = new Map();
+    const used = new Set();
     const items = (obs || []).map(o => {
-      const base = keyOf(o), n = seen.get(base) || 0; seen.set(base, n + 1);
-      const key = n ? `${base}#${n}` : base;
+      const base = keyOf(o); let key = base;
+      for (let n = 1; used.has(key); n++) key = `${base}#${n}`;
+      used.add(key);
       const m = classify(o, c);
       const agent = parseGrade(o.agentGrade) || (o.gradeBy === undefined ? parseGrade(o.grade) || (o.sourceGrade && o.credibility ? parseGrade(o.sourceGrade + o.credibility) : null) : null);
       if (agent && o.agentGrade === undefined) o.agentGrade = fmt(agent);
