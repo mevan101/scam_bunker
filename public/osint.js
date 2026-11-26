@@ -109,22 +109,26 @@
     bindHideToggles(p);
   }
 
+  // The form's valid, de-duplicated indicators, in field order (what saveForm stores and runChecks looks up).
+  function formIndicators(fd) {
+    const inds = [], rejected = [];
+    for (const [name, type] of FIELD_TYPES) {
+      for (const raw of splitList(fd.get(name))) {
+        const ind = D.indicatorFor(type, raw);
+        if (!ind) { rejected.push(raw); continue; }
+        if (!inds.some(x => x.key === ind.key)) inds.push(ind);
+      }
+    }
+    return { inds, rejected };
+  }
   function saveForm() {
     const f = $('#os-form'); const fd = new FormData(f);
     const s = (state.subjectId && getSubject(state.subjectId)) || newSubject();
     const before = new Map((s.indicators || []).map(i => [i.key, i]));
     const now = new Date().toISOString();
-    const rejected = [];
+    const { inds: typed, rejected } = formIndicators(fd);
     const inds = (s.indicators || []).filter(i => !FIELD_TYPES.some(t => t[1] === i.type)); // keep image/camera links from cases
-    for (const [name, type] of FIELD_TYPES) {
-      for (const raw of splitList(fd.get(name))) {
-        const ind = D.indicatorFor(type, raw);
-        if (!ind) { rejected.push(raw); continue; }
-        if (inds.some(x => x.key === ind.key)) continue;
-        const old = before.get(ind.key);
-        inds.push({ ...ind, addedAt: old?.addedAt || now, source: old?.source || 'manual' });
-      }
-    }
+    for (const ind of typed) { const old = before.get(ind.key); inds.push({ ...ind, addedAt: old?.addedAt || now, source: old?.source || 'manual' }); }
     s.name = String(fd.get('name') || '').trim() || inds.find(i => i.type === 'handle')?.label || 'Unnamed subject';
     s.aliases = splitList(fd.get('aliases'));
     s.notes = String(fd.get('notes') || '').slice(0, 4000);
@@ -138,13 +142,15 @@
   // ---------- Public checks ----------
   // What "Save & run public checks" sends, and to whom (same limits as runChecks).
   const via = () => SB.isStatic() ? null : 'Your Scam Bunker server';
+  // Every name RDAP may be asked for: a subdomain with no record of its own falls back to its parent domains.
+  const rdapNames = doms => [...new Set(doms.flatMap(d => window.ScamBunkerOsintCore?.domainCandidates(d) || [d]))];
   function subjectSendsNote(fd) {
-    const vals = n => splitList(fd.get(n)).map(v => v.replace(/^@/, ''));
-    const RE = window.ScamBunkerOsintCore?.WALLET_RE || {}, wallets = vals('wallets').slice(0, MAX_LOOKUPS), chain = c => wallets.filter(w => RE[c]?.test(w));
-    const st = SB.isStatic(), keys = SB.server();
+    const { inds } = formIndicators(fd), vals = (type, max) => inds.filter(i => i.type === type).map(i => i.key.slice(7)).slice(0, max);
+    const RE = window.ScamBunkerOsintCore?.WALLET_RE || {}, wallets = vals('wallet', MAX_LOOKUPS), chain = c => wallets.filter(w => RE[c]?.test(w));
+    const st = SB.isStatic();
     const note = direct.sendsNote([
-      { what: 'username', values: st ? [] : vals('usernames').slice(0, MAX_USERNAMES), to: 'about 60 public platforms' },
-      { what: 'domain', values: vals('domains').slice(0, MAX_LOOKUPS), to: 'rdap.org' },
+      { what: 'username', values: st ? [] : vals('handle', MAX_USERNAMES), to: 'about 60 public platforms' },
+      { what: 'domain', values: rdapNames(vals('domain', MAX_LOOKUPS)), to: 'rdap.org' },
       { what: 'BTC wallet', values: chain('btc'), to: 'mempool.space' },
       { what: 'TRON wallet', values: chain('tron'), to: st ? 'api.trongrid.io' : 'api.trongrid.io (or Tronscan, if a key is set)' },
       { what: 'ETH wallet', values: st ? [] : chain('eth'), to: 'Etherscan, if a key is set' }
@@ -457,7 +463,7 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
   }
   async function checkDomains(c, doms) {
     const results = await Promise.all(doms.map(d => lookupDomain({ domain: d }).then(r => [d, r]).catch(e => [d, { error: e.message }])));
-    c.domainAges = Object.fromEntries(results.map(([d, r]) => [d, r.error ? { error: r.error } : { registeredAt: r.registeredAt || null, ageDays: r.ageDays ?? null, registrar: r.registrar || null, young: !!r.young, registered: r.registered !== false }]));
+    c.domainAges = Object.fromEntries(results.map(([d, r]) => [d, r.error ? { error: r.error } : { registeredAt: r.registeredAt || null, ageDays: r.ageDays ?? null, registrar: r.registrar || null, young: !!r.young, registered: r.registered !== false, ...(r.queried && r.queried !== d ? { queried: r.queried } : {}) }]));
     const young = results.filter(([, r]) => r.young && r.ageDays != null);
     // One plain warning per registration: subdomains that fell back to the same parent share it.
     const byReg = new Map(); young.forEach(([d, r]) => { const k = r.queried || d; if (!byReg.has(k)) byReg.set(k, [d, r]); });
@@ -499,13 +505,20 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
     const ages = c.domainAges || {}, done = doms.filter(d => ages[d]);
     let body;
     if (c._osintAge === 'run') body = `<p class="muted" role="status">Checking the public registration records…</p>`;
-    else if (done.length) body = `<ul class="list">${done.map(d => { const a = ages[d]; return `<li>${a.error ? `${esc(d)}: the record could not be read (${esc(a.error)})` : a.registeredAt ? `${esc(d)} was registered on ${esc(fmtDate(a.registeredAt))}${a.ageDays != null ? ` (${plural(a.ageDays, 'day')} before this check)` : ''}` : `${esc(d)}: no public registration record was found`}</li>`; }).join('')}</ul>${simple && !done.some(d => ages[d].young) ? '<p class="muted">An older website is not proof it is safe: scammers also use hacked or look-alike sites.</p>' : ''}`;
+    else if (done.length) body = `<ul class="list">${done.map(d => `<li>${ageLine(d, ages[d])}</li>`).join('')}</ul>${simple && !done.some(d => ages[d].young) ? '<p class="muted">An older website is not proof it is safe: scammers also use hacked or look-alike sites.</p>' : ''}`;
     else body = `${c._osintAge === 'error' ? `<p class="muted" role="status">The check did not work: ${esc(c._osintAgeError || 'unknown error')}. You can try again.</p>` : ''}
       <button type="button" class="ghost ${simple ? 's-btn' : 'sm'}" data-os-age aria-describedby="os-age-note-${simple ? 's' : 'i'}">${simple ? 'Check how old the website is' : 'Check domain age (RDAP)'}</button>
-      <p class="muted os-sends" id="os-age-note-${simple ? 's' : 'i'}">${esc(direct.sendsNote([{ what: 'domain', values: doms, to: 'rdap.org' }], { via: via() }))}</p>`;
+      <p class="muted os-sends" id="os-age-note-${simple ? 's' : 'i'}">${esc(direct.sendsNote([{ what: 'domain', values: rdapNames(doms), to: 'rdap.org' }], { via: via() }))}</p>`;
     return simple
       ? `<section class="s-card s-sec os-age-check" aria-labelledby="os-age-h"><h3 id="os-age-h">How old is the website?</h3><p class="s-sec-lede">Scam websites are often only days or weeks old. The public registration record shows when a website was created.</p>${body}</section>`
       : `<section class="callout os-age-check" aria-labelledby="os-age-hi"><div><b id="os-age-hi">Domain age</b>${body}</div></section>`;
+  }
+  function ageLine(d, a) {
+    if (a.error) return `${esc(d)}: the record could not be read (${esc(a.error)})`;
+    if (a.registered === false) return `${esc(d)}: no public registration record was found`;
+    const who = a.queried ? `${esc(d)} is part of ${esc(a.queried)}, which` : esc(d);
+    if (!a.registeredAt) return `${who} has a public registration record, but it does not give a creation date`;
+    return `${who} was registered on ${esc(fmtDate(a.registeredAt))}${a.ageDays != null ? ` (${plural(a.ageDays, 'day')} before this check)` : ''}`;
   }
   function mountAgeCard(box, simple) {
     if (!box) return;

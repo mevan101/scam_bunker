@@ -434,14 +434,17 @@
 
   // Private by default: say exactly what a trace sends, and to whom, before the click.
   function traceSendsNote(text) {
-    const entries = parseLines(text), urls = [...new Set(entries.flatMap(e => [e.url, e.pageUrl]).filter(Boolean))];
-    if (!urls.length) return 'Nothing is sent until you click Trace sources.';
-    const hosts = [...new Set(urls.map(host))], n = urls.length === 1 ? 'this link' : `these ${urls.length} links`;
-    const where = isStatic() ? `Your browser downloads ${n} from ${hosts.join(', ')} and sends ${urls.length === 1 ? 'it' : 'them'} to archive.org (Wayback Machine).`
-      : `Your Scam Bunker server downloads ${n} from ${hosts.join(', ')} and sends ${urls.length === 1 ? 'it' : 'them'} to web.archive.org (Wayback Machine).`;
-    return urls.some(u => /[?#]/.test(u)) ? `${where} Links are sent in full: remove anything after “?” first if a link is private.` : where;
+    const entries = parseLines(text);
+    if (!entries.length) return 'Nothing is sent until you click Trace sources.';
+    const firsts = [...new Set(entries.map(e => e.url))], pages = [...new Set(entries.map(e => e.pageUrl).filter(Boolean))];
+    const all = [...new Set([...firsts, ...pages])], links = n => n === 1 ? '1 link' : `${n} links`, hosts = us => [...new Set(us.map(host))].join(', ');
+    const where = isStatic()
+      ? `Your browser downloads the first link on each line (${links(firsts.length)}, from ${hosts(firsts)}) and sends all ${links(all.length)} to archive.org (Wayback Machine).`
+      : `Your Scam Bunker server downloads ${links(all.length)} from ${hosts(all)}, plus the preview image of any web page among them, and sends these links and those images to web.archive.org (Wayback Machine).`;
+    return all.some(u => /[?#]/.test(u)) ? `${where} Links are sent in full: remove anything after “?” first if a link is private.` : where;
   }
-  document.addEventListener('input', e => { if (e.target.id === 'prov-cands' && $('#prov-sends')) $('#prov-sends').textContent = traceSendsNote(e.target.value); });
+  const refreshTraceNote = () => { const n = $('#prov-sends'), ta = $('#prov-cands'); if (n && ta) n.textContent = traceSendsNote(ta.value); };
+  document.addEventListener('input', e => { if (e.target.id === 'prov-cands') refreshTraceNote(); });
 
   async function trace() {
     const c = SB.current; if (!c || !c.forensics || busy) return;
@@ -568,7 +571,7 @@
         ${th ? `<img class="prov-thumb" src="${th}" alt="Thumbnail of ${esc(it.label)}">` : '<div class="prov-thumb prov-nothumb" aria-hidden="true">no preview</div>'}
         <div class="prov-body"><p class="muted" style="margin:0 0 6px">${esc(c.label)}${it.scoreWhy ? ` · originality score ${it.score}` : ''}</p>
           <div class="kv">${rows.map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join('')}${wb}</div>
-          <p class="prov-links"><a href="${safeHref(it.imageUrl)}" target="_blank" rel="noopener">Image ↗</a>${it.pageUrl ? ` · <a href="${safeHref(it.pageUrl)}" target="_blank" rel="noopener">Page ↗</a>` : ''} · Search this copy: ${manualSearchLinks(it.imageUrl).map(([n, u]) => `<a href="${safeHref(u)}" target="_blank" rel="noopener">${n} ↗</a>`).join(' ')}${raw ? ` · <button type="button" class="link" data-prov-add="${esc(raw)}">Compare the first archived copy</button>` : ''}</p>
+          <p class="prov-links"><a href="${safeHref(it.imageUrl)}" target="_blank" rel="noopener">Image ↗</a>${it.pageUrl ? ` · <a href="${safeHref(it.pageUrl)}" target="_blank" rel="noopener">Page ↗</a>` : ''} · Search this copy: ${manualSearchLinks(it.imageUrl).map(([n, u]) => `<a href="${safeHref(u)}" target="_blank" rel="noopener">${n} ↗</a>`).join(' ')}${raw ? ` · <button type="button" class="link" data-prov-add="${esc(raw)}">Compare the first archived copy</button> <span class="muted">(downloads it from web.archive.org)</span>` : ''}</p>
         </div>
       </div></article>`;
   }
@@ -658,7 +661,7 @@
     const c = SB.current; if (!c) return;
     if (e.target.closest('#prov-run')) { trace(); return; }
     const add = e.target.closest('[data-prov-add]');
-    if (add) { const ta = $('#prov-cands'); ta.value = (ta.value.trim() + '\n' + add.dataset.provAdd + (add.dataset.provPage ? ' ' + add.dataset.provPage : '')).trim(); if (add.closest('.prov-card')) trace(); else { ta.focus(); SB.toast('Added. Press “Trace sources” to compare it'); } return; }
+    if (add) { const ta = $('#prov-cands'); ta.value = (ta.value.trim() + '\n' + add.dataset.provAdd + (add.dataset.provPage ? ' ' + add.dataset.provPage : '')).trim(); refreshTraceNote(); if (add.closest('.prov-card')) trace(); else { ta.focus(); SB.toast('Added. Press “Trace sources” to compare it'); } return; }
     const rm = e.target.closest('[data-prov-remove]');
     if (rm && c.provenance) { const it = c.provenance.items.find(i => i.id === rm.dataset.provRemove); c.provenance.items = c.provenance.items.filter(i => i !== it); if (it) { const ta = $('#prov-cands'); ta.value = ta.value.split('\n').filter(l => !l.includes(it.requested || it.imageUrl)).join('\n'); } finish(c); $('#prov-run') && $('#prov-run').focus(); return; }
     if (e.target.closest('#prov-rev-run')) reverseSearch(c);
