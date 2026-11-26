@@ -120,7 +120,7 @@ function guardedRequest(url, opts = {}) {
         chunks.push(c);
       });
       stream.on('end', finish);
-      stream.on('error', e => done(e.status ? e : httpError(502, `Could not read response: ${e.code || e.message}`, 'network')));
+      stream.on('error', e => { stop(); done(e.status ? e : httpError(502, `Could not read response: ${e.code || e.message}`, 'network')); });
       res.on('close', () => { if (!res.complete) done(httpError(502, 'Connection closed before the response ended', 'network')); });
       for (const src of [res, ...(decoders || [])]) if (src !== stream) src.on('error', e => { stop(); done(e.status ? e : httpError(502, `Could not read response: ${e.code || e.message}`, 'network')); });
     });
