@@ -135,4 +135,9 @@ ok('every pinned CDN asset is an exact version on jsDelivr', () => {
   urls.forEach(u => assert(/^https:\/\/cdn\.jsdelivr\.net\/npm\/(@[\w.-]+\/)?[\w.-]+@\d+\.\d+\.\d+(\/|$)/.test(u), u));
   assert(/^sha384-/.test(M.CDN.tesseract.integrity) && /^sha384-/.test(M.CDN.jsqr.integrity));
 });
+ok('official QR on a checkout that names several brands is not a mismatch', () => {
+  const a = az('https://www.paypal.com/checkoutnow?token=EXAMPLE', 'Pay now: scan with PayPal or Apple Pay');
+  assert(!a.quishing, JSON.stringify(a.reasons));
+  assert(!a.reasons.some(r => /not .*real one/.test(r.text)), JSON.stringify(a.reasons));
+});
 console.log(`✓ ${n} intake-media tests passed`);

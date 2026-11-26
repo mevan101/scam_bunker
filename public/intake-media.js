@@ -178,7 +178,9 @@
       const age = ctx.domainAge && ctx.domainAge.ageDays;
       if (age != null && age < 30) why.push(`a website registered only ${age === 1 ? '1 day' : age + ' days'} ago`);
       const named = Object.keys(OFFICIAL).filter(b => new RegExp('\\b' + b + '\\b', 'i').test(context));
-      const mismatch = named.find(b => !OFFICIAL[b].some(d => domain === d || host.endsWith('.' + d) || host === d));
+      // Only a mismatch when the code opens none of the brands the image names (a checkout may list several).
+      const isOfficial = b => OFFICIAL[b].some(d => domain === d || host.endsWith('.' + d) || host === d);
+      const mismatch = named.length && !named.some(isOfficial) ? named[0] : null;
       if (mismatch && all.length) why.push(`a website that is not ${titleCase(mismatch)}'s real one`);
       if (u && u.protocol === 'http:' && all.some(x => x.id !== 'delivery')) why.push('an unencrypted (http) page');
       reasons.push({ text: `This QR code opens ${host || p.url}.${why.length ? ` Warning signs: ${why.join('; ')}.` : ''}`, weight: why.length ? (a.risk >= 30 || mismatch || (age != null && age < 30) ? 'strong' : 'moderate') : 'weak', source: 'qr' });
