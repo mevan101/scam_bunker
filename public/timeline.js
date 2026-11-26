@@ -227,7 +227,7 @@
     const rank = g => 'ABCDEF'.indexOf(g[0]) * 10 + (+g[1]);
     // Latest possible: the earliest evidence that this very file existed (archived/served copies, the case). Page dates are
     // excluded: the image may have been added to the page later.
-    const late = rows.filter(r => ['existed', 'case'].includes(r.kind)).sort((a, b) => a.ms - b.ms || rank(a.grade) - rank(b.grade))[0] || null;
+    const late = rows.filter(r => r.kind === 'case' || (r.kind === 'existed' && (r.origin !== 'Provenance' || r.confirmed))).sort((a, b) => a.ms - b.ms || rank(a.grade) - rank(b.grade))[0] || null;
     // Earliest possible: the earliest date the file itself claims (editable) or, for text cases, the linked domain's registration.
     const fileClaims = rows.filter(r => ['capture', 'created'].includes(r.kind) && ok(r)).sort((a, b) => a.ms - b.ms);
     const early = fileClaims[0] || (media ? null : rows.filter(r => r.kind === 'domain').sort((a, b) => a.ms - b.ms)[0]) || null;

@@ -199,6 +199,8 @@ test('coordinator rule: unconfirmed copies only give weak, labelled leads; page 
   const onlyPage = provCase(); onlyPage.forensics = null;
   onlyPage.provenance.verdict.dates = onlyPage.provenance.verdict.dates.filter(d => d.kind === 'page');
   assert(!T.collect(onlyPage, opts).find(r => r.kind === 'claimed').flags.length, 'page date alone never flags');
+  const un = provCase(); un.provenance.items[0].compare = { relation: 'related' };
+  assert.strictEqual(T.bounds(T.collect(un, opts)).late.kind, 'case', 'unconfirmed copy never bounds');
   const conf = T.collect(provCase(), opts);
   assert.strictEqual(T.plain(conf).reasons.length, 2);
 });
