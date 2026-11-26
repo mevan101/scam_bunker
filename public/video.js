@@ -441,6 +441,7 @@
   // ======================= Browser: analysis =======================
   const SB = window.ScamBunker, esc = SB.esc, $ = s => document.querySelector(s);
   let file = null, previewUrl = null;
+  const sourceFile = new WeakMap(); // case.video → the File its metadata was read from
   const frameUrls = new Map(); // case id → [{ url, mirrorUrl }] (kept out of the case object so saved cases stay small)
 
   async function analyze(f) {
@@ -452,7 +453,7 @@
     if (!detect(bytes)) { v.container = (f.type || 'video').replace('video/', '').toUpperCase(); v.notes.push('Container not recognised as MP4/MOV or WebM/Matroska, so no metadata was read'); }
     v.name = f.name; v.size = f.size; v.type = f.type;
     if (f.size <= 512 * 1048576) { try { const h = await crypto.subtle.digest('SHA-256', await f.arrayBuffer()); v.sha256 = [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join(''); } catch { } }
-    v.frames = []; v.frameStatus = 'pending';
+    v.frames = []; v.frameStatus = 'pending'; sourceFile.set(v, f);
     return v;
   }
 
@@ -647,8 +648,8 @@
     const c = e.detail; render(c);
     if (!c || !c.video) return;
     mergeIntoVerdict(c); SB.renderAll(); render(c);
-    if (c.video.frameStatus === 'pending' && file) {
-      const f = file;
+    const f = sourceFile.get(c.video);
+    if (c.video.frameStatus === 'pending' && f) {
       let pend = false; const step = () => { if (SB.current !== c || pend) return; pend = true; requestAnimationFrame(() => { pend = false; render(c); }); };
       extractFrames(c, f, step).then(() => { if (SB.current === c) { mergeIntoVerdict(c); SB.renderAll(); render(c); persist(c); } });
     }
