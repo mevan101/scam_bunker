@@ -28,11 +28,11 @@
   function open() {
     if (!SB.current) {
       $('#placeholder').hidden = true; $('#report').hidden = false;
-      $('#verdict').hidden = true; const ra = $('#report > .report-actions'); if (ra) ra.hidden = true;
+      $('#verdict').hidden = true; const ra = $('#report .report-actions'); if (ra) ra.hidden = true;
     }
     showTab('events'); tabBtn.focus();
   }
-  document.addEventListener('sb:case', () => { $('#verdict').hidden = false; const ra = $('#report > .report-actions'); if (ra) ra.hidden = false; });
+  document.addEventListener('sb:case', () => { $('#verdict').hidden = false; const ra = $('#report .report-actions'); if (ra) ra.hidden = false; });
 
   const field = (id, label, type = 'text', extra = '') => `<label class="field"><span>${label}</span><input id="ev-f-${id}" type="${type}" ${extra}></label>`;
   host.innerHTML = `

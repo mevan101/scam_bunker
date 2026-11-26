@@ -121,19 +121,22 @@
       </div>
 
       <div class="tabs" role="tablist" aria-label="Report sections" id="tabs">
+        <span class="tab-group" role="presentation" aria-hidden="true">Report</span>
         <button role="tab" aria-selected="true" data-tab="deduction" id="tab-deduction" aria-controls="panel-deduction">Deduction</button>
+        <button role="tab" data-tab="links" id="tab-links" aria-controls="panel-links">Links &amp; entities</button>
+        <button role="tab" data-tab="claims" id="tab-claims" aria-controls="panel-claims">Claims &amp; matches <span class="count" id="claims-count"></span></button>
+        <button role="tab" data-tab="timeline" id="tab-timeline" aria-controls="panel-timeline">Timeline</button>
+        <button role="tab" data-tab="next" id="tab-next" aria-controls="panel-next">Next moves</button>
         <button role="tab" data-tab="agents" id="tab-agents" aria-controls="panel-agents">Agents <span class="count" id="agents-count"></span></button>
+        <span class="tab-group" role="presentation" aria-hidden="true">Media</span>
         <button role="tab" data-tab="image" id="tab-image" aria-controls="panel-image">Image lab</button>
         <button role="tab" data-tab="video" id="tab-video" aria-controls="panel-video" hidden>Video lab</button>
-        <button role="tab" data-tab="links" id="tab-links" aria-controls="panel-links">Links &amp; entities</button>
-        <button role="tab" data-tab="timeline" id="tab-timeline" aria-controls="panel-timeline">Timeline</button>
         <button role="tab" data-tab="provenance" id="tab-provenance" aria-controls="panel-provenance" hidden>Provenance</button>
-        <button role="tab" data-tab="checklist" id="tab-checklist" aria-controls="panel-checklist">Checklist</button>
-        <button role="tab" data-tab="claims" id="tab-claims" aria-controls="panel-claims">Claims &amp; matches <span class="count" id="claims-count"></span></button>
+        <span class="tab-group" role="presentation" aria-hidden="true">Tools</span>
         <button role="tab" data-tab="corroborate" id="tab-corroborate" aria-controls="panel-corroborate">Corroborate</button>
-        <button role="tab" data-tab="next" id="tab-next" aria-controls="panel-next">Next moves</button>
-        <button role="tab" data-tab="custody" id="tab-custody" aria-controls="panel-custody">Custody log</button>
         <button role="tab" data-tab="events" id="tab-events" aria-controls="panel-events">Events <span class="count"></span></button>
+        <button role="tab" data-tab="checklist" id="tab-checklist" aria-controls="panel-checklist">Checklist</button>
+        <button role="tab" data-tab="custody" id="tab-custody" aria-controls="panel-custody">Custody log</button>
       </div>
 
       <div class="panel card" role="tabpanel" tabindex="0" id="panel-deduction" aria-labelledby="tab-deduction" data-panel="deduction"></div>
@@ -187,6 +190,30 @@
   };
   btns.forEach(b => b.addEventListener('click', () => apply(b.dataset.themeSet)));
   apply(cur);
+})();
+</script>
+<script>
+// Report section nav: one ARIA tablist, vertical on wide screens. Arrow keys skip hidden tabs.
+(() => {
+  const list = document.getElementById('tabs');
+  const wide = matchMedia('(min-width: 1280px)');
+  const orient = () => list.setAttribute('aria-orientation', wide.matches ? 'vertical' : 'horizontal');
+  orient(); wide.addEventListener('change', orient);
+  const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+  list.addEventListener('keydown', e => {
+    if (!(e.key in step) && e.key !== 'Home' && e.key !== 'End') return;
+    const tabs = [...list.querySelectorAll('[role=tab]')].filter(t => !t.hidden);
+    const i = tabs.indexOf(document.activeElement); if (i < 0) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const n = e.key === 'Home' ? tabs[0] : e.key === 'End' ? tabs[tabs.length - 1] : tabs[(i + step[e.key] + tabs.length) % tabs.length];
+    n.focus(); n.click();
+  }, true);
+  // In the horizontal (scrolling) layout, keep the selected tab in view.
+  new MutationObserver(() => {
+    const t = list.querySelector('[aria-selected="true"]'); if (!t || wide.matches) return;
+    const l = t.offsetLeft - list.offsetLeft, r = l + t.offsetWidth;
+    if (l < list.scrollLeft || r > list.scrollLeft + list.clientWidth) list.scrollTo({ left: Math.max(0, l - 16) });
+  }).observe(list, { subtree: true, attributeFilter: ['aria-selected'] });
 })();
 </script>
 <script src="forensics.js"></script>
