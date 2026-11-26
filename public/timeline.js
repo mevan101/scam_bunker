@@ -73,7 +73,7 @@
     let n = 0;
     const add = (raw, zoneHint, o) => {
       const p = parseWhen(raw, zoneHint, o.precision); if (!p) return null;
-      const r = { id: 'r' + (++n), ...p, kind: o.kind, what: o.what, src: o.src, origin: o.origin, grade: o.grade, group: o.group || null, href: safeHref(o.href) || null, tab: o.tab || null, flags: [], note: o.note || '', media: !!o.media };
+      const r = { id: 'r' + (++n), ...p, kind: o.kind, what: o.what, src: o.src, origin: o.origin, grade: o.grade, group: o.group || null, href: safeHref(o.href) || null, tab: o.tab || null, flags: [], note: o.note || '', media: !!o.media, confirmed: !!o.confirmed };
       rows.push(r); return r;
     };
 
@@ -119,13 +119,14 @@
         if (d.itemId === 'case') continue; // the case file's own dates are listed above
         const it = items.get(d.itemId) || {};
         seenItems.add(d.itemId);
+        const rel = it.compare && it.compare.relation, confirmed = rel === 'identical' || rel === 'same'; // provenance match verdict same / likely same
         const s = d.source || '';
         const grade = /Wayback Machine first capture of the image/.test(s) ? 'B2' : /Wayback Machine first capture of the page/.test(s) ? 'B3' : /recorded by the Wayback/.test(s) ? 'C2'
           : /HTTP Last-Modified/.test(s) ? 'C3' : /GPS/.test(s) ? 'C2' : /Page publish/.test(s) ? 'D3' : d.trust === 'medium' ? 'C3' : 'D4';
         const utc = /Wayback|Last-Modified|GPS/.test(s);
         const raw = /Page publish/.test(s) && it.pageDate && it.pageDate.published ? it.pageDate.published.iso : d.date;
         const what = { capture: 'Copy captured', created: 'Copy created', existed: 'A matching copy existed', page: 'Page carrying a copy existed' }[d.kind] || 'Dated copy';
-        add(raw, utc ? 'utc' : null, { kind: d.kind === 'page' ? 'page' : d.kind, what: `${what}: ${d.item}`, src: s, origin: 'Provenance', grade, group: 'copy:' + d.itemId, href: safeHref(d.note) || it.pageUrl || it.imageUrl, tab: 'provenance', precision: /GPS/.test(s) ? 'day' : null });
+        add(raw, utc ? 'utc' : null, { kind: d.kind === 'page' ? 'page' : d.kind, what: `${what}: ${d.item}`, src: s, origin: 'Provenance', grade, group: 'copy:' + d.itemId, href: safeHref(d.note) || it.pageUrl || it.imageUrl, tab: 'provenance', precision: /GPS/.test(s) ? 'day' : null, confirmed });
       }
       for (const id of seenItems) {
         const it = items.get(id); if (!it || !it.exifModify) continue;
@@ -181,17 +182,26 @@
   const fmt = r => `${fmtWhen(r)}${r.precision === 'second' || r.precision === 'minute' ? ' ' + zoneLabel(r) : ''}`;
   function contradictions(rows, now) {
     const flag = (r, weight, text, other) => { if (!r.flags.some(f => f.text === text)) r.flags.push({ weight, text, other: other ? other.id : null }); };
+    // Only dates about the case's own media count: the case file, or a copy confirmed as the same image (match verdict
+    // same / likely same). An unconfirmed copy only ever gives a weak, labelled lead. Page dates never count (the image
+    // may have been added to the page later). False alarms are worse than misses (METHODOLOGY combination rules).
+    const own = r => r.origin === 'Image file' || r.origin === 'Video file';
+    const sameMedia = r => own(r) || (r.origin === 'Provenance' && r.confirmed);
+    const RANK = { strong: 0, moderate: 1, weak: 2 };
+    const pick = (list, w) => list.map(e => [e, w(e)]).sort((a, b) => RANK[a[1]] - RANK[b[1]] || a[0].ms - b[0].ms)[0];
+    const unconf = e => (sameMedia(e) || own(e) ? '' : ' Unconfirmed: this copy is not a confirmed visual match of the case media.');
+    const existedW = e => !sameMedia(e) ? 'weak' : e.grade[0] <= 'B' ? 'strong' : 'moderate';
     const existed = rows.filter(r => r.kind === 'existed');
-    // 1. Capture after a copy was already seen (EXIF forged, re-dated, or the wrong camera clock)
-    for (const cap of rows.filter(r => r.kind === 'capture')) {
-      const before = existed.filter(e => span(cap)[0] > span(e)[1]).sort((a, b) => a.ms - b.ms), prior = before.find(e => e.grade[0] <= 'B') || before[0];
-      if (prior) flag(cap, prior.grade[0] <= 'B' ? 'strong' : 'moderate', `Captured after a copy already existed (${prior.src}, ${fmt(prior)}). The capture date is forged or the clock was wrong.`, prior);
+    // 1. Capture after a copy of the same media was already seen (EXIF forged, re-dated, or the wrong camera clock)
+    for (const cap of rows.filter(r => r.kind === 'capture' && sameMedia(r))) {
+      const hit = pick(existed.filter(e => span(cap)[0] > span(e)[1]), existedW);
+      if (hit) flag(cap, hit[1], `Captured after a copy already existed (${hit[0].src}, ${fmt(hit[0])}). The capture date is forged or the clock was wrong.${unconf(hit[0])}`, hit[0]);
     }
-    // 2. Claimed event date after a copy existed (recycled media)
+    // 2. Claimed event date after the same media already existed (recycled media)
+    const claimW = r => r.kind === 'existed' ? existedW(r) : sameMedia(r) ? 'moderate' : 'weak';
     for (const cl of rows.filter(r => r.kind === 'claimed')) {
-      const earlier = rows.filter(r => ['existed', 'page', 'capture'].includes(r.kind) && span(cl)[0] > span(r)[1]).sort((a, b) => a.ms - b.ms);
-      const best = earlier.find(r => r.kind === 'existed' && r.grade[0] <= 'B') || earlier.find(r => r.kind === 'existed') || earlier[0];
-      if (best) flag(cl, best.kind === 'existed' && best.grade[0] <= 'B' ? 'strong' : 'moderate', `The post claims ${fmtWhen(cl)}, but ${best.kind === 'capture' ? 'the media was captured' : best.kind === 'page' ? 'a page carrying a copy existed' : 'a matching copy existed'} by ${fmt(best)} (${best.src}). Possibly recycled media.`, best);
+      const hit = pick(rows.filter(r => (r.kind === 'existed' || (r.kind === 'capture' && (own(r) || r.origin === 'Provenance'))) && span(cl)[0] > span(r)[1]), claimW);
+      if (hit) flag(cl, hit[1], `The post claims ${fmtWhen(cl)}, but ${hit[0].kind === 'capture' ? 'the media was captured' : 'a matching copy existed'} by ${fmt(hit[0])} (${hit[0].src}). Possibly recycled media.${unconf(hit[0])}`, hit[0]);
     }
     // 3. Modified before captured/created, within the same file (same clock, so no zone slack)
     const groups = new Map();
@@ -281,7 +291,18 @@
     return L;
   }
 
-  const api = { parseWhen, parseOffset, span, zoneLabel, fmtWhen, collect, contradictions, bounds, ticks, svg, reportLines, gradeText };
+  // Plain-language reasons and actions for the Simple result (ScamBunker.addReasons / addActions). Weak leads never surface there.
+  function plain(rows) {
+    const reasons = [], actions = [];
+    const has = (kind, re) => rows.some(r => r.kind === kind && r.flags.some(f => f.weight !== 'weak' && re.test(f.text)));
+    if (has('claimed', /claims/)) reasons.push({ text: 'This picture or video already existed before the event the post talks about. It may be old media reused to tell a new story.', weight: rows.some(r => r.kind === 'claimed' && r.flags.some(f => f.weight === 'strong')) ? 'strong' : 'moderate', source: 'timeline' });
+    if (has('capture', /already existed/)) reasons.push({ text: 'The date saved inside the file is later than the date a copy was first seen online, so that date was probably changed.', weight: 'strong', source: 'timeline' });
+    if (rows.some(r => r.kind === 'modified' && r.flags.some(f => f.weight !== 'weak'))) reasons.push({ text: 'The dates saved inside the file do not make sense (it was edited before it was taken), so they may have been changed.', weight: 'moderate', source: 'timeline' });
+    if (reasons.length) actions.push({ text: 'Before you share it, search for older copies of the picture (Google Lens or TinEye, sorted by oldest) to see where and when it first appeared.', href: 'https://tineye.com/' });
+    return { reasons, actions };
+  }
+
+  const api = { parseWhen, parseOffset, span, zoneLabel, fmtWhen, collect, contradictions, bounds, ticks, svg, reportLines, gradeText, plain };
   if (typeof window !== 'undefined') window.ScamBunkerTimeline = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 
@@ -331,17 +352,6 @@
   }
   api.render = render;
 
-  // Plain-language reasons and actions for the Simple result (ScamBunker.addReasons / addActions land in a parallel PR).
-  function plain(rows) {
-    const reasons = [], actions = [];
-    const has = (kind, re) => rows.some(r => r.kind === kind && r.flags.some(f => re.test(f.text)));
-    if (has('claimed', /claims/)) reasons.push({ text: 'This picture or video already existed before the event the post talks about. It may be old media reused to tell a new story.', weight: rows.some(r => r.kind === 'claimed' && r.flags.some(f => f.weight === 'strong')) ? 'strong' : 'moderate', source: 'timeline' });
-    if (has('capture', /already existed/)) reasons.push({ text: 'The date saved inside the file is later than the date a copy was first seen online, so that date was probably changed.', weight: 'strong', source: 'timeline' });
-    if (rows.some(r => r.kind === 'modified' && r.flags.length)) reasons.push({ text: 'The dates saved inside the file do not make sense (it was edited before it was taken), so they may have been changed.', weight: 'moderate', source: 'timeline' });
-    if (reasons.length) actions.push({ text: 'Before you share it, search for older copies of the picture (Google Lens or TinEye, sorted by oldest) to see where and when it first appeared.', href: 'https://tineye.com/' });
-    return { reasons, actions };
-  }
-  api.plain = plain;
   function contribute(c, rows) {
     if (!c || (!SB.addReasons && !SB.addActions)) return;
     const { reasons, actions } = plain(rows);

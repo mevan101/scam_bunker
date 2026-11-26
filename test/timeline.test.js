@@ -74,7 +74,7 @@ const provCase = () => {
   c.text = 'Photo from the fictional Riverton flood on 12 August 2024';
   c.provenance = {
     claimed: { date: '2024-08-12', precision: 'day', basis: '12 August 2024' },
-    items: [{ id: 'c1', label: 'Copy 1', imageUrl: 'https://img.example.org/flood.jpg', pageUrl: 'https://news.example.org/story', exifModify: '2016-01-01T00:00:00', pageDate: { published: { iso: '2018-06-01T09:00:00+02:00', source: 'article:published_time' } } }],
+    items: [{ id: 'c1', label: 'Copy 1', compare: { relation: 'same', strength: 'same' }, imageUrl: 'https://img.example.org/flood.jpg', pageUrl: 'https://news.example.org/story', exifModify: '2016-01-01T00:00:00', pageDate: { published: { iso: '2018-06-01T09:00:00+02:00', source: 'article:published_time' } } }],
     verdict: { dates: [
       { date: '2018-05-02T10:11:12', kind: 'existed', trust: 'high', source: 'Wayback Machine first capture of the image URL (independent archive)', item: 'Copy 1', itemId: 'c1', note: 'https://web.archive.org/web/20180502101112/https://img.example.org/flood.jpg' },
       { date: '2018-06-01T07:00:00', kind: 'page', trust: 'medium', source: 'Page publish date (article:published_time, set by the publisher)', item: 'Copy 1', itemId: 'c1', note: '' },
@@ -185,6 +185,22 @@ test('listing URL match ignores trailing slash before the query and re-encoding'
   const L = [C.normalizeListing({ id: 'Q3', url: 'https://events.example.org/e/?id=3&name=a%20b', title: 'Q3', start: '2025-01-05T18:00', tz: 'Asia/Dhaka' })];
   const c = { at: '2026-11-26T10:00:00Z', text: '', url: 'https://events.example.org/e?name=a+b&id=3&utm_medium=sms' };
   assert(T.collect(c, { ...opts, listings: L }).some(r => r.kind === 'event'));
+});
+
+test('coordinator rule: unconfirmed copies only give weak, labelled leads; page dates never raise recycled', () => {
+  for (const compare of [undefined, { relation: 'mirrored' }, { relation: 'related' }]) {
+    const pc = provCase(); pc.provenance.items[0].compare = compare;
+    const rows = T.collect(pc, opts);
+    const cl = rows.find(r => r.kind === 'claimed'), cap = rows.find(r => r.kind === 'capture' && r.origin === 'Image file');
+    assert(cl.flags.length && cl.flags.every(f => f.weight !== 'strong'), 'claimed not strong');
+    assert(cap.flags.every(f => f.weight === 'weak' && /Unconfirmed/.test(f.text)), 'capture weak + unconfirmed');
+    assert(!T.plain(rows).reasons.some(r => /first seen online/.test(r.text)), 'no Simple reason from a weak lead');
+  }
+  const onlyPage = provCase(); onlyPage.forensics = null;
+  onlyPage.provenance.verdict.dates = onlyPage.provenance.verdict.dates.filter(d => d.kind === 'page');
+  assert(!T.collect(onlyPage, opts).find(r => r.kind === 'claimed').flags.length, 'page date alone never flags');
+  const conf = T.collect(provCase(), opts);
+  assert.strictEqual(T.plain(conf).reasons.length, 2);
 });
 
 console.log(failed ? `✗ timeline: ${failed} failed` : 'timeline: all tests passed');
