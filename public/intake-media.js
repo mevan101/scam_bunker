@@ -600,6 +600,8 @@
     // What this module typed into the form, so it can be taken out again when the image is removed or replaced.
     let filled = { text: [], url: '' };
     const unfill = () => {
+      // Simple mode has just written its own input into the form: leave it alone.
+      if (document.documentElement.dataset.simpleState === 'checking') { filled = { text: [], url: '' }; return; }
       let t = textEl.value, changed = false;
       filled.text.forEach(piece => { if (piece && t.includes(piece)) { t = t.replace(piece, ''); changed = true; } });
       if (changed) textEl.value = t.replace(/\n{3,}/g, '\n\n').trim();
