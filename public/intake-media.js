@@ -536,9 +536,12 @@
   function ocrFindings(r, c) {
     const H = window.DeduceHeuristics, S = window.ScamBunkerSimple || {};
     if (!(r.ocr && r.ocr.text) || !H || !H.analyze) return null;
-    const h = H.analyze({ text: [c && c.text, r.ocr.text].filter(Boolean).join('\n\n') }), level = w => w >= 20 ? 'strong' : w >= 14 ? 'moderate' : 'weak';
-    const had = new Set(((c && c.heuristics && c.heuristics.hits) || []).map(x => x.id || x.label));
-    const hits = h.hits.filter(x => !had.has(x.id || x.label)).sort((a, b) => b.weight - a.weight).slice(0, 6);
+    // The screenshot is also scored alone: a rule's `unless` guard can fire on the caption and hide the screenshot's match.
+    const alone = H.analyze({ text: r.ocr.text }), both = c && c.text ? H.analyze({ text: `${c.text}\n\n${r.ocr.text}` }) : alone;
+    const h = both.score > alone.score ? both : alone, level = w => w >= 20 ? 'strong' : w >= 14 ? 'moderate' : 'weak';
+    const had = new Set(((c && c.heuristics && c.heuristics.hits) || []).map(x => x.id || x.label)), key = x => x.id || x.label;
+    const all = alone.hits.concat(both.hits.filter(x => !alone.hits.some(y => key(y) === key(x))));
+    const hits = all.filter(x => !had.has(key(x))).sort((a, b) => b.weight - a.weight).slice(0, 6);
     const obs = [], reasons = [], actions = [];
     hits.forEach(x => {
       obs.push({ fact: `Screenshot text: “${short(x.match, 60)}”`, inference: x.label, weight: level(x.weight), source: 'ocr', intakeMedia: true });
