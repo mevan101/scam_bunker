@@ -168,9 +168,9 @@
   function caseDefaults(c) {
     const ex = (c && c.forensics && c.forensics.exif) || {};
     const out = { date: '', time: '', offset: '', lat: '', lon: '', domains: [], platform: (c && (c.platform || (c.heuristics && c.heuristics.platform))) || '' };
-    const dt = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2})/.exec(ex.DateTimeOriginal || ex.DateTime || '');
+    const orig = !!ex.DateTimeOriginal, dt = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2})/.exec(ex.DateTimeOriginal || ex.DateTime || '');
     if (dt) { out.date = `${dt[1]}-${dt[2]}-${dt[3]}`; out.time = `${dt[4]}:${dt[5]}`; }
-    if (ex.OffsetTimeOriginal || ex.OffsetTime) out.offset = ex.OffsetTimeOriginal || ex.OffsetTime;
+    out.offset = (orig ? ex.OffsetTimeOriginal : ex.OffsetTime) || ''; // only the offset that belongs to this timestamp
     if (ex.GPSDecimal && isFinite(ex.GPSDecimal.lat)) { out.lat = (+ex.GPSDecimal.lat).toFixed(5); out.lon = (+ex.GPSDecimal.lon).toFixed(5); }
     const urls = [c && c.url, ...((c && c.heuristics && c.heuristics.links) || []).map(l => l.url || l)].filter(Boolean);
     for (const u of urls) { try { const h = new URL(/^https?:/i.test(u) ? u : 'https://' + u).hostname; if (h && !PLATFORM_HOSTS.test(h) && !out.domains.includes(h)) out.domains.push(h); } catch { } }
@@ -191,7 +191,7 @@
       <div class="grid2">
         <label class="field"><span>Date (local)</span><input id="cor-date" type="date" value="${esc(f.date)}"></label>
         <label class="field"><span>Time (local, 24 h)</span><input id="cor-time" type="time" value="${esc(f.time)}"></label>
-        <label class="field"><span>UTC offset (e.g. +06:00)</span><input id="cor-offset" inputmode="text" value="${esc(f.offset)}" placeholder="+00:00"></label>
+        <label class="field"><span>UTC offset (e.g. +06:00)</span><input id="cor-offset" inputmode="text" value="${esc(f.offset)}" placeholder="+06:00"></label>
         <div class="row"><label class="field grow"><span>Latitude</span><input id="cor-lat" inputmode="decimal" value="${esc(f.lat)}" placeholder="23.81"></label>
           <label class="field grow"><span>Longitude</span><input id="cor-lon" inputmode="decimal" value="${esc(f.lon)}" placeholder="90.41"></label></div>
         <label class="field"><span>Shadow direction in the photo (° from north, optional)</span><input id="cor-bearing" inputmode="decimal" value="${esc(f.bearing)}" placeholder="e.g. 315"></label>
@@ -242,9 +242,10 @@
     Object.assign(f, { date: v('cor-date'), time: v('cor-time'), offset: v('cor-offset'), lat: v('cor-lat'), lon: v('cor-lon'), bearing: v('cor-bearing'), ratio: v('cor-ratio'), claim: v('cor-claim'), domain: v('cor-domain').trim(), country: v('cor-country'), platformSel: v('cor-platform') });
     return f;
   }
-  function place(f) {
+  function place(f, needOffset = false) {
     const lat = parseFloat(f.lat), lon = parseFloat(f.lon), off = parseOffset(f.offset);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(f.date)) return { err: 'Enter the date.' };
+    if (needOffset && !String(f.offset).trim()) return { err: 'Enter the UTC offset of the local time (the photo did not record one). Guessing UTC would shift the sun by hours.' };
     if (!(lat >= -90 && lat <= 90) || !(lon >= -180 && lon <= 180)) return { err: 'Enter latitude (-90 to 90) and longitude (-180 to 180).' };
     if (off == null) return { err: 'UTC offset must look like +06:00 or -05:30.' };
     return { lat, lon, off };
@@ -252,7 +253,7 @@
   const errBox = m => `<p class="callout" role="alert">${esc(m)}</p>`;
 
   function runSun(c) {
-    const f = readForm(c), pl = place(f), st = c.corroborate;
+    const f = readForm(c), pl = place(f, true), st = c.corroborate;
     if (pl.err) { st.sunHtml = errBox(pl.err); return render(c); }
     let html = '';
     if (f.time) {
