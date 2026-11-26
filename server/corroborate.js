@@ -109,12 +109,22 @@ function parseWeatherInput(b) {
   if (hour != null && !(Number.isInteger(hour) && hour >= 0 && hour <= 23)) throw httpError(400, 'Hour must be 0-23', 'bad_input');
   const claim = b.claim ? String(b.claim) : null;
   if (claim && !CLAIMS.includes(claim)) throw httpError(400, 'Unknown weather claim', 'bad_input');
-  return { lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100, date, hour, claim };
+  const offsetMin = b.offsetMin === '' || b.offsetMin == null ? null : Number(b.offsetMin);
+  if (offsetMin != null && !(Number.isInteger(offsetMin) && Math.abs(offsetMin) <= 840)) throw httpError(400, 'UTC offset must be -14:00..+14:00', 'bad_input');
+  return { lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100, date, hour, offsetMin, claim };
 }
 
-function summarizeWeather(j, hour = null) {
+const shiftDay = (date, n) => new Date(Date.parse(date + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+
+// `hour` is wall-clock time at `offsetMin` (capture offset) or, without an offset, local time at the place.
+// Open-Meteo answers in the place's timezone, so the instant is moved into it before picking the day and hour.
+function summarizeWeather(j, hour = null, date = null, offsetMin = null) {
   if (!j || !j.daily || !Array.isArray(j.daily.time)) throw httpError(502, 'Unexpected Open-Meteo response', 'upstream');
-  const d = j.daily, i = 0, pick = k => (d[k] ? d[k][i] : null), h = j.hourly || {};
+  date = date || j.daily.time[0];
+  const hourKey = hour == null ? null : offsetMin == null ? `${date}T${String(hour).padStart(2, '0')}`
+    : new Date(Date.parse(`${date}T${String(hour).padStart(2, '0')}:00:00Z`) + ((j.utc_offset_seconds || 0) - offsetMin * 60) * 1000).toISOString().slice(0, 13);
+  const localDate = hourKey ? hourKey.slice(0, 10) : date;
+  const d = j.daily, i = Math.max(0, d.time.indexOf(localDate)), pick = k => (d[k] ? d[k][i] : null), h = j.hourly || {};
   const sameDay = (h.time || []).map((t, k) => (String(t).slice(0, 10) === d.time[i] ? h.snow_depth?.[k] : null)).filter(v => v != null);
   const daily = {
     date: d.time[i], code: pick('weather_code'), text: wmoText(pick('weather_code')),
@@ -123,8 +133,8 @@ function summarizeWeather(j, hour = null) {
     snowDepth: sameDay.length ? Math.max(...sameDay) : null,
   };
   let hourly = null;
-  if (hour != null && j.hourly && Array.isArray(j.hourly.time)) {
-    const h = j.hourly, k = h.time.findIndex(t => Number(String(t).slice(11, 13)) === hour);
+  if (hourKey && Array.isArray(h.time)) {
+    const k = h.time.findIndex(t => String(t).slice(0, 13) === hourKey);
     if (k >= 0) hourly = { time: h.time[k], code: h.weather_code?.[k], text: wmoText(h.weather_code?.[k]), temp: h.temperature_2m?.[k], cloud: h.cloud_cover?.[k], precip: h.precipitation?.[k], snow: h.snowfall?.[k], snowDepth: h.snow_depth?.[k] };
   }
   const missing = daily.code == null && (!hourly || hourly.code == null);
@@ -169,7 +179,9 @@ async function weather(body = {}) {
   const cached = !!j;
   if (!j) {
     const q = new URLSearchParams({
-      latitude: p.lat, longitude: p.lon, start_date: p.date, end_date: p.date, timezone: 'auto',
+      latitude: p.lat, longitude: p.lon, timezone: 'auto',
+      start_date: p.date > '1940-01-01' ? shiftDay(p.date, -1) : p.date,
+      end_date: [shiftDay(p.date, 1), new Date().toISOString().slice(0, 10)].sort()[0],
       daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum,cloud_cover_mean,sunrise,sunset',
       hourly: 'temperature_2m,weather_code,cloud_cover,precipitation,snowfall,snow_depth',
     });
@@ -178,7 +190,7 @@ async function weather(body = {}) {
     if (j && j.error) throw httpError(400, String(j.reason || 'Open-Meteo rejected the request').slice(0, 200), 'bad_input');
     caches.weather.set(key, j);
   }
-  const s = summarizeWeather(j, p.hour);
+  const s = summarizeWeather(j, p.hour, p.date, p.offsetMin);
   return {
     ...p, ...s, cached, check: checkClaim(s, p.claim),
     attribution: { text: 'Weather data by Open-Meteo.com', url: 'https://open-meteo.com/', license: 'CC BY 4.0' },
