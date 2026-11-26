@@ -173,20 +173,20 @@
       const urlPurposes = purposesIn(u ? (u.hostname + ' ' + u.pathname) : '');
       const all = purposes.length ? purposes : urlPurposes;
       const why = [];
-      if (a.risk >= 30) why.push(lower(a.flags.find(f => !/^Not encrypted|^Credential/.test(f)) || a.flags[0] || 'its address is built to look like another website'));
+      if (a.risk >= 30) why.push(plainFlag(a.flags.find(f => !/^Not encrypted|^Credential/.test(f)) || a.flags[0]));
       if (SHORT.test(host)) why.push('a link shortener that hides where it really goes');
       const age = ctx.domainAge && ctx.domainAge.ageDays;
       if (age != null && age < 30) why.push(`a website registered only ${age === 1 ? '1 day' : age + ' days'} ago`);
       const named = Object.keys(OFFICIAL).filter(b => new RegExp('\\b' + b + '\\b', 'i').test(context));
       const mismatch = named.find(b => !OFFICIAL[b].some(d => domain === d || host.endsWith('.' + d) || host === d));
-      if (mismatch && all.length) why.push(`not ${titleCase(mismatch)}'s real website`);
+      if (mismatch && all.length) why.push(`a website that is not ${titleCase(mismatch)}'s real one`);
       if (u && u.protocol === 'http:' && all.some(x => x.id !== 'delivery')) why.push('an unencrypted (http) page');
-      reasons.push({ text: `This QR code opens ${host || p.url}${why.length ? ': ' + why.join(', ') : ''}.`, weight: why.length ? (a.risk >= 30 || mismatch || (age != null && age < 30) ? 'strong' : 'moderate') : 'weak', source: 'qr' });
+      reasons.push({ text: `This QR code opens ${host || p.url}.${why.length ? ` Warning signs: ${why.join('; ')}.` : ''}`, weight: why.length ? (a.risk >= 30 || mismatch || (age != null && age < 30) ? 'strong' : 'moderate') : 'weak', source: 'qr' });
       if (age != null && age >= 30 && age < 180) reasons.push({ text: `The website in the QR code (${domain}) was registered ${age} days ago. Real parking, bank and payment sites are usually years old.`, weight: 'moderate', source: 'qr' });
       if (all.length && why.length) {
         const strong = a.risk >= 30 || !!mismatch || (age != null && age < 30);
         out.quishing = strong ? 'strong' : 'suspicious';
-        reasons.unshift({ text: `The image asks you to scan a QR code to ${all[0].words}, but the code leads to ${why[0]}. This is a common QR code scam ("quishing").`, weight: strong ? 'strong' : 'moderate', source: 'qr' });
+        reasons[0] = { text: `This QR code opens ${host || p.url}. The image asks you to scan it to ${all[0].words}, but it leads to ${why.join('; ')}. This is a common QR code scam ("quishing").`, weight: strong ? 'strong' : 'moderate', source: 'qr' };
         actions.push({ text: `Do not scan it or enter anything. To ${all[0].words}, open the official app, or type the official website address yourself.` });
         if (all.some(x => x.id === 'parking')) actions.push({ text: 'Check the parking sign or meter for a sticker placed over the real code, and tell the parking operator.' });
         if (all.some(x => x.id === 'payment' || x.id === 'parking')) actions.push({ text: 'If you already paid or typed card details, call your bank using the number on the back of your card.' });
@@ -223,6 +223,21 @@
       reasons.push({ text: `This QR code contains text: "${short(p.text, 100)}".`, weight: 'weak', source: 'qr' });
     }
     return out;
+  }
+  // URL-heuristic flags (scam.js) in plain words, as a phrase that fits "the code leads to …".
+  function plainFlag(f) {
+    f = String(f || '');
+    let m;
+    if ((m = f.match(/top-level domain \(([^)]+)\)/i))) return `an address ending in ${m[1]}, which is cheap and often used by scam sites`;
+    if (/Punycode/i.test(f)) return 'an address that uses look-alike letters from other alphabets';
+    if (/Raw IP/i.test(f)) return 'a bare number instead of a website name';
+    if ((m = f.match(/brand name "([^"]+)"/i))) return `an address that uses the name "${m[1]}" but is not its real website`;
+    if ((m = f.match(/(?:Look-alike spelling of|away from) "([^"]+)"/i))) return `an address spelled to look like "${m[1]}"`;
+    if (/@/.test(f)) return 'an address that hides the real website after an "@"';
+    if (/subdomain/i.test(f)) return 'a long address built to hide the real website at the end';
+    if (/hyphens/i.test(f)) return 'a throwaway-looking address with several hyphens';
+    if (/shortener/i.test(f)) return 'a link shortener that hides where it really goes';
+    return f ? lower(f) : 'an address built to look like another website';
   }
   function lower(s) { s = String(s).replace(/\s+—\s+/g, ', '); return s.charAt(0).toLowerCase() + s.slice(1); }
   function titleCase(s) { return s.replace(/\b\w/g, c => c.toUpperCase()).replace(/^Bkash$/, 'bKash'); }
@@ -389,12 +404,19 @@
       <progress id="im-progress" max="100" value="0" aria-labelledby="im-msg" hidden></progress>
       <p class="im-note" id="im-note" hidden>Your image never leaves this device. The text reader and its English and Bangla language data (about 8 MB) are downloaded once from cdn.jsdelivr.net, then kept in this browser.</p>
       <div class="im-found" id="im-found"></div>`;
-    const anchor = $('#drop');
-    if (anchor && anchor.parentNode) anchor.after(box); else (document.querySelector('main') || document.body).prepend(box);
+    placeBox();
     return box;
   }
+  // Show the status next to whichever intake the person is using: the Simple box or the Investigator drop zone.
+  function placeBox() {
+    const simple = document.documentElement.dataset.mode === 'simple' && $('#s-form');
+    const anchor = simple || $('#drop');
+    if (anchor && anchor.parentNode) { if (anchor.nextElementSibling !== box) anchor.after(box); }
+    else if (!box.isConnected) (document.querySelector('main') || document.body).prepend(box);
+    box.classList.toggle('im-simple', !!simple);
+  }
   function makeUi(onCancel) {
-    const b = statusBox(), msg = b.querySelector('#im-msg'), bar = b.querySelector('#im-progress'), cancel = b.querySelector('#im-cancel'), note = b.querySelector('#im-note');
+    const b = statusBox(); placeBox(); const msg = b.querySelector('#im-msg'), bar = b.querySelector('#im-progress'), cancel = b.querySelector('#im-cancel'), note = b.querySelector('#im-note');
     b.hidden = false; b.querySelector('#im-found').innerHTML = ''; b.dataset.state = 'busy';
     cancel.onclick = onCancel;
     return {
@@ -466,13 +488,13 @@
   }
   const safeHost = u => { try { return new URL(u).hostname; } catch { return ''; } };
 
-  // Each adapter returns its own part, so a shell that merges both extractions does not repeat anything.
-  function toExtraction(r, part) {
-    const qr = part !== 'ocr', ocr = part !== 'qr';
-    const text = [ocr && r.ocr && r.ocr.text, ...(qr ? r.qr.map(q => analyzeQr(q).caseText) : [])].filter(Boolean).join('\n\n');
-    const urls = qr ? r.qr.map(classifyPayload).filter(p => p.kind === 'url').map(p => p.url) : [];
-    const notes = r.notes.filter(n => /QR code/.test(n) ? qr : ocr);
-    return { text, url: urls[0], notes, attachments: [{ type: 'intake-media', part: part || 'all', qr: qr ? r.qr.slice() : [], ocrText: ocr && r.ocr ? r.ocr.text : '', screenshot: r.screenshot }] };
+  // The shell picks one adapter per input, so either adapter returns both the QR and the OCR findings. The image itself
+  // stays in `attachments`, so the normal image forensics still run on it.
+  function toExtraction(r, file) {
+    const text = [r.ocr && r.ocr.text, ...r.qr.map(q => analyzeQr(q).caseText)].filter(Boolean).join('\n\n');
+    const urls = r.qr.map(classifyPayload).filter(p => p.kind === 'url').map(p => p.url);
+    r.via = 'adapter';
+    return { text, url: urls[0], notes: r.notes.slice(), attachments: [file, { type: 'intake-media', qr: r.qr.slice(), ocrText: r.ocr ? r.ocr.text : '', screenshot: r.screenshot }] };
   }
 
   // ---------- Contributing reasons to the case ----------
@@ -505,9 +527,12 @@
         if (q.actions[0]) v.advice = q.actions.map(a => a.text).join(' ') + (v.advice ? ' ' + v.advice : '');
       }
       const sb = SB();
-      const reasons = obs.filter(o => o.source === 'qr').map(o => ({ text: o.fact, weight: o.weight, source: 'qr' }));
-      if (r.ocr && r.ocr.text) reasons.push({ text: `We read the text in the screenshot on your device and checked it like a pasted message (${wordCount(r.ocr.text)} words).`, weight: 'weak', source: 'ocr' });
-      const actions = list.flatMap(a => a.actions);
+      const reasons = list.flatMap(a => a.reasons.map(x => ({ text: x.text, weight: WEIGHTS[x.weight] || 'weak', quote: a.host || '', source: 'qr', intakeMedia: true })));
+      if (r.ocr && r.ocr.text) reasons.push({ text: `We read the text in the screenshot on your device and checked it like a pasted message (${wordCount(r.ocr.text)} words). Reading can miss or change words.`, weight: 'info', quote: '', source: 'ocr', intakeMedia: true });
+      const actions = list.flatMap(a => a.actions.map(x => ({ ...x, intakeMedia: true })));
+      // This runs again when the domain age arrives: replace what we added before instead of adding it twice.
+      if (Array.isArray(c.simpleReasons)) c.simpleReasons = c.simpleReasons.filter(x => !x.intakeMedia);
+      if (Array.isArray(c.simpleActions)) c.simpleActions = c.simpleActions.filter(x => !x.intakeMedia);
       if (typeof sb.addReasons === 'function' && reasons.length) { try { sb.addReasons(c, reasons); } catch (e) { console.debug('addReasons failed', e); } }
       if (typeof sb.addActions === 'function' && actions.length) { try { sb.addActions(c, actions); } catch (e) { console.debug('addActions failed', e); } }
       c.caseExtras = { ...(c.caseExtras || {}), media_intake: { qr: list.map(a => ({ payload: a.payload, kind: a.kind, host: a.host || null, quishing: a.quishing, reasons: a.reasons.map(x => x.text) })), screenshot: r.screenshot ? { score: r.screenshot.score, reasons: r.screenshot.reasons } : null, ocr: r.ocr ? { words: wordCount(r.ocr.text), confidence: r.ocr.confidence } : null } };
@@ -531,7 +556,7 @@
   document.addEventListener('sb:case', e => {
     const c = e.detail, r = last;
     if (!c || !r || r.consumed || !(r.qr.length || (r.ocr && r.ocr.text))) return;
-    if (!mode.registered && !(c.imagePreview && c.imagePreview === r.previewSrc)) return;
+    if (r.via !== 'adapter' && !(c.imagePreview && c.imagePreview === r.previewSrc)) return;
     r.consumed = true;
     try { applyToCase(c, r); } catch (err) { console.debug('intake-media: could not add reasons', err); }
   });
@@ -544,14 +569,16 @@
   // ---------- Intake adapters (PRODUCT.md "Module contracts") ----------
   const isImage = f => !!f && (/^image\//.test(f.type || '') || /\.(png|jpe?g|webp|gif|bmp|heic|avif)$/i.test(f.name || ''));
   const ADAPTERS = [
-    { id: 'screenshot-ocr', label: 'Screenshot text (on-device OCR)',
-      detect: input => !isImage(input && input.file) ? 0 : (SCREENSHOT_NAME.test(input.file.name || '') || /png/i.test(input.file.type || '')) ? 0.7 : 0.45,
-      extract: async input => toExtraction(await process(input.file, { text: input.text }), 'ocr') },
-    { id: 'qr-code', label: 'QR code (decoded on device)',
-      detect: input => isImage(input && input.file) ? 0.5 : 0,
-      extract: async input => toExtraction(await process(input.file, { text: input.text }), 'qr') },
+    // Scores sit just above the shell's plain image adapter (0.9): every image is checked for a QR code, and text is
+    // read only when the pixels say "screenshot". The image forensics still run because the file is passed through.
+    { id: 'screenshot-ocr', label: 'Screenshot',
+      detect: input => !isImage(input && input.file) ? 0 : (SCREENSHOT_NAME.test(input.file.name || '') || /png/i.test(input.file.type || '')) ? 0.95 : 0,
+      extract: async input => toExtraction(await process(input.file, { text: input.text }), input.file) },
+    { id: 'qr-code', label: 'Photo, screenshot or QR code',
+      detect: input => isImage(input && input.file) ? 0.92 : 0,
+      extract: async input => toExtraction(await process(input.file, { text: input.text }), input.file) },
   ];
-  const mode = { registered: false, fallback: false };
+  const mode = { registered: false, form: false };
   function register() {
     const sb = SB();
     if (mode.registered || typeof sb.registerIntake !== 'function') return false;
@@ -559,25 +586,25 @@
     return true;
   }
 
-  // ---------- Fallback for a shell without registerIntake: read the dropped image and fill the form ----------
-  function startFallback() {
-    if (mode.registered || mode.fallback) return;
+  // ---------- Investigator intake form (and shells without registerIntake): read the dropped image, fill the form ----------
+  function watchForm() {
+    if (mode.form) return;
     const preview = $('#preview'), textEl = $('#text'), urlEl = $('#url'), go = $('#go');
     if (!preview || !textEl) return;
-    mode.fallback = true;
+    mode.form = true;
     let waitingGo = false;
     const onImage = async () => {
       const src = preview.getAttribute('src');
-      if (!src || !/^blob:/.test(src) || $('#drop-full')?.hidden) return;
+      // Simple mode already ran the adapters on this file before handing it to the form.
+      if (!src || !/^blob:/.test(src) || $('#drop-full')?.hidden || document.documentElement.dataset.simpleState === 'checking') return;
       let file; try { const b = await (await fetch(src)).blob(); file = new File([b], (($('#file-name')?.textContent || 'image').split(' · ')[0]), { type: b.type }); } catch { return; }
       if (!isImage(file)) return;
       const r = await process(file, { text: textEl.value });
       r.previewSrc = src;
       if (preview.getAttribute('src') !== src) return;
-      const ex = toExtraction(r);
       if (r.ocr && r.ocr.text && !textEl.value.includes(r.ocr.text.slice(0, 40))) textEl.value = textEl.value.trim() ? `${textEl.value.trim()}\n\n${r.ocr.text}` : r.ocr.text;
       r.qr.forEach(q => { const p = classifyPayload(q); if (p.kind === 'url' && urlEl && !urlEl.value.trim()) urlEl.value = p.url; else { const line = analyzeQr(q).caseText; if (!textEl.value.includes(line)) textEl.value = (textEl.value.trim() ? textEl.value.trim() + '\n' : '') + line; } });
-      if (ex.text) textEl.dispatchEvent(new Event('input', { bubbles: true }));
+      if ((r.ocr && r.ocr.text) || r.qr.length) textEl.dispatchEvent(new Event('input', { bubbles: true }));
       if (waitingGo) { waitingGo = false; go && go.click(); }
     };
     new MutationObserver(onImage).observe(preview, { attributes: true, attributeFilter: ['src'] });
@@ -592,11 +619,8 @@
     if (preview.getAttribute('src')) onImage();
   }
 
-  // The shell may add registerIntake while it starts up, so try now and again on sb:ready; fall back only after that.
-  const shellReady = () => { const s = SB().server ? SB().server() : null; return !!(s && (s.online || s.static)); };
-  if (!register()) {
-    if (shellReady()) startFallback();
-    else document.addEventListener('sb:ready', () => setTimeout(() => { if (!register()) startFallback(); }, 0), { once: true });
-  }
+  // The shell may add registerIntake while it starts up, so try now and again on sb:ready.
+  register(); watchForm();
+  document.addEventListener('sb:ready', () => setTimeout(register, 0), { once: true });
   API.adapters = ADAPTERS; API.process = process; API.mode = mode;
 })();

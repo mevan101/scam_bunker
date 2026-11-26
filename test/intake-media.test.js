@@ -82,7 +82,7 @@ ok('login QR on a newly registered domain is strong quishing', () => {
 ok('brand named in the image but QR opens another domain', () => {
   const a = az('https://bkash-reward-bd.example/login', 'bKash: verify your account to claim the reward');
   assert.strictEqual(a.quishing, 'strong');
-  assert(a.reasons.some(r => /not Bkash's real website|not bKash's real website/.test(r.text)), JSON.stringify(a.reasons));
+  assert(a.reasons.some(r => /that is not bKash's real one/.test(r.text)), JSON.stringify(a.reasons));
 });
 ok('brand QR that opens the real domain is not flagged', () => {
   const a = az('https://www.bkash.com/en/help', 'bKash help: scan to log in to the app');

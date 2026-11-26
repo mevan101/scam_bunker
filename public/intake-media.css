@@ -12,3 +12,4 @@
 .im-list code { font: var(--fs-sm) var(--mono); color: var(--ink); }
 .im-tag { display: inline-block; padding: 0 6px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--surface); font-size: var(--fs-xs); font-weight: 600; color: var(--ink-2); }
 .im-found:empty { display: none; }
+.im-status.im-simple { margin: var(--s3) 0 0; }
