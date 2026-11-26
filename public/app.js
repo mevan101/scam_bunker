@@ -400,14 +400,7 @@ How I want you to work:
       ${(c.corroboration || []).length ? `<section><h3>Web corroboration</h3>${c.corroboration.filter(r => /^https?:\/\//i.test(r.url || "")).map(r => `<div class="linkcard"><a href="${esc(r.url)}" target="_blank" rel="noopener"><b>${esc(r.title)}</b></a><ul><li>${esc(r.description || '')}</li></ul></div>`).join('')}</section>` : ''}`;
   }
 
-  function renderTimeline(c) {
-    const f = c.forensics;
-    const items = [...(f?.timeline || []), ...(c.video?.timeline || [])].map(t => ({ ...t }));
-    items.push({ when: c.at.slice(0, 19), what: 'Case opened in Scam Bunker', src: 'This investigation', trust: 'low' });
-    items.sort((a, b) => a.when.localeCompare(b.when));
-    panel('timeline').innerHTML = `${!f && c.video ? (c.video.earliest ? '' : '<div class="callout">The video has no surviving embedded timestamps, which is typical after platform re-encoding. Reverse-search its keyframes (Video lab) and use the earliest indexed copy.</div>') : !f ? '<p class="empty">Add an image to rebuild its timeline from embedded timestamps.</p>' : !f.earliest ? '<div class="callout">The file has no surviving embedded timestamps, which is typical after social-media upload. To date it, run a reverse image search and use the earliest indexed copy (TinEye: sort by Oldest).</div>' : ''}
-      <div class="tl">${items.map(t => `<div class="tl-item ${t.trust === 'low' ? 'low' : ''}"><time>${esc(t.when.replace('T', ' · '))}</time><p>${esc(t.what)}</p><small>${esc(t.src)} · trust ${esc(t.trust)}</small></div>`).join('')}</div>`;
-  }
+  const renderTimeline = c => window.ScamBunkerTimeline?.render(c); // public/timeline.js
 
   function renderNext(c) {
     const v = V(c);
@@ -464,7 +457,7 @@ How I want you to work:
     const v = V(c);
     return [`SCAM BUNKER CASE REPORT · ${new Date(c.at).toLocaleString()}`, `Verdict: ${v.verdict} (${v.category}) · risk ${v.risk}/100${v.estimative ? '' : ` · signal strength ${v.confidence}%`}`, v.estimative && `Assessment: ${v.estimative}`, c.platform && `Platform: ${c.platform}`, c.url && `URL: ${c.url}`, '', v.headline, '', 'DEDUCTION', v.deduction, '', 'EVIDENCE', ...(v.observations || []).map(o => `- [${o.weight}${o.grade ? ' · ' + o.grade : ''}] ${o.fact} → ${o.inference}`),
       v.image_dating && `\nIMAGE DATING: ${v.image_dating.earliest || 'unknown'}, ${v.image_dating.basis}`, v.ai_involvement && `AI INVOLVEMENT: ${v.ai_involvement.assessment}, ${v.ai_involvement.basis}`,
-      (v.hidden_info || []).length && '\nHIDDEN INFO\n' + v.hidden_info.map(x => '- ' + x).join('\n'), ...(c.provenance?.reportLines || []), ...(c.grading?.reportLines || []), '\nNEXT STEPS', ...(v.next_steps || []).map(x => '- ' + x), '\nADVICE', v.advice].filter(x => x !== null && x !== undefined && x !== false).join('\n');
+      (v.hidden_info || []).length && '\nHIDDEN INFO\n' + v.hidden_info.map(x => '- ' + x).join('\n'), ...(c.provenance?.reportLines || []), ...(window.ScamBunkerTimeline?.caseReportLines(c) || []), ...(c.grading?.reportLines || []), '\nNEXT STEPS', ...(v.next_steps || []).map(x => '- ' + x), '\nADVICE', v.advice].filter(x => x !== null && x !== undefined && x !== false).join('\n');
   }
   $('#btn-copy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(summaryText(current)); toast('Summary copied'); } catch { toast('Clipboard blocked'); } });
   $('#btn-export').addEventListener('click', () => {
