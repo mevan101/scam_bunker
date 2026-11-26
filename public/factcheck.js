@@ -1,7 +1,9 @@
 // Scam Bunker — "Claims" tab: existing fact-checks for the post's checkable claims (BACKLOG P1-7) and
 // similar earlier cases from public/similar.js (BACKLOG P2-1). Claim extraction and the Google Fact Check Tools
 // lookup run on the server (server/factcheck.js); without GOOGLE_FACTCHECK_API_KEY no third-party call is made and
-// each claim links to Google Fact Check Explorer instead. Results are added to the agents' case file.
+// each claim links to Google Fact Check Explorer instead. In static mode (GitHub Pages) claims are extracted in the
+// browser with the same code (public/shared/claims.js) and each claim gets the Explorer deep link.
+// Results are added to the agents' case file.
 (function () {
   'use strict';
   if (!window.ScamBunker) return;
@@ -33,15 +35,39 @@
     SB.store.set('scambunker.cases', list);
   }
 
+  const isStatic = () => !!(SB.isStatic && SB.isStatic());
+  // Plain-language reasons/actions for Simple mode (ScamBunker.addReasons/addActions land in a parallel PR).
+  const contributed = new WeakMap();
+  function contribute(c) {
+    const fc = c && c.factcheck; if (!fc || fc.status || !(fc.claims || []).length) return;
+    const key = JSON.stringify(fc.claims.map(cl => [cl.text, (cl.matches || []).length]));
+    if (contributed.get(c) === key) return; contributed.set(c, key);
+    const short = t => (t.length > 90 ? window.ScamBunkerClaims.cut(t, 87).trimEnd() + '…' : t);
+    try {
+      if (typeof SB.addActions === 'function') SB.addActions(c, fc.claims.slice(0, 2).filter(cl => cl.explorerUrl).map(cl => ({ text: `See what fact-checkers have said about “${short(cl.text)}”`, href: cl.explorerUrl })));
+      if (typeof SB.addReasons === 'function' && fc.available) {
+        const rs = fc.claims.map(cl => { const m = (cl.matches || [])[0], r = m && m.reviews[0]; return r ? { text: `Fact-checkers have already looked at a claim like “${short(cl.text)}”: ${r.publisher} rated it “${r.rating}”. Open it to make sure it is the same claim.`, weight: 'weak', source: 'factcheck' } : null; }).filter(Boolean);
+        if (rs.length) SB.addReasons(c, rs);
+      }
+    } catch { }
+  }
+  function local(c) {
+    const X = window.ScamBunkerClaims;
+    if (!X) { render(c); return; }
+    c.factcheck = { available: false, local: true, service: 'Google Fact Check Explorer (manual)', claims: X.extractClaims(String(c.text).slice(0, 12000)) };
+    c.caseExtras = { ...(c.caseExtras || {}), factchecks: forAgents(c.factcheck) };
+    observations(c); persist(c); contribute(c); render(c);
+  }
   async function lookup(c) {
-    if (!c || !c.text || !(SB.server() || {}).online) { render(c); return; }
+    if (!c || !c.text) { render(c); return; }
+    if (isStatic() || !(SB.server() || {}).online) return local(c);
     c.factcheck = { status: 'run', claims: [] }; render(c);
     const p = SB.post('/api/factcheck', { text: c.text })
       .then(r => { c.factcheck = r; })
       .catch(e => { c.factcheck = { error: e.message, claims: [] }; })
       .then(() => {
         c.caseExtras = { ...(c.caseExtras || {}), factchecks: forAgents(c.factcheck) };
-        observations(c); persist(c);
+        observations(c); persist(c); contribute(c);
         if (SB.current === c) { SB.renderAll(); render(c); }
       });
     (c.pending = c.pending || []).push(p); // app.js waits for module lookups before the agents run
@@ -62,6 +88,7 @@
     const el = SB.panel('claims'); if (!el) return;
     const count = $('#claims-count');
     if (!c) { el.innerHTML = ''; return; }
+    el.dataset.caseId = c.id || '';
     const fc = c.factcheck, sim = window.ScamBunkerSimilar && window.ScamBunkerSimilar.html ? window.ScamBunkerSimilar.html(c) : '';
     if (count) count.textContent = (c.similar || []).length ? String(c.similar.length) : '';
     let claims;
@@ -69,7 +96,9 @@
     else if (!fc) claims = '<p class="empty">Fact-check lookup needs the Scam Bunker server.</p>';
     else if (fc.status === 'run') claims = '<p class="muted" role="status">Extracting claims and searching published fact-checks…</p>';
     else if (fc.error) claims = `<div class="callout">Could not search fact-checks: ${esc(fc.error)}. Try <a style="color:var(--blue)" href="${EXPLORER_HOME}" target="_blank" rel="noopener">Google Fact Check Explorer ↗</a> by hand.</div>`;
-    else claims = `<p class="muted">${fc.available
+    else claims = `<p class="muted">${fc.local
+      ? 'Claims were extracted in this browser and nothing was sent to a third party. The automatic Google Fact Check Tools search needs the local app (<code>npm start</code>) with <code>GOOGLE_FACTCHECK_API_KEY</code>; here, open each claim in Google Fact Check Explorer.'
+      : fc.available
       ? 'Each claim below was sent to the Google Fact Check Tools API, which searches fact-checks published with ClaimReview markup. A match may be about a different claim. Open it and confirm before relying on the rating.'
       : 'Automatic lookup is off (set <code>GOOGLE_FACTCHECK_API_KEY</code> on the server to enable it). Nothing was sent to a third party. Search each claim in Google Fact Check Explorer by hand.'}</p>
       ${(fc.claims || []).length ? fc.claims.map(cl => claimHtml(cl, fc)).join('') : `<p class="empty">No checkable factual claims found. Claims are sentences with numbers, dates, names, or words such as “cures” or “confirmed”. <a style="color:var(--blue)" href="${EXPLORER_HOME}" target="_blank" rel="noopener">Google Fact Check Explorer ↗</a></p>`}`;
@@ -83,5 +112,12 @@
     if (!e.target.closest('#history-list .hist')) return;
     setTimeout(() => { const c = SB.current; if (!c) return; if (c.factcheck && !c.factcheck.status) { observations(c); SB.renderAll(); render(c); } else lookup(c); }, 0);
   });
+  // Cases opened from elsewhere (e.g. a dossier's Linked cases) do not fire sb:case, so refresh when the tab is shown.
+  const tab = $('#tab-claims');
+  if (tab) new MutationObserver(() => {
+    const c = SB.current, el = SB.panel('claims');
+    if (!c || !el || tab.getAttribute('aria-selected') !== 'true' || el.dataset.caseId === String(c.id || '')) return;
+    if (c.factcheck && !c.factcheck.status) render(c); else lookup(c);
+  }).observe(tab, { attributes: true, attributeFilter: ['aria-selected'] });
   render(SB.current);
 })();

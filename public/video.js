@@ -576,7 +576,7 @@
         ${(fr.weak || []).length ? fr.weak.map(w => `<span>${W('weak')} ${esc(w)}</span>`).join('') : `<span class="muted">No pixel-level AI hints${fr.noise != null ? ` · noise ${esc(fr.noise)}` : ''}</span>`}
         ${u ? `<div class="vid-acts"><button type="button" class="link" data-vid-dl="${i}">Download frame</button><button type="button" class="link" data-vid-dl="${i}" data-mirror>Mirrored</button><button type="button" class="link" data-vid-copy="${i}">Copy</button></div>
         <div class="vid-acts" aria-label="Reverse search this frame">${ENGINES.map(([n, href]) => `<a href="${href}" target="_blank" rel="noopener" data-vid-search="${i}" aria-label="${esc(n)}: reverse-search the frame at ${esc(fmtT(fr.t))} (copies the frame first)">${esc(n)} ↗</a>`).join('')}</div>
-        ${srv.ai && fr.vision ? `<div class="vid-acts"><button type="button" class="link" data-vid-vision="${i}">${vis ? 'Ask the vision agent again' : 'Send this frame to the vision agent'}</button></div>` : ''}` : ''}
+        ${srv.ai && !srv.static && fr.vision ? `<div class="vid-acts"><button type="button" class="link" data-vid-vision="${i}">${vis ? 'Ask the vision agent again' : 'Send this frame to the vision agent'}</button></div>` : ''}` : ''}
         ${vis ? `<div class="vid-vision" role="status">${esc(vis)}</div>` : ''}
       </figcaption></figure>`;
   }
@@ -618,6 +618,7 @@
   }
   async function vision(c, i) {
     const fr = c.video.frames[i]; c.video.vision = c.video.vision || {};
+    if (SB.isStatic && SB.isStatic()) { c.video.vision[i] = 'The vision agent needs the local app with an AI provider. Download this frame and attach it in “Investigate with Claude” instead.'; render(c); return; }
     c.video.vision[i] = 'The vision agent is examining this frame…'; render(c);
     try {
       const r = await SB.post('/api/agent', { agent: 'forensics', case: { persona: c.persona, platform: c.platform, url: c.url, text: `${c.text || ''}\n\n[Keyframe at ${fmtT(fr.t)} of a ${c.video.container} video. Examine the frame visually.]`.trim(), video: summarize(c.video), imageData: fr.vision } });

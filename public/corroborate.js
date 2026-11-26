@@ -1,7 +1,11 @@
 // Scam Bunker — Corroborate tab (docs/BACKLOG.md ii-3, ii-7, ii-8, ii-9 and P2-5).
 // Sun position (NOAA Solar Calculator algorithm) and the shadow helper run locally in the browser.
 // Certificate transparency (crt.sh), historical weather (Open-Meteo) and the ScamSniffer phishing list are fetched by
-// server/corroborate.js, only when the investigator presses the button for that lookup.
+// server/corroborate.js, only when the investigator presses the button for that lookup. In static mode (GitHub Pages, no
+// /api) the browser calls Open-Meteo and the ScamSniffer list on GitHub directly (both CORS-enabled, no key). crt.sh is
+// not: its frequent timeout / 502 responses carry no CORS header, so a browser cannot read them and the web version
+// shows a "local app" state with a manual crt.sh link instead. Parsing and validation are shared with the server through
+// public/shared/corroborate-core.js, so both paths return the same result.
 // Pure functions are exported on window.ScamBunkerCorroborate and unit-tested in test/corroborate.test.js.
 (function () {
   'use strict';
@@ -186,7 +190,7 @@
     const f = st.form || (st.form = { ...d, domain: d.domains[0] || '', claim: '', bearing: '', ratio: '', country: SB.store.get('sb-corroborate-country', 'BD'), platformSel: d.platform });
     const countries = Object.entries(ROUTES.countries).map(([k, v]) => [k, v.name]);
     p.innerHTML = `
-      <p class="callout">Each check is a <b>lead, not a verdict</b>. Nothing leaves your machine until you press a lookup button; sun position is computed locally. Examples here are invented.</p>
+      <p class="callout">Each check is a <b>lead, not a verdict</b>. Nothing leaves your machine until you press a lookup button; sun position is computed locally. Examples here are invented.${isStatic() ? ' <b>Web version:</b> there is no Scam Bunker server here, so weather, certificate and phishing-list lookups go straight from your browser to Open-Meteo and GitHub (ScamSniffer list); the crt.sh certificate summary needs the local app.' : ''}</p>
       <h3 id="cor-sun-h">Sun &amp; shadows <span class="tag">local · NOAA algorithm</span></h3>
       <div class="grid2">
         <label class="field"><span>Date (local)</span><input id="cor-date" type="date" value="${esc(f.date)}"></label>
@@ -252,6 +256,42 @@
   }
   const errBox = m => `<p class="callout" role="alert">${esc(m)}</p>`;
 
+  // ---------- Lookups: server route, or browser-direct in static mode ----------
+  const K = window.ScamBunkerCorroborateCore;
+  const isStatic = () => !!(SB.isStatic && SB.isStatic());
+  const direct = { weather: new Map(), scam: null, scamLoading: null };
+  async function getJson(url, ms, failMsg) {
+    let r, j;
+    try { r = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(ms), credentials: 'omit', referrerPolicy: 'no-referrer' }); }
+    catch { throw new Error(failMsg); } // network error, timeout, or an error page without CORS headers
+    try { j = await r.json(); } catch { j = null; }
+    return { ok: r.ok, status: r.status, j };
+  }
+  const browserLookups = {
+    async weather(body) {
+      const p = K.parseWeatherInput(body), key = K.weatherKey(p);
+      let j = direct.weather.get(key); const cached = !!j;
+      if (!j) {
+        const r = await getJson(K.weatherUrl(p), 15000, 'Open-Meteo is unavailable right now; try again later.');
+        const bad = K.weatherApiError(r.j); if (bad) throw bad;
+        if (!r.ok) throw new Error('Open-Meteo is unavailable right now; try again later.');
+        direct.weather.set(key, j = r.j);
+      }
+      return K.weatherResult(p, j, cached);
+    },
+    async scamsniffer(body) {
+      const domains = K.scamDomains(body);
+      if (!direct.scam || Date.now() - direct.scam.t > 6 * 3600e3) {
+        direct.scamLoading = direct.scamLoading || getJson(K.SCAMSNIFFER_URL, 60000, 'Could not download the ScamSniffer list right now.')
+          .then(r => { if (!r.ok) throw new Error('Could not download the ScamSniffer list right now.'); return (direct.scam = { t: Date.now(), set: K.scamSet(r.j) }); })
+          .finally(() => { direct.scamLoading = null; });
+        await direct.scamLoading;
+      }
+      return K.scamResult(domains, direct.scam);
+    },
+  };
+  const lookup = (name, body) => (isStatic() && K ? browserLookups[name](body) : SB.post('/api/corroborate/' + name, body));
+
   function runSun(c) {
     const f = readForm(c), pl = place(f, true), st = c.corroborate;
     if (pl.err) { st.sunHtml = errBox(pl.err); return render(c); }
@@ -282,7 +322,7 @@
     if (pl.err) { st.wxHtml = errBox(pl.err); return render(c); }
     st.wxHtml = '<p class="muted">Looking up Open-Meteo…</p>'; render(c);
     try {
-      const r = await SB.post('/api/corroborate/weather', { lat: pl.lat, lon: pl.lon, date: f.date, hour: f.time ? +f.time.slice(0, 2) : null, offsetMin: f.time && f.offset.trim() ? pl.off : null, claim: f.claim || null });
+      const r = await lookup('weather', { lat: pl.lat, lon: pl.lon, date: f.date, hour: f.time ? +f.time.slice(0, 2) : null, minute: f.time ? +f.time.slice(3, 5) || 0 : null, offsetMin: f.time && f.offset.trim() ? pl.off : null, claim: f.claim || null });
       const dd = r.daily, h = r.hourly, ck = r.check;
       st.wxHtml = `${ck ? `<div class="obs"><div class="ob"><div><span class="k">Claimed: ${esc(ck.claim)}</span><p>${esc(ck.why)}</p></div><div><span class="k">Strength</span><p>${esc(ck.strength)}: gridded model, not a local observation</p></div><span class="w ${ck.result === 'contradicted' ? 'moderate' : ck.result === 'consistent' ? 'ok' : 'weak'}">${esc(ck.result)}</span></div></div>` : ''}
         <div class="kv">
@@ -299,9 +339,14 @@
   async function runCrt(c) {
     const f = readForm(c), st = c.corroborate;
     if (!f.domain) { st.domHtml = errBox('Enter a domain.'); return render(c); }
+    if (isStatic()) {
+      let d; try { d = K.normalizeDomain(f.domain); } catch (e) { st.domHtml = errBox(e.message); return render(c); }
+      st.domHtml = `<div class="callout" role="status"><p><b>Certificate history needs the local app.</b> crt.sh does not allow browser requests from other sites when it is slow or failing (which is often), so the web version cannot query it reliably. Run Scam Bunker locally (<code>npm start</code>) for the automatic summary, or open crt.sh yourself and note the earliest <i>Not Before</i> date.</p><p>${ext(`https://crt.sh/?q=${encodeURIComponent(d)}`, `Search crt.sh for ${d}`)}</p></div>`;
+      return render(c);
+    }
     st.domHtml = '<p class="muted">Querying crt.sh (can take up to 20 s)…</p>'; render(c);
     try {
-      const r = await SB.post('/api/corroborate/crtsh', { domain: f.domain });
+      const r = await lookup('crtsh', { domain: f.domain });
       const days = r.firstSeen ? Math.floor((Date.now() - Date.parse(r.firstSeen)) / 864e5) : null;
       st.domHtml = `<div class="linkcard"><div class="top"><code>${esc(r.domain)}</code><span class="w ${days != null && days < 90 ? 'moderate' : 'weak'}">${r.firstSeen ? `first certificate ${esc(r.firstSeen.slice(0, 10))}` : 'no certificates logged'}</span></div>
         ${r.firstSeen ? `<div class="kv"><div>First seen</div><div>${esc(r.firstSeen)} (${days} days ago)</div><div>Latest</div><div>${esc(r.lastSeen)}</div><div>Certificates</div><div>${r.count}</div>
@@ -316,9 +361,9 @@
     const f = readForm(c), st = c.corroborate;
     const doms = [...new Set([f.domain, ...caseDefaults(c).domains].filter(Boolean))];
     if (!doms.length) { st.domHtml = errBox('Enter a domain.'); return render(c); }
-    st.domHtml = '<p class="muted">Loading the ScamSniffer list (first lookup downloads ~9 MB to the server, then it is cached)…</p>'; render(c);
+    st.domHtml = `<p class="muted" role="status">${isStatic() ? 'Loading the ScamSniffer list (first lookup downloads ~9 MB into this tab from GitHub, then it is kept in memory)…' : 'Loading the ScamSniffer list (first lookup downloads ~9 MB to the server, then it is cached)…'}</p>`; render(c);
     try {
-      const r = await SB.post('/api/corroborate/scamsniffer', { domains: doms });
+      const r = await lookup('scamsniffer', { domains: doms });
       st.domHtml = `<div class="obs">${r.results.map(x => `<div class="ob"><div><span class="k">Domain</span><p><code>${esc(x.domain)}</code>${x.listed && x.matched !== x.domain ? ` (via <code>${esc(x.matched)}</code>)` : ''}</p></div><div><span class="k">ScamSniffer</span><p>${x.listed ? 'On the phishing list' : 'Not on the list'}</p></div><span class="w ${x.listed ? 'strong' : 'weak'}">${x.listed ? 'listed' : 'not listed'}</span></div>`).join('')}</div>
         <p class="muted">${esc(r.note)} ${r.listSize.toLocaleString()} domains, fetched ${esc(r.fetchedAt.slice(0, 16).replace('T', ' '))} UTC. Data: ${ext(r.source.url, r.source.name)} (${esc(r.source.license)}), downloaded at runtime and not redistributed.</p>`;
     } catch (e) { st.domHtml = errBox(e.message); }
@@ -326,6 +371,25 @@
   }
 
   document.addEventListener('sb:case', e => render(e.detail));
+  // Simple mode (parallel shell PR; call defensively): the tool tab is Investigator-only, but anyone with a link in their
+  // case gets a plain "report this website" step.
+  const corTab = document.querySelector('#tab-corroborate');
+  function applyUiMode() {
+    if (!corTab) return;
+    const simple = typeof SB.mode === 'function' && SB.mode() === 'simple';
+    corTab.hidden = simple;
+    if (simple && corTab.getAttribute('aria-selected') === 'true') SB.showTab('deduction');
+  }
+  document.addEventListener('sb:mode', applyUiMode);
+  document.addEventListener('sb:ready', applyUiMode);
+  applyUiMode();
+  const contributed = new WeakSet();
+  document.addEventListener('sb:case', e => {
+    const c = e.detail; if (!c || contributed.has(c) || typeof SB.addActions !== 'function' || !caseDefaults(c).domains.length) return;
+    contributed.add(c);
+    try { SB.addActions(c, [{ text: 'If the link looks fake, report it to Google so browsers warn other people.', href: 'https://safebrowsing.google.com/safebrowsing/report_phish/' }]); } catch { }
+  });
+
   document.addEventListener('click', e => {
     if (e.target.closest('#history-list .hist')) { setTimeout(() => render(SB.current), 0); return; }
     const c = SB.current, btn = e.target.closest('[data-panel="corroborate"] button[id^="cor-"]'); if (!c || !btn) return;

@@ -1,0 +1,423 @@
+{
+ "crt": {
+  "domain": "example.com",
+  "count": 4,
+  "firstSeen": "2016-07-14T00:00:00Z",
+  "firstCertId": 24558997,
+  "firstIssuer": "C=US, O=Symantec Corporation, OU=Symantec Trust Network, CN=Symantec Class 3 Secure Server CA - G4",
+  "lastSeen": "2026-09-26T22:49:11Z",
+  "issuers": [
+   {
+    "name": "SSL Corporation",
+    "n": 2
+   },
+   {
+    "name": "Symantec Corporation",
+    "n": 1
+   },
+   {
+    "name": "thawte SSL CA - G2",
+    "n": 1
+   }
+  ],
+  "names": [
+   "*.example.com",
+   "dev.example.com",
+   "example.com",
+   "products.example.com",
+   "support.example.com",
+   "www.example.com"
+  ],
+  "namesTotal": 6,
+  "source": {
+   "name": "crt.sh (Sectigo)",
+   "url": "https://crt.sh/?q=example.com"
+  },
+  "strength": "moderate",
+  "note": "First certificate logged is an upper bound on when the site went live with HTTPS. A domain whose first certificate is days old but claims years of history is a strong mismatch; old certificates do not prove the current owner is the same."
+ },
+ "crtEmpty": {
+  "domain": "example.net",
+  "count": 0,
+  "firstSeen": null,
+  "lastSeen": null,
+  "issuers": [],
+  "names": [],
+  "source": {
+   "name": "crt.sh (Sectigo)",
+   "url": "https://crt.sh/?q=example.net"
+  },
+  "strength": "moderate",
+  "note": "No certificates logged for this exact name. Many legitimate sites sit behind shared certificates, so absence alone is weak."
+ },
+ "weather": [
+  {
+   "lat": 23.81,
+   "lon": 90.41,
+   "date": "2024-07-15",
+   "hour": 9,
+   "offsetMin": null,
+   "claim": "snow",
+   "timezone": "GMT",
+   "utcOffsetSeconds": 0,
+   "elevation": 9,
+   "gridLat": 23.796133,
+   "gridLon": 90.38055,
+   "daily": {
+    "date": "2024-07-15",
+    "code": 53,
+    "text": "Moderate drizzle",
+    "tmax": 33.3,
+    "tmin": 27.2,
+    "precip": 1.9,
+    "snow": 0,
+    "cloud": 100,
+    "sunrise": "2024-07-14T23:20",
+    "sunset": "2024-07-15T12:48",
+    "snowDepth": 0
+   },
+   "hourly": {
+    "time": "2024-07-15T09:00",
+    "code": 3,
+    "text": "Overcast",
+    "temp": 32.8,
+    "cloud": 100,
+    "precip": 0,
+    "snow": 0,
+    "snowDepth": 0
+   },
+   "missing": false,
+   "cached": false,
+   "check": {
+    "claim": "snow",
+    "result": "contradicted",
+    "strength": "moderate",
+    "why": "No snowfall or snow cover in the model, and 32.8 °C."
+   },
+   "attribution": {
+    "text": "Weather data by Open-Meteo.com",
+    "url": "https://open-meteo.com/",
+    "license": "CC BY 4.0"
+   },
+   "note": "ERA5-based reanalysis on a ~9-25 km grid. Agreement is supporting evidence only; treat a contradiction as a reason to dig, not a verdict."
+  },
+  {
+   "lat": 23.81,
+   "lon": 90.41,
+   "date": "2024-07-15",
+   "hour": null,
+   "offsetMin": null,
+   "claim": null,
+   "timezone": "GMT",
+   "utcOffsetSeconds": 0,
+   "elevation": 9,
+   "gridLat": 23.796133,
+   "gridLon": 90.38055,
+   "daily": {
+    "date": "2024-07-15",
+    "code": 53,
+    "text": "Moderate drizzle",
+    "tmax": 33.3,
+    "tmin": 27.2,
+    "precip": 1.9,
+    "snow": 0,
+    "cloud": 100,
+    "sunrise": "2024-07-14T23:20",
+    "sunset": "2024-07-15T12:48",
+    "snowDepth": 0
+   },
+   "hourly": null,
+   "missing": false,
+   "cached": false,
+   "check": null,
+   "attribution": {
+    "text": "Weather data by Open-Meteo.com",
+    "url": "https://open-meteo.com/",
+    "license": "CC BY 4.0"
+   },
+   "note": "ERA5-based reanalysis on a ~9-25 km grid. Agreement is supporting evidence only; treat a contradiction as a reason to dig, not a verdict."
+  },
+  {
+   "lat": 23.81,
+   "lon": 90.41,
+   "date": "2024-07-15",
+   "hour": 15,
+   "offsetMin": 360,
+   "claim": "rain",
+   "timezone": "GMT",
+   "utcOffsetSeconds": 0,
+   "elevation": 9,
+   "gridLat": 23.796133,
+   "gridLon": 90.38055,
+   "daily": {
+    "date": "2024-07-15",
+    "code": 53,
+    "text": "Moderate drizzle",
+    "tmax": 33.3,
+    "tmin": 27.2,
+    "precip": 1.9,
+    "snow": 0,
+    "cloud": 100,
+    "sunrise": "2024-07-14T23:20",
+    "sunset": "2024-07-15T12:48",
+    "snowDepth": 0
+   },
+   "hourly": {
+    "time": "2024-07-15T09:00",
+    "code": 3,
+    "text": "Overcast",
+    "temp": 32.8,
+    "cloud": 100,
+    "precip": 0,
+    "snow": 0,
+    "snowDepth": 0
+   },
+   "missing": false,
+   "cached": false,
+   "check": {
+    "claim": "rain",
+    "result": "unclear",
+    "strength": "weak",
+    "why": "Model shows no precipitation, but showers can be local."
+   },
+   "attribution": {
+    "text": "Weather data by Open-Meteo.com",
+    "url": "https://open-meteo.com/",
+    "license": "CC BY 4.0"
+   },
+   "note": "ERA5-based reanalysis on a ~9-25 km grid. Agreement is supporting evidence only; treat a contradiction as a reason to dig, not a verdict."
+  },
+  {
+   "lat": 23.81,
+   "lon": 90.41,
+   "date": "2024-07-15",
+   "hour": 3,
+   "offsetMin": null,
+   "claim": "clear",
+   "timezone": "GMT",
+   "utcOffsetSeconds": 0,
+   "elevation": 9,
+   "gridLat": 23.796133,
+   "gridLon": 90.38055,
+   "daily": {
+    "date": "2024-07-15",
+    "code": 53,
+    "text": "Moderate drizzle",
+    "tmax": 33.3,
+    "tmin": 27.2,
+    "precip": 1.9,
+    "snow": 0,
+    "cloud": 100,
+    "sunrise": "2024-07-14T23:20",
+    "sunset": "2024-07-15T12:48",
+    "snowDepth": 0
+   },
+   "hourly": {
+    "time": "2024-07-15T03:00",
+    "code": 51,
+    "text": "Light drizzle",
+    "temp": 30.7,
+    "cloud": 100,
+    "precip": 0.1,
+    "snow": 0,
+    "snowDepth": 0
+   },
+   "missing": false,
+   "cached": false,
+   "check": {
+    "claim": "clear",
+    "result": "contradicted",
+    "strength": "moderate",
+    "why": "Model shows light drizzle with 100% cloud and 0.1 mm precipitation."
+   },
+   "attribution": {
+    "text": "Weather data by Open-Meteo.com",
+    "url": "https://open-meteo.com/",
+    "license": "CC BY 4.0"
+   },
+   "note": "ERA5-based reanalysis on a ~9-25 km grid. Agreement is supporting evidence only; treat a contradiction as a reason to dig, not a verdict."
+  }
+ ],
+ "claims": [
+  {
+   "claim": "cloudy",
+   "result": "consistent",
+   "strength": "weak",
+   "why": "Model shows overcast (100% cloud)."
+  },
+  {
+   "claim": "fog",
+   "result": "unclear",
+   "strength": "weak",
+   "why": "Reanalysis rarely resolves fog; absence is not evidence."
+  },
+  {
+   "claim": "thunderstorm",
+   "result": "unclear",
+   "strength": "weak",
+   "why": "No storm in the model; convective storms are local."
+  },
+  {
+   "claim": "clear",
+   "result": "unclear",
+   "strength": "weak",
+   "why": "Model shows overcast; local breaks in cloud are possible."
+  },
+  {
+   "claim": "rain",
+   "result": "unclear",
+   "strength": "weak",
+   "why": "Model shows no precipitation, but showers can be local."
+  },
+  {
+   "claim": "snow",
+   "result": "contradicted",
+   "strength": "moderate",
+   "why": "No snowfall or snow cover in the model, and 32.8 °C."
+  }
+ ],
+ "scamsniffer": {
+  "results": [
+   {
+    "domain": "login.phish-wallet-claim.invalid",
+    "listed": true,
+    "matched": "phish-wallet-claim.invalid"
+   },
+   {
+    "domain": "www.fake-airdrop.invalid",
+    "listed": true,
+    "matched": "www.fake-airdrop.invalid"
+   },
+   {
+    "domain": "fake-airdrop.invalid",
+    "listed": false,
+    "matched": null
+   },
+   {
+    "domain": "example.com",
+    "listed": false,
+    "matched": null
+   }
+  ],
+  "listSize": 3,
+  "strength": "strong",
+  "source": {
+   "name": "ScamSniffer scam-database",
+   "url": "https://github.com/scamsniffer/scam-database",
+   "license": "GPL-3.0"
+  },
+  "note": "Community-maintained crypto-phishing list (C2). A hit is a strong lead; no hit means only that this list has not seen it."
+ },
+ "normalize": [
+  [
+   "example-shop.invalid",
+   "www.example-shop.invalid"
+  ],
+  [
+   "example.com",
+   "example.com"
+  ],
+  [
+   "sub.example.org",
+   "sub.example.org"
+  ],
+  [
+   "keep.example",
+   "www.keep.example"
+  ]
+ ],
+ "factcheck": [
+  {
+   "available": false,
+   "service": "Google Fact Check Explorer (manual)",
+   "claims": [
+    {
+     "text": "a simple lemon and baking soda drink cures cancer in 7 days",
+     "query": "simple lemon baking soda drink cures cancer 7 days",
+     "why": [
+      "number",
+      "\"cures\""
+     ],
+     "explorerUrl": "https://toolbox.google.com/factcheck/explorer/search/simple%20lemon%20baking%20soda%20drink%20cures%20cancer%207%20days"
+    },
+    {
+     "text": "Scientists confirm it is 100% TRUE but the mainstream media won't report it because big pharma pays them",
+     "query": "scientists confirm mainstream media wont report because big pharma pays",
+     "why": [
+      "number",
+      "\"scientists\""
+     ],
+     "explorerUrl": "https://toolbox.google.com/factcheck/explorer/search/scientists%20confirm%20mainstream%20media%20wont%20report%20because%20big%20pharma%20pays"
+    }
+   ]
+  },
+  {
+   "available": false,
+   "service": "Google Fact Check Explorer (manual)",
+   "claims": [
+    {
+     "text": "The Ministry of Health confirmed on 3 March 2026 that tap water in Northvale contains 40% more fluoride than allowed",
+     "query": "ministry health confirmed 3 march 2026 tap water northvale contains",
+     "why": [
+      "date",
+      "\"ministry\"",
+      "named entity"
+     ],
+     "explorerUrl": "https://toolbox.google.com/factcheck/explorer/search/ministry%20health%20confirmed%203%20march%202026%20tap%20water%20northvale%20contains"
+    },
+    {
+     "text": "A study found 9 in 10 dentists in Eastbrook agree",
+     "query": "study found 9 10 dentists eastbrook agree",
+     "why": [
+      "number",
+      "\"study\"",
+      "named entity"
+     ],
+     "explorerUrl": "https://toolbox.google.com/factcheck/explorer/search/study%20found%209%2010%20dentists%20eastbrook%20agree"
+    },
+    {
+     "text": "Researchers found the reservoir was closed in 2019",
+     "query": "researchers found reservoir closed 2019",
+     "why": [
+      "date",
+      "\"researchers found\""
+     ],
+     "explorerUrl": "https://toolbox.google.com/factcheck/explorer/search/researchers%20found%20reservoir%20closed%202019"
+    }
+   ]
+  },
+  {
+   "available": false,
+   "service": "Google Fact Check Explorer (manual)",
+   "claims": [
+    {
+     "text": "Vaccines do not cause autism, a 2019 study of 650,000 children in Denmark found",
+     "query": "vaccines cause autism 2019 study 650 000 children denmark found",
+     "why": [
+      "date",
+      "\"vaccines\"",
+      "named entity"
+     ],
+     "explorerUrl": "https://toolbox.google.com/factcheck/explorer/search/vaccines%20cause%20autism%202019%20study%20650%20000%20children%20denmark%20found"
+    },
+    {
+     "text": "It is a hoax that: the Northvale dam collapsed in 2024 killing 300 people",
+     "query": "hoax northvale dam collapsed 2024 killing 300",
+     "why": [
+      "date",
+      "named entity"
+     ],
+     "explorerUrl": "https://toolbox.google.com/factcheck/explorer/search/hoax%20northvale%20dam%20collapsed%202024%20killing%20300"
+    },
+    {
+     "text": "Officials confirmed the dam is safe",
+     "query": "officials confirmed dam safe",
+     "why": [
+      "\"officials\""
+     ],
+     "explorerUrl": "https://toolbox.google.com/factcheck/explorer/search/officials%20confirmed%20dam%20safe"
+    }
+   ]
+  }
+ ]
+}

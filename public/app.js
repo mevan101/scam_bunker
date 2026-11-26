@@ -421,7 +421,7 @@ How I want you to work:
     try {
       const body = { hasImage: !!c.forensics, case: { persona: c.persona, platform: c.platform, url: c.url, text: c.text, heuristics: compactHeuristics(c.heuristics), forensics: c.forensics ? DeduceForensics.summarize(c.forensics) : null, page: c.page?.markdown || null, corroboration: c.corroboration, video: c.video ? VID().summarize(c.video) : null, ...c.caseExtras } };
       // Same prompt either way: the server and the browser share public/shared/prompt.js.
-      ({ prompt } = server.static ? { prompt: window.ScamBunkerPrompt.buildHandoffPrompt(body) } : await post('/api/prompt', body));
+      ({ prompt } = server.static ? { prompt: window.ScamBunkerPrompt.buildHandoffPrompt(body, window.ScamBunkerClaims?.caseFileSections) } : await post('/api/prompt', body));
     } catch (e) { toast('Could not build the prompt: ' + e.message); return; }
     let copied = false; try { await navigator.clipboard.writeText(prompt); copied = true; } catch { }
     const short = prompt.length < 7000;
