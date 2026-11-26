@@ -315,7 +315,7 @@ How I want you to work:
       <blockquote class="deduction">${esc(v.deduction || '')}</blockquote>
       ${boxes.length ? `<section><div class="grid2">${boxes.join('')}</div></section>` : ''}
       ${offenderHtml(c)}
-      <section><h3>Evidence chain</h3><div class="obs">${obs}</div></section>
+      <section><h3>Evidence chain</h3><div class="obs"><div class="ob ob-head" aria-hidden="true"><span>Observation</span><span>Inference</span><span>Weight</span></div>${obs}</div></section>
       ${(v.disagreements || []).length ? `<section><h3>Where the agents disagreed</h3><ul class="list">${v.disagreements.map(d => `<li>${esc(d)}</li>`).join('')}</ul></section>` : ''}
       ${(v.hidden_info || []).length ? `<section><h3>Hidden in the file</h3><ul class="list red">${v.hidden_info.map(d => `<li>${esc(d)}</li>`).join('')}</ul></section>` : ''}
       <section><div class="advice"><b>What to do now:</b> ${esc(v.advice || '')}</div></section>`;
@@ -330,7 +330,7 @@ How I want you to work:
       const a = c.agents[id], m = AGENT_META[id];
       const st = { run: 'Investigating', done: 'Reported', err: 'Failed', wait: 'Awaiting reports' }[a.status] || a.status;
       const body = a.status === 'run' || a.status === 'wait' ? '<div class="shimmer" style="width:92%"></div><div class="shimmer" style="width:76%"></div><div class="shimmer" style="width:84%"></div>' : esc(a.report || '');
-      return `<article class="agent ${id === 'lead' ? 'lead' : ''}"><header><div class="av" style="color:${m.color};background:${m.bg}">${m.glyph}</div><div><h4>${m.name}</h4><div class="role">${m.role}</div></div><span class="st ${a.status === 'wait' ? 'off' : a.status}"><i></i>${st}</span></header><div class="body">${body}</div></article>`;
+      return `<article class="agent ${id === 'lead' ? 'lead' : ''}"><header><div class="av" style="color:${m.color};background:${m.bg}">${m.glyph}</div><div><h3>${m.name}</h3><div class="role">${m.role}</div></div><span class="st ${a.status === 'wait' ? 'off' : a.status}"><i></i>${st}</span></header><div class="body" tabindex="0" role="region" aria-label="${m.name} report">${body}</div></article>`;
     }).join('')}</div>`;
   }
 

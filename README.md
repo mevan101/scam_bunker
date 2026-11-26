@@ -4,7 +4,14 @@
 
 Drop in an image, a post, a DM or a link. Scam Bunker dates the image, checks whether AI generated it, pulls out the information hidden in the file, takes the links apart, and classifies the scheme. With an API key it also hands the evidence to a team of AI specialists. A lead investigator, modelled on Sherlock Holmes's method, cross-examines their reports and delivers the verdict.
 
-![Scam Bunker agents room](docs/screenshot.png)
+![Scam Bunker case report: a crypto "mentor" scam on the Deduction tab, with verdict, segmented risk scale and graded evidence chain](docs/screenshot.png)
+
+<p>
+  <img src="docs/screenshot-dark.png" alt="The same case report in the dark theme" width="68%">
+  <img src="docs/screenshot-mobile.png" alt="A phishing SMS case report on a phone" width="28%">
+</p>
+
+The interface follows a small design system documented in [docs/DESIGN.md](docs/DESIGN.md).
 
 ## What it does
 
