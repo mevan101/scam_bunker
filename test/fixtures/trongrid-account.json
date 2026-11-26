@@ -1,0 +1,17 @@
+{
+  "data": [
+    {
+      "address": "41a9a1b6d2c4e8f00112233445566778899aabbccd",
+      "balance": 12500000,
+      "create_time": 1729000000000,
+      "latest_opration_time": 1732500000000,
+      "free_net_usage": 120,
+      "trc20": [
+        { "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t": "48210500000" },
+        { "TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8": "0" }
+      ]
+    }
+  ],
+  "success": true,
+  "meta": { "at": 1732600000000, "page_size": 1 }
+}

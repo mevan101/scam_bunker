@@ -432,14 +432,16 @@ How I want you to work:
     const repeat = Object.values(idx).filter(i => i.n > 1).sort((a, b) => b.n - a.n);
     $('#offender-index').innerHTML = repeat.length ? `<h4>Repeat offenders across your cases</h4><ul class="list red">${repeat.slice(0, 12).map(i => `<li><b>${esc(i.label)}</b> · ${esc(i.type)} · in ${i.n} cases</li>`).join('')}</ul>` : '';
     $('#history-list').innerHTML = list.length ? list.map(x => `<div class="hist" data-id="${x.id}"><span class="d" style="background:${VERDICT_COLOR[x.verdict] || 'var(--muted)'}"></span><div class="t"><b>${esc(x.verdict)} · ${x.risk}</b><span>${esc(x.text || x.url || 'Image case')}</span></div><small class="muted">${new Date(x.at).toLocaleDateString()}</small></div>`).join('') : '<p class="empty">No saved cases yet.</p>';
-    $$('#history-list .hist').forEach(el => el.addEventListener('click', () => {
-      const x = list.find(i => i.id === el.dataset.id); if (!x) return;
-      current = { ...x, imagePreview: null, forensics: x.forensics ? { ...x.forensics, reverse: [], timeline: x.forensics.timeline || [], ai: x.forensics.ai, elaUrl: '' } : null };
-      $('#text').value = x.text; $('#url').value = x.url || '';
-      $('#placeholder').hidden = true; $('#report').hidden = false; renderAll(current); showTab('deduction'); $('#dlg-history').close();
-    }));
+    $$('#history-list .hist').forEach(el => el.addEventListener('click', () => { if (openCase(el.dataset.id)) $('#dlg-history').close(); }));
     $('#dlg-history').showModal();
   });
+  function openCase(id) {
+    const x = store.get('scambunker.cases', []).find(i => i.id === id); if (!x) return false;
+    current = { ...x, imagePreview: null, forensics: x.forensics ? { ...x.forensics, reverse: [], timeline: x.forensics.timeline || [], ai: x.forensics.ai, elaUrl: '' } : null };
+    $('#text').value = x.text; $('#url').value = x.url || '';
+    $('#placeholder').hidden = true; $('#report').hidden = false; renderAll(current); showTab('deduction');
+    return true;
+  }
   $('#history-clear').addEventListener('click', () => { store.set('scambunker.cases', []); $('#history-list').innerHTML = '<p class="empty">No saved cases yet.</p>'; });
 
   // ---------- Persona ----------
@@ -463,7 +465,7 @@ How I want you to work:
   function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); }
 
   // Public API for feature modules (public/*.js) — see CONTRIBUTING.md
-  window.ScamBunker = { get current() { return current; }, esc, post, toast, panel, showTab, store, renderAll: () => current && renderAll(current), server: () => server };
+  window.ScamBunker = { get current() { return current; }, esc, post, toast, panel, showTab, store, renderAll: () => current && renderAll(current), openCase, server: () => server };
 
   init();
 })();
