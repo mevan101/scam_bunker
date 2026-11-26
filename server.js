@@ -202,7 +202,7 @@ function lanHost(host) {
   const m = /^(\[[0-9a-f:.]+\]|[^:\[\]]+)(?::(\d+))?$/.exec(host);
   if (!m || (m[2] || '80') !== String(PORT)) return false;
   const name = m[1].replace(/^\[|\]$/g, '');
-  return net.isIP(name) !== 0 || name === 'localhost' || /^[a-z0-9-]+\.local$/.test(name);
+  return net.isIP(name) !== 0 || name === 'localhost' || /^([a-z0-9-]+\.)+local\.?$/.test(name);
 }
 const OWN_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', HOST.includes(':') ? `[${HOST}]` : HOST].flatMap(h => [`${h}:${PORT}`, ...(+PORT === 80 ? [h] : [])]));
 function apiGate(req, u) {

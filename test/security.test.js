@@ -68,7 +68,7 @@ test('local API: HOST=0.0.0.0 accepts IP and .local Hosts but no other names, st
   try {
     assert.equal((await req(lan.port, { headers: { Host: `192.0.2.10:${lan.port}` } })).status, 200);
     assert.equal((await req(lan.port, { headers: { Host: `192.0.2.10:${lan.port}`, Origin: 'http://evil.test' } })).status, 403);
-    for (const h of [`[2001:db8::5]:${lan.port}`, `studio-pc.local:${lan.port}`]) assert.equal((await req(lan.port, { headers: { Host: h } })).status, 200, h);
+    for (const h of [`[2001:db8::5]:${lan.port}`, `studio-pc.local:${lan.port}`, `studio-pc.home.local.:${lan.port}`]) assert.equal((await req(lan.port, { headers: { Host: h } })).status, 200, h);
     for (const h of [`rebind.test:${lan.port}`, `192.0.2.10:9999`]) assert.equal((await req(lan.port, { headers: { Host: h } })).status, 403, h); // rebinding arrives under a DNS name
     assert.equal((await req(lan.port, { method: 'POST', path: '/api/prompt', headers: { Host: `192.0.2.10:${lan.port}`, 'Content-Type': 'text/plain' }, body: '{}' })).status, 415);
   } finally { lan.stop(); }
@@ -159,7 +159,12 @@ test('decoding: stacked Content-Encoding and raw or zlib deflate are decoded; un
     '/raw': ['deflate', zlib.deflateRawSync(text)], '/zlib': ['deflate', zlib.deflateSync(text)],
     '/unknown': ['gzip, zstd', Buffer.from(text)],
   };
-  const srv = await listen((q, s) => { const [enc, b] = bodies[q.url]; s.writeHead(200, { 'content-type': 'text/html', 'content-encoding': enc }); s.end(b); });
+  bodies['/split'] = ['deflate', zlib.deflateSync(text)];
+  const srv = await listen((q, s) => {
+    const [enc, b] = bodies[q.url];
+    if (q.url === '/split') { s.writeHead(200, { 'content-encoding': enc }); s.flushHeaders(); s.write(b.subarray(0, 1)); return setTimeout(() => s.end(b.subarray(1)), 30); } // zlib header split across chunks
+    s.writeHead(200, { 'content-type': 'text/html', 'content-encoding': enc }); s.end(b);
+  });
   const base = `http://127.0.0.1:${srv.address().port}`;
   try {
     for (const p of Object.keys(bodies)) assert.equal((await guardedRequest(base + p, { isBlocked: () => false, decompress: true })).buffer.toString(), text, p);
@@ -170,6 +175,7 @@ test('HTML scanning: quoted ">" in attributes, XHTML self-closing scripts, quote
   assert.deepEqual(scan.tagsNamed('<a href="/cal.ics?x=>1">c</a><a href=it\'s>u</a>', ['a']).map(t => scan.tagAttrs(t).href), ['/cal.ics?x=>1', "it's"]);
   const ld = ev.parseJsonLd('<script src="/app.js"/><script type="application/ld+json">{"@type":"Event","name":"Night Market","startDate":"2025-11-02T18:00:00+06:00"}</script>');
   assert.equal(ld.length, 1);
+  assert.equal(ev.parseJsonLd('<script type="application/ld+json" data-src=/e/>{"@type":"Event","name":"Night Market"}</script>').length, 1, 'unquoted value ending in / is not self-closing');
   const srv = await listen((q, s) => {
     s.writeHead(200, { 'content-type': 'text/html' });
     s.end(q.url === '/' ? '<meta http-equiv="refresh" content="0; url=/it&#39;s-on?a=1&amp;b=2">' : '<h1>moved</h1>');
