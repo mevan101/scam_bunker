@@ -122,6 +122,7 @@ const test = base.extend({
     });
     await page.addInitScript(() => {
       window.__sbComplete = 0;
+      try { localStorage.setItem('scambunker.tour', 'done'); } catch (e) { } // the first-visit tour is tested separately
       document.addEventListener('sb:case-complete', () => { window.__sbComplete++; });
     });
     await use(page);
