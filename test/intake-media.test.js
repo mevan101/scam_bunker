@@ -111,6 +111,7 @@ ok('other payload kinds', () => {
   assert.strictEqual(M.classifyPayload('WIFI:T:nopass;S:Free Airport WiFi;;').ssid, 'Free Airport WiFi');
   assert.strictEqual(M.classifyPayload('bitcoin:bc1qinventedaddressxxxxxxxxxxxxxxxxxxxx?amount=0.1').kind, 'crypto');
   assert.strictEqual(M.classifyPayload('SMSTO:+15550100:STOP').body, 'STOP');
+  assert.strictEqual(M.classifyPayload('SMSTO:+15550100:Save 20% today').body, 'Save 20% today');
   assert.strictEqual(M.classifyPayload('otpauth://totp/Invented?secret=ABC').kind, 'otp');
   assert.strictEqual(M.classifyPayload('Hello there').kind, 'text');
   assert(/Wi-Fi network called "Free Airport WiFi", which has no password/.test(az('WIFI:T:nopass;S:Free Airport WiFi;;').reasons[0].text));

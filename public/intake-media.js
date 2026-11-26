@@ -147,7 +147,7 @@
     if (/^(bc1[0-9a-z]{20,80}|[13][1-9A-HJ-NP-Za-km-z]{25,34}|0x[0-9a-fA-F]{40}|T[1-9A-HJ-NP-Za-km-z]{33})$/.test(s)) return { kind: 'crypto', chain: '', address: s };
     if ((m = /^WIFI:(.*)$/i.exec(s))) { const g = k => (new RegExp('(?:^|;)' + k + ':((?:\\\\.|[^;])*)').exec(m[1]) || [])[1] || ''; return { kind: 'wifi', ssid: g('S').replace(/\\(.)/g, '$1'), security: g('T') || 'nopass' }; }
     if ((m = /^tel:(.+)$/i.exec(s))) return { kind: 'tel', number: m[1] };
-    if ((m = /^(?:sms|smsto):([^:?]+)(?:[:?](?:body=)?(.*))?$/i.exec(s))) return { kind: 'sms', number: m[1], body: decodeURIComponent((m[2] || '').replace(/\+/g, ' ')) };
+    if ((m = /^(?:sms|smsto):([^:?]+)(?:[:?](?:body=)?(.*))?$/i.exec(s))) return { kind: 'sms', number: m[1], body: safeDecode((m[2] || '').replace(/\+/g, ' ')) };
     if ((m = /^mailto:([^?]+)/i.exec(s))) return { kind: 'email', address: m[1] };
     if (/^otpauth:\/\//i.test(s)) return { kind: 'otp' };
     if (/^(whatsapp|tg|viber|intent|market|itms-apps?):/i.test(s)) return { kind: 'app', scheme: s.split(':')[0].toLowerCase() };
@@ -239,6 +239,7 @@
     if (/shortener/i.test(f)) return 'a link shortener that hides where it really goes';
     return f ? lower(f) : 'an address built to look like another website';
   }
+  function safeDecode(s) { try { return decodeURIComponent(s); } catch { return s; } }
   function lower(s) { s = String(s).replace(/\s+—\s+/g, ', '); return s.charAt(0).toLowerCase() + s.slice(1); }
   function titleCase(s) { return s.replace(/\b\w/g, c => c.toUpperCase()).replace(/^Bkash$/, 'bKash'); }
 
