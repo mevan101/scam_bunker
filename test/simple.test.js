@@ -37,8 +37,8 @@ for (const [name, input, expect] of CASES) {
 { const c = { heuristics: { hits: [{ id: 'urgency', category: 'Pressure', weight: 16, label: 'x', match: 'act now', plain: 'Custom plain sentence.' }], links: [], entities: {}, coordination: [] } };
   assert.strictEqual(S.plainReasons(c)[0].text, 'Custom plain sentence.'); console.log('✓ hit.plain overrides the built-in sentence'); }
 
-// Every rule has a plain sentence (via its id, its base id, or its category).
-for (const r of H.RULES) assert(S.plainFor({ id: r.id, category: r.category, label: r.label }) !== `${r.label}.`, `rule ${r.id} has a plain sentence`);
+// Every rule has a plain sentence (its own `plain` field from scam.js, else via its id, its base id, or its category).
+for (const r of H.RULES) assert(S.plainFor({ id: r.id, category: r.category, label: r.label, plain: r.plain }) !== `${r.label}.`, `rule ${r.id} has a plain sentence`);
 console.log(`✓ all ${H.RULES.length} rules have plain sentences`);
 
 // Risk words and hidden-data copy.
