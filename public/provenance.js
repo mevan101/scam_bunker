@@ -355,7 +355,6 @@
   const isStatic = () => !!(SB.isStatic && SB.isStatic());
   const isSimple = () => typeof SB.mode === 'function' && SB.mode() === 'simple';
   const addReasons = (c, r) => { if (typeof SB.addReasons === 'function' && r.length) SB.addReasons(c, r); };
-  const addActions = (c, a) => { if (typeof SB.addActions === 'function' && a.length) SB.addActions(c, a); };
   const localAppHtml = (what, detail) => direct ? direct.localAppHtml(esc, what, detail) : `<p class="muted">${esc(what)}: available in the local app.</p>`;
   const waybackLookup = url => isStatic() ? (direct ? direct.wayback(url) : Promise.resolve({ ok: false, url, error: 'Needs the local app' })) : postJson('/api/provenance/wayback', { url }).catch(e => ({ ok: false, url, error: e.message }));
   const wayback = url => { if (!url) return Promise.resolve(null); if (!waybackCache.has(url)) waybackCache.set(url, waybackLookup(url)); return waybackCache.get(url); };
@@ -631,15 +630,7 @@
   }
 
   // ---------- Events ----------
-  // Simple mode: teach how to check a picture by hand, and say it plainly when the trace found an old photo.
-  function simpleActions(c) {
-    if (!c || !c.forensics || c._provActions) return;
-    c._provActions = true;
-    addActions(c, [
-      { text: 'Search for this picture on Google Lens (upload it, then open "Exact matches"). If the same photo was online before the event, it is being reused', href: 'https://lens.google.com/' },
-      { text: 'Search for it on TinEye and sort by "Oldest" to see when it first appeared online', href: 'https://tineye.com/' }
-    ]);
-  }
+  // Simple mode: say it plainly when the trace found an old photo (the shell already links reverse image search).
   function simpleReasons(c) {
     const v = c.provenance && c.provenance.verdict, claimed = v && v.claimed;
     const recycled = v && v.contradictions.find(x => /^Recycled/.test(x.text));
@@ -647,7 +638,7 @@
     c._provReason = v.earliest.date;
     addReasons(c, [{ text: `This picture was already online on ${fmtDate(v.earliest.date).slice(0, 10)}, before the event the post says it shows (${claimed.date}). It is probably an old photo being reused.`, weight: recycled.weight, source: v.earliest.source }]);
   }
-  document.addEventListener('sb:case', e => { simpleActions(e.detail); sync(e.detail); });
+  document.addEventListener('sb:case', e => sync(e.detail));
   document.addEventListener('sb:mode', () => sync(SB.current));
   document.addEventListener('sb:provenance', e => simpleReasons(e.detail));
   document.addEventListener('click', e => {

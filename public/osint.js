@@ -32,7 +32,6 @@
   // Simple mode (default) vs Investigator mode: ScamBunker.mode() lands with the Simple-mode shell, so call it defensively.
   const isSimple = () => typeof SB.mode === 'function' && SB.mode() === 'simple';
   const addReasons = (c, r) => { if (typeof SB.addReasons === 'function' && r.length) SB.addReasons(c, r); };
-  const addActions = (c, a) => { if (typeof SB.addActions === 'function' && a.length) SB.addActions(c, a); };
   const canLookup = () => SB.server().online || (SB.isStatic() && !!direct);
   const lookupDomain = body => SB.isStatic() ? direct.domain(body) : postJson('/api/osint/domain', body);
   const lookupWallet = body => SB.isStatic() ? direct.wallet(body) : postJson('/api/osint/wallet', body);
@@ -431,8 +430,7 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
     const results = await Promise.all(doms.map(d => lookupDomain({ domain: d }).then(r => [d, r]).catch(e => [d, { error: e.message }])));
     c.domainAges = Object.fromEntries(results.map(([d, r]) => [d, r.error ? { error: r.error } : { registeredAt: r.registeredAt || null, ageDays: r.ageDays ?? null, registrar: r.registrar || null, young: !!r.young, registered: r.registered !== false }]));
     const young = results.filter(([, r]) => r.young && r.ageDays != null);
-    addReasons(c, young.map(([d, r]) => ({ text: `The website ${d} was created only ${plural(r.ageDays, 'day')} ago (${fmtDate(r.registeredAt)}). Scam websites are usually brand new. Real banks, shops and employers have had theirs for years.`, weight: r.ageDays < 30 ? 'strong' : 'moderate', source: 'Public domain registration records (RDAP)' })));
-    addActions(c, results.filter(([, r]) => !r.error).map(([d]) => ({ text: `See when ${d} was created and who registered it`, href: `https://lookup.icann.org/en/lookup?name=${encodeURIComponent(d)}` })));
+    addReasons(c, young.map(([d, r]) => ({ text: `The website ${d} was created only ${plural(r.ageDays, 'day')} ago (${fmtDate(r.registeredAt)}). Scam websites are usually brand new. Real banks, shops and employers have had theirs for years.`, weight: r.ageDays < 30 ? 'strong' : 'moderate', quote: d, source: 'Public domain registration records (RDAP)' })));
     const obs = young.map(([d, r]) => domainObs(d, r));
     if (!obs.length) return;
     c._osintObs = obs;
@@ -446,21 +444,13 @@ ${s?.notes ? `<section><h2>Investigator notes</h2><p style="white-space:pre-wrap
     x.domainAges = c.domainAges;
     store.set('scambunker.cases', list);
   }
-  // Plain-language to-dos for a crypto wallet in the case (Simple mode result). No lookup is needed for this.
-  function walletActions(c) {
-    if (!c || c._osintWalletActions) return;
-    c._osintWalletActions = true;
-    const core = window.ScamBunkerOsintCore;
-    const wallets = (c.indicators || []).filter(i => i.type === 'wallet').map(i => i.key.slice(7)).map(a => [a, D.walletChain(a)]).filter(([, ch]) => ch && core && core.EXPLORER[ch]).slice(0, 3);
-    addActions(c, wallets.map(([a, ch]) => ({ text: `Do not send money to the crypto wallet ${a.slice(0, 6)}…${a.slice(-4)}. Crypto payments cannot be reversed. You can see its public payment history here`, href: core.EXPLORER[ch](a) })));
-  }
   function syncMode() {
     const btn = document.getElementById('btn-subjects'); if (btn) btn.hidden = isSimple();
     if (isSimple()) $$('.os-attach').forEach(x => x.remove()); else injectAttach();
   }
   document.addEventListener('sb:mode', syncMode);
   document.addEventListener('sb:ready', syncMode);
-  document.addEventListener('sb:case', e => { walletActions(e.detail); checkCaseDomains(e.detail).catch(err => console.debug('domain age check skipped:', err)); });
+  document.addEventListener('sb:case', e => { checkCaseDomains(e.detail).catch(err => console.debug('domain age check skipped:', err)); });
   document.addEventListener('sb:case-complete', e => {
     const c = e.detail; if (!c?._osintObs) return;
     c._osintObs.forEach(ob => { addObs(c.local, ob); addObs(c.final, ob); });
